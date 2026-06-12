@@ -301,14 +301,23 @@ Order Details: {{workflow_run_url}}`
 ];
 
 const DEFAULT_PERSONALIZATION_CONFIG: PersonalizationConfig = {
-  name: 'FuFire API Portal',
-  apiUrl: 'https://api.fufire.io/v1/personalization',
-  secretRef: 'SECRET_REF_FUFIRE_LIVE_KEY',
-  birthTimeFallback: {
-    birth_time: '12:00',
-    birth_time_known: false,
-    birth_time_source: 'default_noon'
-  }
+  name: 'FuFire API',
+  baseUrl: 'https://api.fufire.space',
+  apiKeySecretRef: 'SECRET_REF_FUFIRE',
+  enabled: true,
+  endpointPaths: {
+    chronometryResolve: '/v1/chronometry/resolve',
+    bazi: '/v1/calculate/bazi',
+    baziTrace: '/v1/calculate/bazi/trace',
+    wuxing: '/v1/calculate/wuxing'
+  },
+  defaultStandard: 'CIVIL',
+  defaultBoundary: 'midnight',
+  ambiguousTimePolicy: 'earlier',
+  nonexistentTimePolicy: 'error',
+  timeoutMs: 10000,
+  retryCount: 3,
+  healthStatus: 'unknown'
 };
 
 const DEFAULT_POD_CONFIG: PodProviderConfig = {

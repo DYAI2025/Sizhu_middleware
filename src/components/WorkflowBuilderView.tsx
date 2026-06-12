@@ -494,11 +494,11 @@ export default function WorkflowBuilderView() {
   // HELPER FOR ICON RENDER
   const getNodeIcon = (type: WorkflowNode['type']) => {
     switch (type) {
-      case 'personalization': return <Zap className="w-5 h-5 text-amber-500" />;
-      case 'template': return <FileText className="w-5 h-5 text-blue-500" />;
-      case 'generation': return <ImageIcon className="w-5 h-5 text-purple-500" />;
-      case 'quality_gate': return <ShieldCheck className="w-5 h-5 text-emerald-500" />;
-      case 'pod': return <Printer className="w-5 h-5 text-red-500" />;
+      case 'personalization': return <Zap className="w-5 h-5 text-ac" />;
+      case 'template': return <FileText className="w-5 h-5 text-ac" />;
+      case 'generation': return <ImageIcon className="w-5 h-5 text-ac" />;
+      case 'quality_gate': return <ShieldCheck className="w-5 h-5 text-ac" />;
+      case 'pod': return <Printer className="w-5 h-5 text-ac" />;
     }
   };
 
@@ -507,29 +507,29 @@ export default function WorkflowBuilderView() {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in text-[#141414]" id="workflow-builder-view-root">
+    <div className="space-y-6 animate-fade-in text-da" id="workflow-builder-view-root">
       
       {/* Toast Alert */}
       {notification && (
-        <div className="fixed bottom-4 right-4 bg-[#141414] border border-[#d1d1cf] text-white px-4 py-3 rounded-sm shadow-sm flex items-center gap-2.5 z-50">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+        <div className="fixed bottom-4 right-4 bg-b2 border border-nt text-da px-4 py-3 rounded-sm shadow-sm flex items-center gap-2.5 z-50">
+          <span className="w-1.5 h-1.5 rounded-full bg-ac animate-pulse"></span>
           <span className="text-[10px] font-mono uppercase tracking-wider font-bold">{notification}</span>
         </div>
       )}
 
       {/* View Title */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#d1d1cf] pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-nt pb-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-[#141414]">Visual Workflow Control Board</h1>
-          <p className="text-xs text-slate-500 mt-1">Design, construct, and drag pipeline nodes to synchronize print-on-demand variants with LLM Quality Gates</p>
+          <h1 className="text-xl font-bold tracking-tight text-da">Visual Workflow Control Board</h1>
+          <p className="text-xs text-nt mt-1">Design, construct, and drag pipeline nodes to synchronize print-on-demand variants with LLM Quality Gates</p>
         </div>
         
         <div className="flex items-center gap-2 self-start sm:self-auto">
-          <span className="text-[10px] font-mono font-bold text-slate-400 uppercase">ACTIVE CONFIG MATRIX:</span>
+          <span className="text-[10px] font-mono font-bold text-nt uppercase">ACTIVE CONFIG MATRIX:</span>
           <select
             value={selectedProductId}
             onChange={(e) => handleProductChange(e.target.value)}
-            className="border border-[#d1d1cf] bg-white rounded-sm p-1.5 text-xs text-slate-700 outline-none font-mono font-bold font-semibold"
+            className="border border-nt bg-b1 rounded-sm p-1.5 text-xs text-da outline-none font-mono font-bold font-semibold"
           >
             {products.map(p => (
               <option key={p.id} value={p.id}>
@@ -542,8 +542,8 @@ export default function WorkflowBuilderView() {
 
       {/* Observer Block warning banner */}
       {isObserver && (
-        <div className="bg-amber-50 border border-amber-250 text-amber-800 p-4 rounded-sm text-xs leading-normal flex items-start gap-2.5 shadow-xs font-mono">
-          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+        <div className="bg-b1 border border-ac text-ac p-4 rounded-sm text-xs leading-normal flex items-start gap-2.5 shadow-xs font-mono">
+          <AlertTriangle className="w-4 h-4 text-ac shrink-0 mt-0.5" />
           <div>
             <strong>Observer Authorization Check:</strong> You have read-only permissions for visual schematics. You can select stages to inspect variables and template paths, but dragging, node appending, deleting, and deployments are strictly suspended.
           </div>
@@ -556,10 +556,10 @@ export default function WorkflowBuilderView() {
         {/* COL 1: Stages Drawer Panel (Draggable Items) */}
         {!isObserver ? (
           <div className="xl:col-span-2 space-y-4">
-            <div className="bg-white border border-[#d1d1cf] p-4 rounded-sm space-y-3.5">
+            <div className="bg-b1 border border-nt p-4 rounded-sm space-y-3.5">
               <div>
-                <h3 className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400">Available Stages</h3>
-                <p className="text-[10px] text-slate-500 leading-normal">Drag nodes onto the canvas grid coordinate space to append layers:</p>
+                <h3 className="text-[10px] font-mono font-bold uppercase tracking-wider text-nt">Available Stages</h3>
+                <p className="text-[10px] text-nt leading-normal">Drag nodes onto the canvas grid coordinate space to append layers:</p>
               </div>
 
               <div className="space-y-2">
@@ -574,35 +574,35 @@ export default function WorkflowBuilderView() {
                     key={item.type}
                     draggable={!isObserver}
                     onDragStart={(e) => handleSidebarDragStart(e, item.type)}
-                    className="p-3 bg-slate-50 hover:bg-slate-105 border border-[#d1d1cf] rounded-sm flex items-center gap-2.5 cursor-grab active:cursor-grabbing transition text-left select-none group"
+                    className="p-3 bg-b1 hover:bg-b2 border border-nt rounded-sm flex items-center gap-2.5 cursor-grab active:cursor-grabbing transition text-left select-none group"
                   >
-                    <div className="p-1 px-1.5 bg-white border border-[#e5e5e3] rounded-sm">
+                    <div className="p-1 px-1.5 bg-b1 border border-nt rounded-sm">
                       {getNodeIcon(item.type as any)}
                     </div>
                     <div>
-                      <div className="text-[11px] font-bold font-sans text-slate-800 uppercase tracking-tight group-hover:text-blue-600 transition-colors">{item.label}</div>
-                      <div className="text-[9px] text-slate-400 font-mono mt-0.5">{item.desc}</div>
+                      <div className="text-[11px] font-bold font-sans text-da uppercase tracking-tight group-hover:text-ac transition-colors">{item.label}</div>
+                      <div className="text-[9px] text-nt font-mono mt-0.5">{item.desc}</div>
                     </div>
                   </div>
                 ))}
               </div>
 
-              <div className="border-t border-[#d1d1cf] pt-3">
+              <div className="border-t border-nt pt-3">
                 <button
                   onClick={resetToPresetSequential}
-                  className="w-full text-center py-1.5 border border-[#d1d1cf] hover:bg-slate-50 text-[9px] font-bold font-mono tracking-wider uppercase rounded-sm flex items-center justify-center gap-1 cursor-pointer"
+                  className="w-full text-center py-1.5 border border-nt hover:bg-b1 text-[9px] font-bold font-mono tracking-wider uppercase rounded-sm flex items-center justify-center gap-1 cursor-pointer"
                 >
-                  <RotateCcw className="w-3 h-3 text-[#555]" /> Sequential Preset
+                  <RotateCcw className="w-3 h-3 text-nt" /> Sequential Preset
                 </button>
               </div>
             </div>
           </div>
         ) : (
           <div className="xl:col-span-2 space-y-4">
-            <div className="bg-white border border-[#d1d1cf] p-4 rounded-sm space-y-3 font-mono text-[10px] text-slate-500">
-              <span className="font-bold text-slate-400 uppercase block tracking-wider">Active Stage Path</span>
+            <div className="bg-b1 border border-nt p-4 rounded-sm space-y-3 font-mono text-[10px] text-nt">
+              <span className="font-bold text-nt uppercase block tracking-wider">Active Stage Path</span>
               <p className="leading-snug">Each column represents a sequential execution step running left-to-right on incoming webhooks.</p>
-              <div className="p-2 border border-blue-105 bg-blue-50/10 text-blue-700 rounded-sm">
+              <div className="p-2 border border-ac bg-b1/10 text-ac rounded-sm">
                 Automatic connectors calculate relative coordinates instantly.
               </div>
             </div>
@@ -611,23 +611,23 @@ export default function WorkflowBuilderView() {
 
         {/* COL 2: Drag and drop Canvas */}
         <div className="xl:col-span-7 space-y-4">
-          <div className="bg-white border border-[#d1d1cf] rounded-sm flex flex-col overflow-hidden relative shadow-xs">
+          <div className="bg-b1 border border-nt rounded-sm flex flex-col overflow-hidden relative shadow-xs">
             {/* Canvas Header bar */}
-            <div className="p-3 bg-slate-50 border-b border-[#d1d1cf] flex items-center justify-between text-xs font-mono font-bold select-none">
+            <div className="p-3 bg-b1 border-b border-nt flex items-center justify-between text-xs font-mono font-bold select-none">
               <div className="flex items-center gap-2 text-[10px]">
-                <Sparkles className="w-3.5 h-3.5 text-blue-500" />
-                <span className="uppercase text-slate-600">Product Mesh Grid Context:</span>
-                <span className="bg-blue-105 text-blue-800 py-0.2 px-1 border border-blue-200 uppercase font-black tracking-wide text-[9px]">{selectedProductId}</span>
+                <Sparkles className="w-3.5 h-3.5 text-ac" />
+                <span className="uppercase text-nt">Product Mesh Grid Context:</span>
+                <span className="bg-ac text-ac py-0.2 px-1 border border-ac uppercase font-black tracking-wide text-[9px]">{selectedProductId}</span>
               </div>
 
               <div className="flex items-center gap-3">
-                <span className="text-[9px] text-[#888]">Node Elements: {activeWorkflow?.nodes.length || 0}</span>
+                <span className="text-[9px] text-nt">Node Elements: {activeWorkflow?.nodes.length || 0}</span>
                 {!isObserver && (
                   <button
                     onClick={handleSaveAll}
-                    className="bg-[#141414] hover:opacity-90 border border-black text-white text-[9.5px] font-mono font-black py-1 px-3.5 rounded-sm flex items-center gap-1 cursor-pointer uppercase tracking-wider"
+                    className="bg-b2 hover:opacity-90 border border-da text-da text-[9.5px] font-mono font-black py-1 px-3.5 rounded-sm flex items-center gap-1 cursor-pointer uppercase tracking-wider"
                   >
-                    <Save className="w-3.5 h-3.5 text-blue-400" /> Save & Deploy Live
+                    <Save className="w-3.5 h-3.5 text-ac" /> Save & Deploy Live
                   </button>
                 )}
               </div>
@@ -640,7 +640,7 @@ export default function WorkflowBuilderView() {
               onDrop={handleCanvasDrop}
               onMouseMove={handleCanvasMouseMove}
               onMouseUp={handleCanvasMouseUp}
-              className="bg-[#fafaf9] h-[480px] w-full relative overflow-hidden select-none cursor-default custom-scrollbar"
+              className="bg-b1 h-[480px] w-full relative overflow-hidden select-none cursor-default custom-scrollbar"
               style={{
                 backgroundImage: 'radial-gradient(#d1d1cf 1px, transparent 1px)',
                 backgroundSize: '20px 20px'
@@ -722,56 +722,56 @@ export default function WorkflowBuilderView() {
                       e.stopPropagation();
                       setSelectedNodeId(node.id);
                     }}
-                    className={`absolute w-[210px] bg-white border rounded-sm p-3.5 space-y-2 z-10 select-none shadow-sm cursor-grab active:cursor-grabbing hover:border-blue-400 hover:shadow-md transition-all ${
+                    className={`absolute w-[210px] bg-b1 border rounded-sm p-3.5 space-y-2 z-10 select-none shadow-sm cursor-grab active:cursor-grabbing hover:border-ac hover:shadow-md transition-all ${
                       isSelected 
-                        ? 'border-blue-500 ring-1 ring-blue-400 border-l-4 border-l-blue-600' 
-                        : 'border-[#d1d1cf]'
+                        ? 'border-ac ring-1 ring-blue-400 border-l-4 border-l-blue-600' 
+                        : 'border-nt'
                     }`}
                     style={{ left: `${node.x}px`, top: `${node.y}px` }}
                   >
                     {/* Visual Node Pin Header */}
                     <div className="flex items-center justify-between pointer-events-none">
-                      <span className="text-[8.5px] font-black uppercase text-blue-600 tracking-widest font-mono bg-blue-50 border border-blue-200 px-1 rounded-sm leading-none">
+                      <span className="text-[8.5px] font-black uppercase text-ac tracking-widest font-mono bg-b1 border border-ac px-1 rounded-sm leading-none">
                         STAGE {index + 1}
                       </span>
-                      <span className="text-[10px] font-mono text-slate-400 font-bold">X: {Math.round(node.x)}</span>
+                      <span className="text-[10px] font-mono text-nt font-bold">X: {Math.round(node.x)}</span>
                     </div>
 
                     <div className="flex items-start gap-2.5 pointer-events-none pt-1">
-                      <div className="p-1 px-1.5 bg-slate-50 border border-slate-150 rounded-sm shrink-0 mt-0.5">
+                      <div className="p-1 px-1.5 bg-b1 border border-nt rounded-sm shrink-0 mt-0.5">
                         {getNodeIcon(node.type)}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <h4 className="text-[11.5px] font-bold text-slate-800 tracking-tight truncate leading-none uppercase font-mono">{node.title}</h4>
-                        <p className="text-[9.5px] text-slate-400 leading-normal mt-1 line-clamp-2">{node.description}</p>
+                        <h4 className="text-[11.5px] font-bold text-da tracking-tight truncate leading-none uppercase font-mono">{node.title}</h4>
+                        <p className="text-[9.5px] text-nt leading-normal mt-1 line-clamp-2">{node.description}</p>
                       </div>
                     </div>
 
                     {/* Node Footer metrics link / Actions */}
-                    <div className="flex items-center justify-between border-t border-[#f4f4f2] pt-2 mt-1">
-                      <div className="text-[8px] text-slate-400 font-mono flex items-center leading-none">
+                    <div className="flex items-center justify-between border-t border-nt pt-2 mt-1">
+                      <div className="text-[8px] text-nt font-mono flex items-center leading-none">
                         {node.type === 'template' && (
-                          <span className="text-[8.5px] bg-sky-50 text-sky-800 border border-sky-200 px-1.5 rounded-sm uppercase font-bold truncate max-w-[130px]">
+                          <span className="text-[8.5px] bg-ac text-ac border border-ac px-1.5 rounded-sm uppercase font-bold truncate max-w-[130px]">
                             TMP: {node.config.templateId || 'Unassigned'}
                           </span>
                         )}
                         {node.type === 'generation' && (
-                          <span className="text-[8.5px] bg-indigo-50 text-indigo-800 border border-indigo-200 px-1.5 rounded-sm uppercase font-bold">
+                          <span className="text-[8.5px] bg-b1 text-ac border border-ac px-1.5 rounded-sm uppercase font-bold">
                             Iter Swarm: {node.config.numInitiallyGenerated || '3'}
                           </span>
                         )}
                         {node.type === 'quality_gate' && (
-                          <span className="text-[8.5px] bg-emerald-50 text-emerald-800 border border-emerald-200 px-1.5 rounded-sm uppercase font-bold">
+                          <span className="text-[8.5px] bg-b1 text-ac border border-ac px-1.5 rounded-sm uppercase font-bold">
                             Score &gt;={node.config.minAcceptanceScore || '80'}
                           </span>
                         )}
                         {node.type === 'personalization' && (
-                          <span className="text-[8.5px] bg-amber-50 text-amber-800 border border-amber-250 px-1.5 rounded-sm uppercase font-bold">
+                          <span className="text-[8.5px] bg-b1 text-ac border border-ac px-1.5 rounded-sm uppercase font-bold">
                             API: {node.config.name ? node.config.name.substring(0,8) : 'FuFire'}
                           </span>
                         )}
                         {node.type === 'pod' && (
-                          <span className="text-[8.5px] bg-rose-50 text-rose-800 border border-rose-200 px-1.5 rounded-sm uppercase font-bold truncate max-w-[130px]">
+                          <span className="text-[8.5px] bg-ac text-ac border border-ac px-1.5 rounded-sm uppercase font-bold truncate max-w-[130px]">
                             SKU: {node.config.productUid || 'Missing'}
                           </span>
                         )}
@@ -783,7 +783,7 @@ export default function WorkflowBuilderView() {
                             e.stopPropagation();
                             handleDeleteNode(node.id);
                           }}
-                          className="text-slate-400 hover:text-red-500 p-0.5 rounded hover:bg-slate-50 transition cursor-pointer"
+                          className="text-nt hover:text-ac p-0.5 rounded hover:bg-b1 transition cursor-pointer"
                           title="Remove Stage"
                         >
                           <Trash2 className="w-3 h-3" />
@@ -796,10 +796,10 @@ export default function WorkflowBuilderView() {
 
               {/* Empty state instruction on blank canvas */}
               {activeWorkflow?.nodes.length === 0 && (
-                <div className="h-full flex flex-col items-center justify-center p-8 text-center text-slate-400 pointer-events-none select-none">
-                  <Move className="w-8 h-8 text-slate-300 stroke-[1.2] animate-bounce duration-500 mb-2" />
-                  <span className="text-xs font-mono font-bold uppercase text-[#555]">Mesh Canvas Unpopulated</span>
-                  <span className="p-3 text-[11px] max-w-sm leading-relaxed block text-slate-400">
+                <div className="h-full flex flex-col items-center justify-center p-8 text-center text-nt pointer-events-none select-none">
+                  <Move className="w-8 h-8 text-nt stroke-[1.2] animate-bounce duration-500 mb-2" />
+                  <span className="text-xs font-mono font-bold uppercase text-nt">Mesh Canvas Unpopulated</span>
+                  <span className="p-3 text-[11px] max-w-sm leading-relaxed block text-nt">
                     Use the left panel to drag staging adapters onto the grid, or click "Sequential Preset" to load a default flow state.
                   </span>
                 </div>
@@ -810,24 +810,24 @@ export default function WorkflowBuilderView() {
 
         {/* COL 3: Properties Drawer (Configuration of selected node) */}
         <div className="xl:col-span-3">
-          <div className="bg-white border border-[#d1d1cf] rounded-sm p-4 space-y-4 shadow-xs min-h-[400px]">
-            <div className="border-b border-[#d1d1cf] pb-2.5 flex items-center justify-between">
-              <h3 className="text-xs font-bold uppercase tracking-widest text-[#141414] font-mono flex items-center gap-1.5">
-                <Settings className="w-3.5 h-3.5 text-slate-450 animate-spin-slow" />
+          <div className="bg-b1 border border-nt rounded-sm p-4 space-y-4 shadow-xs min-h-[400px]">
+            <div className="border-b border-nt pb-2.5 flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-da font-mono flex items-center gap-1.5">
+                <Settings className="w-3.5 h-3.5 text-nt animate-spin-slow" />
                 Stage variables
               </h3>
               {activeNode && (
-                <span className="text-[8px] bg-slate-100 text-slate-600 font-mono py-0.2 px-1 rounded">
+                <span className="text-[8px] bg-b2 text-nt font-mono py-0.2 px-1 rounded">
                   {activeNode.type.toUpperCase()}
                 </span>
               )}
             </div>
 
             {activeNode ? (
-              <div className="space-y-4 animate-fade-in text-xs font-sans text-slate-700">
+              <div className="space-y-4 animate-fade-in text-xs font-sans text-da">
                 {/* Visual Label */}
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase font-mono">Stage Visual Label</label>
+                  <label className="block text-[10px] font-bold text-nt uppercase font-mono">Stage Visual Label</label>
                   <input
                     type="text"
                     disabled={isObserver}
@@ -838,13 +838,13 @@ export default function WorkflowBuilderView() {
                         setActiveWorkflow({ ...activeWorkflow, nodes: nextNodes });
                       }
                     }}
-                    className="mt-1 w-full border border-[#d1d1cf] bg-white rounded-sm p-2 outline-none text-xs font-sans text-slate-800"
+                    className="mt-1 w-full border border-nt bg-b1 rounded-sm p-2 outline-none text-xs font-sans text-da"
                   />
                 </div>
 
                 {/* Desc */}
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase font-mono">Visual Subtitle</label>
+                  <label className="block text-[10px] font-bold text-nt uppercase font-mono">Visual Subtitle</label>
                   <input
                     type="text"
                     disabled={isObserver}
@@ -855,24 +855,24 @@ export default function WorkflowBuilderView() {
                         setActiveWorkflow({ ...activeWorkflow, nodes: nextNodes });
                       }
                     }}
-                    className="mt-1 w-full border border-[#d1d1cf] bg-white rounded-sm p-2 outline-none text-xs text-slate-800"
+                    className="mt-1 w-full border border-nt bg-b1 rounded-sm p-2 outline-none text-xs text-da"
                   />
                 </div>
 
                 {/* NODE SPECIFIC PROPERTY CONFIGURATOR FIELDS (MOCKED & INTEGRATED) */}
-                <div className="border-t border-slate-100 pt-3.5 space-y-4">
-                  <div className="text-[10px] font-mono font-bold text-slate-400 uppercase block tracking-wider">Configure properties</div>
+                <div className="border-t border-nt pt-3.5 space-y-4">
+                  <div className="text-[10px] font-mono font-bold text-nt uppercase block tracking-wider">Configure properties</div>
                   
                   {/* Category A: Prompt Template Node configs */}
                   {activeNode.type === 'template' && (
                     <div className="space-y-3.5">
                       <div>
-                        <label className="block text-[9.5px] font-bold font-mono text-slate-505">Prompt Template Binder</label>
+                        <label className="block text-[9.5px] font-bold font-mono text-nt">Prompt Template Binder</label>
                         <select
                           disabled={isObserver}
                           value={activeNode.config.templateId || ''}
                           onChange={(e) => handleUpdateNodeConfig({ templateId: e.target.value })}
-                          className="mt-1 w-full border border-[#d1d1cf] bg-white rounded-sm p-2 outline-none font-mono text-slate-705 font-bold"
+                          className="mt-1 w-full border border-nt bg-b1 rounded-sm p-2 outline-none font-mono text-nt font-bold"
                         >
                           <option value="">-- Choose active astro prompt --</option>
                           {templates.map(t => (
@@ -883,13 +883,13 @@ export default function WorkflowBuilderView() {
                         </select>
                       </div>
                       
-                      <div className="p-3 bg-blue-50/5 border border-blue-200/50 rounded-sm text-[10px] text-blue-805 leading-normal font-mono">
+                      <div className="p-3 bg-b1/5 border border-ac/50 rounded-sm text-[10px] text-ac leading-normal font-mono">
                         <strong>Pipeline Variable Injector:</strong> Mapped templates receive dynamic tokens (<code>{"{{fufire.animal}}"}, {"{{personalization.birth_place}}"}</code>) when orders materialize.
                       </div>
 
-                      <div className="text-[10px] text-slate-455 font-mono">
+                      <div className="text-[10px] text-nt font-mono">
                         <span className="font-bold">Backend Trigger:</span><br />
-                        <code className="text-zinc-600 block bg-slate-50 p-1 border rounded text-[9.5px] mt-1">
+                        <code className="text-nt block bg-b1 p-1 border rounded text-[9.5px] mt-1">
                           TODO: REST POST /api/v1/compile-template
                         </code>
                       </div>
@@ -901,7 +901,7 @@ export default function WorkflowBuilderView() {
                     <div className="space-y-3.5">
                       <div className="grid grid-cols-2 gap-2.5">
                         <div>
-                          <label className="block text-[9px] font-black font-mono text-slate-500 uppercase">Swarm size</label>
+                          <label className="block text-[9px] font-black font-mono text-nt uppercase">Swarm size</label>
                           <input
                             type="number"
                             min={1}
@@ -909,17 +909,17 @@ export default function WorkflowBuilderView() {
                             disabled={isObserver}
                             value={activeNode.config.numInitiallyGenerated || 3}
                             onChange={(e) => handleUpdateNodeConfig({ numInitiallyGenerated: Number(e.target.value) })}
-                            className="mt-1 w-full border border-[#d1d1cf] bg-white rounded-sm p-1.5 text-center font-mono font-bold"
+                            className="mt-1 w-full border border-nt bg-b1 rounded-sm p-1.5 text-center font-mono font-bold"
                           />
                         </div>
 
                         <div>
-                          <label className="block text-[9px] font-black font-mono text-slate-500 uppercase">File Format</label>
+                          <label className="block text-[9px] font-black font-mono text-nt uppercase">File Format</label>
                           <select
                             disabled={isObserver}
                             value={activeNode.config.imageFormat || 'png'}
                             onChange={(e) => handleUpdateNodeConfig({ imageFormat: e.target.value })}
-                            className="mt-1 w-full border border-[#d1d1cf] bg-white rounded-sm p-1.5 font-mono"
+                            className="mt-1 w-full border border-nt bg-b1 rounded-sm p-1.5 font-mono"
                           >
                             <option value="png">PNG (Lossless)</option>
                             <option value="jpeg">JPEG</option>
@@ -928,12 +928,12 @@ export default function WorkflowBuilderView() {
                       </div>
 
                       <div>
-                        <label className="block text-[9px] font-black font-mono text-slate-505 uppercase">Primary AI Provider</label>
+                        <label className="block text-[9px] font-black font-mono text-nt uppercase">Primary AI Provider</label>
                         <select
                           disabled={isObserver}
                           value={activeNode.config.primaryProvider || 'Gemini'}
                           onChange={(e) => handleUpdateNodeConfig({ primaryProvider: e.target.value })}
-                          className="mt-1 w-full border border-[#d1d1cf] bg-white rounded-sm p-1.5 outline-none font-mono"
+                          className="mt-1 w-full border border-nt bg-b1 rounded-sm p-1.5 outline-none font-mono"
                         >
                           <option value="Gemini">Gemini (Imagen 3)</option>
                           <option value="OpenAI">OpenAI (DALL-E 3)</option>
@@ -943,32 +943,32 @@ export default function WorkflowBuilderView() {
                       </div>
 
                       <div>
-                        <label className="block text-[9px] font-black font-mono text-slate-505 uppercase">Primary Engine Model</label>
+                        <label className="block text-[9px] font-black font-mono text-nt uppercase">Primary Engine Model</label>
                         <input
                           type="text"
                           disabled={isObserver}
                           value={activeNode.config.primaryModel || ''}
                           onChange={(e) => handleUpdateNodeConfig({ primaryModel: e.target.value })}
                           placeholder="e.g. dall-e-3"
-                          className="mt-1 w-full border border-[#d1d1cf] bg-white p-1.5 font-mono"
+                          className="mt-1 w-full border border-nt bg-b1 p-1.5 font-mono"
                         />
                       </div>
 
                       <div className="pt-2">
-                        <label className="block text-[9px] font-black font-mono text-slate-505 uppercase">API Credentials Reference</label>
+                        <label className="block text-[9px] font-black font-mono text-nt uppercase">API Credentials Reference</label>
                         <input
                           type="text"
                           disabled={isObserver}
                           value={activeNode.config.primarySecretRef || ''}
                           onChange={(e) => handleUpdateNodeConfig({ primarySecretRef: e.target.value })}
                           placeholder="SECRET_REF_OPENAI_MAIN"
-                          className="mt-1 w-full border border-rose-200 bg-rose-50/10 p-1.5 font-mono text-red-700 font-bold"
+                          className="mt-1 w-full border border-ac bg-ac/10 p-1.5 font-mono text-ac font-bold"
                         />
                       </div>
 
-                      <div className="text-[10px] text-slate-455 font-mono">
+                      <div className="text-[10px] text-nt font-mono">
                         <span className="font-bold">Backend Trigger:</span><br />
-                        <code className="text-zinc-600 block bg-slate-50 p-1 border rounded text-[9.5px] mt-1 whitespace-pre-wrap">
+                        <code className="text-nt block bg-b1 p-1 border rounded text-[9.5px] mt-1 whitespace-pre-wrap">
                           TODO: REST POST /api/v1/generate-swarm
                         </code>
                       </div>
@@ -980,7 +980,7 @@ export default function WorkflowBuilderView() {
                     <div className="space-y-3.5">
                       <div className="grid grid-cols-2 gap-2.5">
                         <div>
-                          <label className="block text-[9px] font-black font-mono text-slate-500 uppercase">Min Score (10-100)</label>
+                          <label className="block text-[9px] font-black font-mono text-nt uppercase">Min Score (10-100)</label>
                           <input
                             type="number"
                             min={10}
@@ -988,12 +988,12 @@ export default function WorkflowBuilderView() {
                             disabled={isObserver}
                             value={activeNode.config.minAcceptanceScore || 80}
                             onChange={(e) => handleUpdateNodeConfig({ minAcceptanceScore: Number(e.target.value) })}
-                            className="mt-1 w-full border border-[#d1d1cf] bg-white rounded-sm p-1.5 text-center font-bold font-mono"
+                            className="mt-1 w-full border border-nt bg-b1 rounded-sm p-1.5 text-center font-bold font-mono"
                           />
                         </div>
 
                         <div>
-                          <label className="block text-[9px] font-black font-mono text-slate-500 uppercase">Max iterations</label>
+                          <label className="block text-[9px] font-black font-mono text-nt uppercase">Max iterations</label>
                           <input
                             type="number"
                             min={1}
@@ -1001,18 +1001,18 @@ export default function WorkflowBuilderView() {
                             disabled={isObserver}
                             value={activeNode.config.maxRejectedBeforeEscalation || 3}
                             onChange={(e) => handleUpdateNodeConfig({ maxRejectedBeforeEscalation: Number(e.target.value) })}
-                            className="mt-1 w-full border border-[#d1d1cf] bg-white rounded-sm p-1.5 text-center font-bold font-mono"
+                            className="mt-1 w-full border border-nt bg-b1 rounded-sm p-1.5 text-center font-bold font-mono"
                           />
                         </div>
                       </div>
 
                       <div>
-                        <label className="block text-[9px] font-black font-mono text-slate-500 uppercase">LLM Vision Provider</label>
+                        <label className="block text-[9px] font-black font-mono text-nt uppercase">LLM Vision Provider</label>
                         <select
                           disabled={isObserver}
                           value={activeNode.config.llmProvider || 'Gemini'}
                           onChange={(e) => handleUpdateNodeConfig({ llmProvider: e.target.value })}
-                          className="mt-1 w-full border border-[#d1d1cf] bg-white rounded-sm p-1.5 outline-none font-mono"
+                          className="mt-1 w-full border border-nt bg-b1 rounded-sm p-1.5 outline-none font-mono"
                         >
                           <option value="Gemini">Gemini Vision (Pro)</option>
                           <option value="OpenAI">OpenAI GPT-4o</option>
@@ -1021,20 +1021,20 @@ export default function WorkflowBuilderView() {
                       </div>
 
                       <div>
-                        <label className="block text-[9px] font-black font-mono text-slate-500 uppercase">Evaluation Instructions / Prompt</label>
+                        <label className="block text-[9px] font-black font-mono text-nt uppercase">Evaluation Instructions / Prompt</label>
                         <textarea
                           disabled={isObserver}
                           rows={3}
                           value={activeNode.config.qaPrompt || ''}
                           onChange={(e) => handleUpdateNodeConfig({ qaPrompt: e.target.value })}
-                          className="mt-1 w-full border border-[#d1d1cf] bg-slate-50 rounded-sm p-2 outline-none font-mono text-[10.5px] leading-normal"
+                          className="mt-1 w-full border border-nt bg-b1 rounded-sm p-2 outline-none font-mono text-[10.5px] leading-normal"
                           placeholder="Rule parameters here..."
                         />
                       </div>
 
-                      <div className="text-[10px] text-slate-455 font-mono">
+                      <div className="text-[10px] text-nt font-mono">
                         <span className="font-bold">Backend Trigger:</span><br />
-                        <code className="text-zinc-600 block bg-slate-50 p-1 border rounded text-[9.5px] mt-1 whitespace-pre-wrap">
+                        <code className="text-nt block bg-b1 p-1 border rounded text-[9.5px] mt-1 whitespace-pre-wrap">
                           TODO: REST POST /api/v1/qa-evaluation
                         </code>
                       </div>
@@ -1045,41 +1045,41 @@ export default function WorkflowBuilderView() {
                   {activeNode.type === 'personalization' && (
                     <div className="space-y-3.5">
                       <div>
-                        <label className="block text-[9.5px] font-bold font-mono text-slate-505 uppercase">Adapter Name</label>
+                        <label className="block text-[9.5px] font-bold font-mono text-nt uppercase">Adapter Name</label>
                         <input
                           type="text"
                           disabled={isObserver}
                           value={activeNode.config.name || ''}
                           onChange={(e) => handleUpdateNodeConfig({ name: e.target.value })}
-                          className="mt-1 w-full border border-[#d1d1cf] bg-white p-2 font-mono"
+                          className="mt-1 w-full border border-nt bg-b1 p-2 font-mono"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-[9.5px] font-bold font-mono text-slate-505 uppercase">webhook Endpoint URL</label>
+                        <label className="block text-[9.5px] font-bold font-mono text-nt uppercase">webhook Endpoint URL</label>
                         <input
                           type="text"
                           disabled={isObserver}
                           value={activeNode.config.apiUrl || ''}
                           onChange={(e) => handleUpdateNodeConfig({ apiUrl: e.target.value })}
-                          className="mt-1 w-full border border-[#d1d1cf] bg-white p-2 font-mono"
+                          className="mt-1 w-full border border-nt bg-b1 p-2 font-mono"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-[9.5px] font-bold font-mono text-slate-505 uppercase">API credentials Token Ref</label>
+                        <label className="block text-[9.5px] font-bold font-mono text-nt uppercase">API credentials Token Ref</label>
                         <input
                           type="text"
                           disabled={isObserver}
                           value={activeNode.config.secretRef || ''}
                           onChange={(e) => handleUpdateNodeConfig({ secretRef: e.target.value })}
-                          className="mt-1 w-full border border-[#d1d1cf] bg-rose-50/10 text-red-700 font-bold p-2 font-mono"
+                          className="mt-1 w-full border border-nt bg-ac/10 text-ac font-bold p-2 font-mono"
                         />
                       </div>
 
-                      <div className="text-[10px] text-slate-455 font-mono">
+                      <div className="text-[10px] text-nt font-mono">
                         <span className="font-bold">Backend Trigger:</span><br />
-                        <code className="text-zinc-600 block bg-slate-50 p-1 border rounded text-[9.5px] mt-1 whitespace-pre-wrap">
+                        <code className="text-nt block bg-b1 p-1 border rounded text-[9.5px] mt-1 whitespace-pre-wrap">
                           TODO: Fetch payload webhook and bind to astroglyphs system logic (CJS/ESM proxy integration)
                         </code>
                       </div>
@@ -1090,44 +1090,44 @@ export default function WorkflowBuilderView() {
                   {activeNode.type === 'pod' && (
                     <div className="space-y-3.5">
                       <div>
-                        <label className="block text-[9.5px] font-bold font-mono text-slate-505 uppercase">Fulfillment vendor</label>
+                        <label className="block text-[9.5px] font-bold font-mono text-nt uppercase">Fulfillment vendor</label>
                         <input
                           type="text"
                           disabled={isObserver}
                           value={activeNode.config.name || ''}
                           onChange={(e) => handleUpdateNodeConfig({ name: e.target.value })}
-                          className="mt-1 w-full border border-[#d1d1cf] bg-white p-2 font-mono"
+                          className="mt-1 w-full border border-nt bg-b1 p-2 font-mono"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-[9.5px] font-bold font-mono text-slate-505 uppercase">Target BluePrint code / SKU</label>
+                        <label className="block text-[9.5px] font-bold font-mono text-nt uppercase">Target BluePrint code / SKU</label>
                         <input
                           type="text"
                           disabled={isObserver}
                           value={activeNode.config.productUid || ''}
                           onChange={(e) => handleUpdateNodeConfig({ productUid: e.target.value })}
                           placeholder="canvas-40x50-vintage"
-                          className="mt-1 w-full border border-[#d1d1cf] bg-white p-2 font-mono text-sky-800 font-bold"
+                          className="mt-1 w-full border border-nt bg-b1 p-2 font-mono text-ac font-bold"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-[9.5px] font-bold font-mono text-slate-505 uppercase">API Dispatch mode</label>
+                        <label className="block text-[9.5px] font-bold font-mono text-nt uppercase">API Dispatch mode</label>
                         <select
                           disabled={isObserver}
                           value={activeNode.config.dispatchMode || 'draft'}
                           onChange={(e) => handleUpdateNodeConfig({ dispatchMode: e.target.value })}
-                          className="mt-1 w-full border border-[#d1d1cf] bg-white rounded-sm p-1.5 outline-none font-mono"
+                          className="mt-1 w-full border border-nt bg-b1 rounded-sm p-1.5 outline-none font-mono"
                         >
                           <option value="draft">Draft Order Queue (Review before print)</option>
                           <option value="order">Full AutoSubmit (Direct Production)</option>
                         </select>
                       </div>
 
-                      <div className="text-[10px] text-slate-455 font-mono">
+                      <div className="text-[10px] text-nt font-mono">
                         <span className="font-bold">Backend Trigger:</span><br />
-                        <code className="text-zinc-600 block bg-slate-50 p-1 border rounded text-[9.5px] mt-1 whitespace-pre-wrap">
+                        <code className="text-nt block bg-b1 p-1 border rounded text-[9.5px] mt-1 whitespace-pre-wrap">
                           TODO: REST POST /api/v1/pod/dispatch
                         </code>
                       </div>
@@ -1136,15 +1136,15 @@ export default function WorkflowBuilderView() {
                 </div>
 
                 {/* DB Table alignment info for RBAC compliance */}
-                <div className="bg-slate-50 border border-[#d1d1cf] rounded-sm p-3.5 text-[9.5px] text-slate-700 space-y-1 font-mono">
-                  <div className="font-bold uppercase text-slate-400">Postgres Schema Maps</div>
+                <div className="bg-b1 border border-nt rounded-sm p-3.5 text-[9.5px] text-da space-y-1 font-mono">
+                  <div className="font-bold uppercase text-nt">Postgres Schema Maps</div>
                   <div>TABLE: <code>workflow_stages</code></div>
                   <div>POLICY: <code>auth.role() = 'Owner' OR 'Admin'</code></div>
                 </div>
               </div>
             ) : (
-              <div className="py-12 text-center text-slate-400 font-mono text-[11px] leading-normal pt-24">
-                <Info className="w-5 h-5 text-slate-300 mx-auto mb-2" />
+              <div className="py-12 text-center text-nt font-mono text-[11px] leading-normal pt-24">
+                <Info className="w-5 h-5 text-nt mx-auto mb-2" />
                 Select any stage node inside the canvas to inspect and configure variables.
               </div>
             )}

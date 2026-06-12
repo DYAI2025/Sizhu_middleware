@@ -82,13 +82,22 @@ export interface QualityGate1Config {
 
 export interface PersonalizationConfig {
   name: string; // Default: FuFire API
-  apiUrl: string;
-  secretRef: string; // e.g. SECRET_REF_FUFIRE
-  birthTimeFallback: {
-    birth_time: string; // "12:00"
-    birth_time_known: boolean; // false
-    birth_time_source: string; // "default_noon"
+  baseUrl: string;
+  apiKeySecretRef: string; // e.g. SECRET_REF_FUFIRE
+  enabled: boolean;
+  endpointPaths: {
+    chronometryResolve: string;
+    bazi: string;
+    baziTrace: string;
+    wuxing: string;
   };
+  defaultStandard: string; // 'CIVIL'
+  defaultBoundary: string; // 'midnight'
+  ambiguousTimePolicy: 'earlier' | 'later' | 'require_manual_resolution';
+  nonexistentTimePolicy: 'error' | 'shift_forward';
+  timeoutMs: number;
+  retryCount: number;
+  healthStatus?: 'healthy' | 'unhealthy' | 'unknown';
 }
 
 export interface PodProviderConfig {

@@ -85,78 +85,78 @@ CREATE POLICY "Observers can read catalog"
   };
 
   return (
-    <div className="space-y-6 animate-fade-in text-[#141414]" id="settings-architect-hud">
+    <div className="space-y-6 animate-fade-in text-da" id="settings-architect-hud">
       {/* Title block */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#d1d1cf] pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-nt pb-4">
         <div>
-          <h1 className="text-xl font-bold text-[#141414] tracking-tight font-sans">Settings & DB Modeler</h1>
-          <p className="text-xs text-slate-500 mt-1">Study Postgres schema registers, extract SQL builds, and handle local store seeds</p>
+          <h1 className="text-xl font-bold text-da tracking-tight font-sans">Settings & DB Modeler</h1>
+          <p className="text-xs text-nt mt-1">Study Postgres schema registers, extract SQL builds, and handle local store seeds</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
         {/* PostgreSQL diagram schemas */}
-        <div className="lg:col-span-7 bg-white border border-[#d1d1cf] p-5 rounded-sm space-y-4">
-          <div className="flex items-center justify-between border-b border-[#d1d1cf] pb-2">
-            <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 font-mono flex items-center gap-1.5">
-              <Database className="w-3.5 h-3.5 text-slate-400" /> PostgreSQL Table Registry Mapped
+        <div className="lg:col-span-7 bg-b1 border border-nt p-5 rounded-sm space-y-4">
+          <div className="flex items-center justify-between border-b border-nt pb-2">
+            <h3 className="text-xs font-bold uppercase tracking-widest text-nt font-mono flex items-center gap-1.5">
+              <Database className="w-3.5 h-3.5 text-nt" /> PostgreSQL Table Registry Mapped
             </h3>
-            <span className="text-[9px] font-mono bg-blue-50 border border-blue-250 text-blue-800 font-bold px-2 py-0.5 rounded-sm tracking-wide">
+            <span className="text-[9px] font-mono bg-b1 border border-ac text-ac font-bold px-2 py-0.5 rounded-sm tracking-wide">
               TABLES: 16
             </span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs max-h-[360px] overflow-y-auto pr-1">
             {TABLES.map((t, idx) => (
-              <div key={idx} className="p-3 bg-slate-50 border border-[#d1d1cf] rounded-sm flex flex-col justify-between hover:border-slate-400 transition">
+              <div key={idx} className="p-3 bg-b1 border border-nt rounded-sm flex flex-col justify-between hover:border-nt transition">
                 <div>
-                  <strong className="text-[#141414] font-mono font-bold text-[12px]">{t.name}</strong>
-                  <p className="text-[10px] text-slate-500 mt-1.5 leading-relaxed font-mono">{t.columns}</p>
+                  <strong className="text-da font-mono font-bold text-[12px]">{t.name}</strong>
+                  <p className="text-[10px] text-nt mt-1.5 leading-relaxed font-mono">{t.columns}</p>
                 </div>
               </div>
             ))}
           </div>
 
-          <div className="p-3 bg-blue-50 border border-blue-200 rounded-sm text-blue-800 text-[11px] font-mono leading-normal">
+          <div className="p-3 bg-b1 border border-ac rounded-sm text-ac text-[11px] font-mono leading-normal">
             <strong>Relational Integrity Principle:</strong> Database constructs enforce CASCADE triggers on bindings, active/suspended product indices, and secure row restrictions matching our backend models.
           </div>
         </div>
 
         {/* Action center side */}
-        <div className="lg:col-span-5 bg-white border border-[#d1d1cf] p-5 rounded-sm space-y-4 flex flex-col justify-between">
+        <div className="lg:col-span-5 bg-b1 border border-nt p-5 rounded-sm space-y-4 flex flex-col justify-between">
           
           {/* Download segment */}
           <div className="space-y-3">
-            <div className="flex items-center justify-between border-b border-[#d1d1cf] pb-2">
-              <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 font-mono flex items-center gap-1.5">
-                <Terminal className="w-3.5 h-3.5 text-slate-400" /> SQL Schema Exporter
+            <div className="flex items-center justify-between border-b border-nt pb-2">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-nt font-mono flex items-center gap-1.5">
+                <Terminal className="w-3.5 h-3.5 text-nt" /> SQL Schema Exporter
               </h3>
               <button
                 onClick={() => copyToClipboard(RAW_SQL_CODE, 1)}
-                className="bg-[#141414] border border-black hover:opacity-90 text-white font-mono rounded-sm py-1 px-2.5 transition text-[10px] uppercase font-bold flex items-center gap-1 cursor-pointer"
+                className="bg-b2 border border-da hover:opacity-90 text-da font-mono rounded-sm py-1 px-2.5 transition text-[10px] uppercase font-bold flex items-center gap-1 cursor-pointer"
               >
-                {copiedIndex === 1 ? <Check className="w-3.5 h-3.5 text-emerald-450" /> : <Copy className="w-3.5 h-3.5" />}
+                {copiedIndex === 1 ? <Check className="w-3.5 h-3.5 text-ac" /> : <Copy className="w-3.5 h-3.5" />}
                 {copiedIndex === 1 ? 'COPIED' : 'COPY'}
               </button>
             </div>
 
-            <pre className="bg-[#141414] border border-[#d1d1cf] text-emerald-400 p-3 rounded-sm text-[9px] font-mono leading-relaxed h-[200px] overflow-y-auto shadow-inner">
+            <pre className="bg-b2 border border-nt text-ac p-3 rounded-sm text-[9px] font-mono leading-relaxed h-[200px] overflow-y-auto shadow-inner">
               {RAW_SQL_CODE}
             </pre>
           </div>
 
           {/* Hard Reset Segment */}
-          <div className="border-t border-[#d1d1cf] pt-4 space-y-2">
-            <h4 className="text-xs font-bold text-red-600 uppercase font-mono tracking-widest flex items-center gap-1.5">
-              <AlertCircle className="w-3.5 h-3.5 text-red-600 shrink-0" /> Operation Security Limit
+          <div className="border-t border-nt pt-4 space-y-2">
+            <h4 className="text-xs font-bold text-ac uppercase font-mono tracking-widest flex items-center gap-1.5">
+              <AlertCircle className="w-3.5 h-3.5 text-ac shrink-0" /> Operation Security Limit
             </h4>
-            <p className="text-slate-400 text-[11px] font-mono leading-normal">
+            <p className="text-nt text-[11px] font-mono leading-normal">
               Need a clear canvas to test Owner/Observer simulation profiles? Trigger a database hard reset to restore default products and maps seeds status.
             </p>
             <button
               onClick={handleReset}
-              className="w-full bg-red-650 hover:bg-red-700 text-white font-bold border border-red-700 font-mono p-2.5 rounded-sm text-xs cursor-pointer tracking-wider uppercase transition text-center"
+              className="w-full bg-ac hover:bg-ac text-da font-bold border border-ac font-mono p-2.5 rounded-sm text-xs cursor-pointer tracking-wider uppercase transition text-center"
             >
               Hard Reset Database Seeds
             </button>

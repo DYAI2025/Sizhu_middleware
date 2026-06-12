@@ -189,37 +189,37 @@ Dominant Elemental Path: {{fufire.dominant_element}}
       // Variable rendering
       MANDATORY_VARS.forEach(v => {
         if (cleanLine.includes(v)) {
-          cleanLine = cleanLine.replaceAll(v, `<span class="bg-indigo-100 text-indigo-800 font-bold px-1.5 py-0.5 rounded text-xs border border-indigo-200">${v}</span>`);
+          cleanLine = cleanLine.replaceAll(v, `<span class="bg-b2 text-ac font-bold px-1.5 py-0.5 rounded text-xs border border-ac">${v}</span>`);
         }
       });
 
       if (line.startsWith('# ')) {
-        return <h1 key={idx} className="text-xl font-extrabold pb-1 mt-4 text-slate-900 border-b border-slate-100" dangerouslySetInnerHTML={{ __html: cleanLine.substring(2) }} />;
+        return <h1 key={idx} className="text-xl font-extrabold pb-1 mt-4 text-da border-b border-nt" dangerouslySetInnerHTML={{ __html: cleanLine.substring(2) }} />;
       }
       if (line.startsWith('## ')) {
-        return <h2 key={idx} className="text-lg font-bold mt-3 text-slate-800" dangerouslySetInnerHTML={{ __html: cleanLine.substring(3) }} />;
+        return <h2 key={idx} className="text-lg font-bold mt-3 text-da" dangerouslySetInnerHTML={{ __html: cleanLine.substring(3) }} />;
       }
       if (line.startsWith('- ')) {
-        return <li key={idx} className="ml-4 list-disc text-xs text-slate-600 my-1" dangerouslySetInnerHTML={{ __html: cleanLine.substring(2) }} />;
+        return <li key={idx} className="ml-4 list-disc text-xs text-nt my-1" dangerouslySetInnerHTML={{ __html: cleanLine.substring(2) }} />;
       }
-      return <p key={idx} className="text-xs text-slate-600 min-h-4 leading-normal my-1" dangerouslySetInnerHTML={{ __html: cleanLine }} />;
+      return <p key={idx} className="text-xs text-nt min-h-4 leading-normal my-1" dangerouslySetInnerHTML={{ __html: cleanLine }} />;
     });
   };
 
   return (
     <div className="space-y-6 animate-fade-in" id="templates-view-container">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-[#d1d1cf] pb-4">
+      <div className="flex items-center justify-between border-b border-nt pb-4">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 tracking-tight font-sans">Prompt Template Revisions</h1>
-          <p className="text-xs text-slate-500 mt-1">Edit Liquid templates, verify mandatory tags, and lock active revisions to dynamic sandbox environments</p>
+          <h1 className="text-xl font-bold text-da tracking-tight font-sans">Prompt Template Revisions</h1>
+          <p className="text-xs text-nt mt-1">Edit Liquid templates, verify mandatory tags, and lock active revisions to dynamic sandbox environments</p>
         </div>
         {!isObserver && (
           <button
             onClick={handleAddNew}
-            className="bg-[#141414] hover:opacity-90 text-white text-xs font-mono font-bold px-4 py-2 rounded-sm flex items-center gap-1.5 cursor-pointer uppercase tracking-wider border border-black"
+            className="bg-b2 hover:opacity-90 text-da text-xs font-mono font-bold px-4 py-2 rounded-sm flex items-center gap-1.5 cursor-pointer uppercase tracking-wider border border-da"
           >
-            <Plus className="w-3.5 h-3.5 text-blue-500" /> New Template
+            <Plus className="w-3.5 h-3.5 text-ac" /> New Template
           </button>
         )}
       </div>
@@ -228,8 +228,8 @@ Dominant Elemental Path: {{fufire.dominant_element}}
         
         {/* Left Side: Template Revision Register */}
         <div className="lg:col-span-4 space-y-4">
-          <div className="bg-white border border-[#d1d1cf] text-[#141414] rounded-sm p-4 space-y-3">
-            <h2 className="text-[10px] font-bold uppercase tracking-widest font-mono text-slate-400">Archived & Active Register</h2>
+          <div className="bg-b1 border border-nt text-da rounded-sm p-4 space-y-3">
+            <h2 className="text-[10px] font-bold uppercase tracking-widest font-mono text-nt">Archived & Active Register</h2>
             <div className="space-y-2 max-h-[350px] overflow-y-auto pr-1">
               {templates.map((t) => (
                 <button
@@ -237,21 +237,21 @@ Dominant Elemental Path: {{fufire.dominant_element}}
                   onClick={() => handleSelect(t)}
                   className={`w-full text-left p-3 rounded-sm border transition text-xs flex flex-col gap-1 cursor-pointer ${
                     selectedTemplate?.id === t.id 
-                      ? 'bg-blue-50/50 border-blue-400 border-l-2 border-l-blue-500' 
-                      : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+                      ? 'bg-b1/50 border-ac border-l-2 border-l-blue-500' 
+                      : 'bg-b1 border-nt hover:bg-b2'
                   }`}
                 >
-                  <div className="font-bold text-slate-900 flex items-center justify-between font-mono">
+                  <div className="font-bold text-da flex items-center justify-between font-mono">
                     <span className="truncate max-w-[180px]">{t.name}</span>
-                    <span className="text-[10px] font-mono bg-blue-100 text-blue-800 py-0.2 px-1.5 rounded-sm font-bold border border-blue-200">
+                    <span className="text-[10px] font-mono bg-b2 text-ac py-0.2 px-1.5 rounded-sm font-bold border border-ac">
                       v{t.version}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between text-[10px] text-slate-400 mt-1.5 font-mono">
+                  <div className="flex items-center justify-between text-[10px] text-nt mt-1.5 font-mono">
                     <span className={`px-1.5 py-0.2 rounded-sm font-bold text-[9px] border ${
-                      t.status === 'active' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' :
-                      t.status === 'draft' ? 'bg-amber-50 border-amber-200 text-amber-800' :
-                      'bg-slate-100 border-slate-300 text-slate-600'
+                      t.status === 'active' ? 'bg-b1 border-ac text-ac' :
+                      t.status === 'draft' ? 'bg-b1 border-ac text-ac' :
+                      'bg-b2 border-nt text-nt'
                     }`}>
                       {t.status.toUpperCase()}
                     </span>
@@ -263,9 +263,9 @@ Dominant Elemental Path: {{fufire.dominant_element}}
           </div>
 
           {/* Guidelines info */}
-          <div className="bg-blue-50 border border-blue-200 rounded-sm p-4 text-xs text-blue-800 space-y-2">
+          <div className="bg-b1 border border-ac rounded-sm p-4 text-xs text-ac space-y-2">
             <h4 className="font-bold font-mono text-[10px] uppercase flex items-center gap-1.5">
-              <AlertCircle className="w-3.5 h-3.5 shrink-0 text-blue-600" />
+              <AlertCircle className="w-3.5 h-3.5 shrink-0 text-ac" />
               Automated Version Safety Rules
             </h4>
             <p className="leading-relaxed opacity-95">
@@ -278,30 +278,30 @@ Dominant Elemental Path: {{fufire.dominant_element}}
         </div>
 
         {/* Right Side: Interactive Editor and Variable compliance */}
-        <div className="lg:col-span-8 bg-white border border-[#d1d1cf] rounded-sm p-6 flex flex-col gap-5">
+        <div className="lg:col-span-8 bg-b1 border border-nt rounded-sm p-6 flex flex-col gap-5">
           
           {/* Top Panel fields */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-nt pb-4">
             <div className="flex-1">
-              <label className="block text-[10px] font-bold text-slate-400 font-mono uppercase tracking-wider">Template Identifier / Name</label>
+              <label className="block text-[10px] font-bold text-nt font-mono uppercase tracking-wider">Template Identifier / Name</label>
               <input
                 type="text"
                 disabled={isObserver}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Astrological Constellation Print Prompt Template"
-                className="mt-1.5 w-full text-base font-bold border-b border-transparent hover:border-slate-200 focus:border-slate-900 py-1 outline-none text-[#141414] font-mono"
+                className="mt-1.5 w-full text-base font-bold border-b border-transparent hover:border-nt focus:border-nt py-1 outline-none text-da font-mono"
               />
             </div>
 
             <div className="flex items-center gap-3 shrink-0">
               <div>
-                <label className="block text-[10px] font-bold font-mono text-slate-400 uppercase tracking-wider">Revision Status</label>
+                <label className="block text-[10px] font-bold font-mono text-nt uppercase tracking-wider">Revision Status</label>
                 <select
                   disabled={isObserver}
                   value={status}
                   onChange={(e) => setStatus(e.target.value as any)}
-                  className="mt-1 border border-[#d1d1cf] bg-white rounded-sm p-1.5 text-xs font-mono font-bold text-slate-800 outline-none"
+                  className="mt-1 border border-nt bg-b1 rounded-sm p-1.5 text-xs font-mono font-bold text-da outline-none"
                 >
                   <option value="draft">DRAFT CODE</option>
                   <option value="active">ACTIVE ENGINE</option>
@@ -313,9 +313,9 @@ Dominant Elemental Path: {{fufire.dominant_element}}
                 <button
                   id="btn-save-template"
                   onClick={handleSave}
-                  className="bg-[#141414] hover:opacity-90 text-white text-xs font-mono font-bold px-4 py-2.5 rounded-sm flex items-center gap-1.5 mt-4 cursor-pointer uppercase border border-black"
+                  className="bg-b2 hover:opacity-90 text-da text-xs font-mono font-bold px-4 py-2.5 rounded-sm flex items-center gap-1.5 mt-4 cursor-pointer uppercase border border-da"
                 >
-                  <Save className="w-3.5 h-3.5 text-blue-500" /> Save Version
+                  <Save className="w-3.5 h-3.5 text-ac" /> Save Version
                 </button>
               )}
             </div>
@@ -324,23 +324,23 @@ Dominant Elemental Path: {{fufire.dominant_element}}
           {/* Validation Banner */}
           {validationMsg && (
             <div className={`p-3 rounded-sm flex items-start gap-2 text-xs border ${
-              validationMsg.type === 'ok' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-amber-50 border-amber-200 text-amber-800'
+              validationMsg.type === 'ok' ? 'bg-b1 border-ac text-ac' : 'bg-b1 border-ac text-ac'
             }`}>
               {validationMsg.type === 'ok' ? (
-                <Check className="w-3.5 h-3.5 shrink-0 text-emerald-600 stroke-[2.5]" />
+                <Check className="w-3.5 h-3.5 shrink-0 text-ac stroke-[2.5]" />
               ) : (
-                <AlertCircle className="w-3.5 h-3.5 shrink-0 text-amber-655 text-amber-600" />
+                <AlertCircle className="w-3.5 h-3.5 shrink-0 text-ac text-ac" />
               )}
               <span className="font-mono text-[11px] font-semibold">{validationMsg.text}</span>
             </div>
           )}
 
           {/* Editor Header / Preview Selector */}
-          <div className="flex border-b border-[#d1d1cf]">
+          <div className="flex border-b border-nt">
             <button
               onClick={() => setIsPreview(false)}
               className={`py-2 px-4 text-xs font-mono font-bold border-b-2 -mb-[2px] transition ${
-                !isPreview ? 'border-[#141414] text-[#141414]' : 'border-transparent text-slate-400 hover:text-slate-600'
+                !isPreview ? 'border-da text-da' : 'border-transparent text-nt hover:text-nt'
               }`}
             >
               <span className="flex items-center gap-1.5">
@@ -350,35 +350,35 @@ Dominant Elemental Path: {{fufire.dominant_element}}
             <button
               onClick={() => setIsPreview(true)}
               className={`py-2 px-4 text-xs font-mono font-bold border-b-2 -mb-[2px] transition ${
-                isPreview ? 'border-[#141414] text-[#141414]' : 'border-transparent text-slate-400 hover:text-slate-600'
+                isPreview ? 'border-da text-da' : 'border-transparent text-nt hover:text-nt'
               }`}
             >
               <span className="flex items-center gap-1.5">
-                <Eye className="w-3.5 h-3.5 text-blue-500" /> Live Webhook Render
+                <Eye className="w-3.5 h-3.5 text-ac" /> Live Webhook Render
               </span>
             </button>
           </div>
 
           {/* Frame Container */}
-          <div className="flex-1 min-h-[300px] border border-[#d1d1cf] rounded-sm overflow-hidden flex flex-col">
+          <div className="flex-1 min-h-[300px] border border-nt rounded-sm overflow-hidden flex flex-col">
             {!isPreview ? (
               <textarea
                 disabled={isObserver}
                 value={content}
                 onChange={(e) => handleContentChange(e.target.value)}
                 placeholder="Paste or write raw markdown prompt template including {{order.order_number}} values..."
-                className="w-full flex-1 p-4 font-mono text-xs text-slate-800 leading-relaxed bg-slate-50 focus:bg-white focus:outline-none resize-none min-h-[300px]"
+                className="w-full flex-1 p-4 font-mono text-xs text-da leading-relaxed bg-b1 focus:bg-b1 focus:outline-none resize-none min-h-[300px]"
               />
             ) : (
-              <div className="w-full flex-1 p-5 bg-white overflow-y-auto leading-relaxed text-xs space-y-3 border-l border-slate-50">
+              <div className="w-full flex-1 p-5 bg-b1 overflow-y-auto leading-relaxed text-xs space-y-3 border-l border-nt">
                 {renderMockMarkdownPreview(content)}
               </div>
             )}
           </div>
 
           {/* Liquid Variable Reference Board */}
-          <div className="bg-slate-50 p-4 rounded-sm border border-[#d1d1cf] space-y-2">
-            <h3 className="text-[10px] font-bold font-mono text-slate-500 uppercase tracking-widest">Available Astrological context keys:</h3>
+          <div className="bg-b1 p-4 rounded-sm border border-nt space-y-2">
+            <h3 className="text-[10px] font-bold font-mono text-nt uppercase tracking-widest">Available Astrological context keys:</h3>
             <div className="flex flex-wrap gap-1.5 text-[10px]">
               {MANDATORY_VARS.map((v) => {
                 const isActiveVar = content.includes(v);
@@ -392,11 +392,11 @@ Dominant Elemental Path: {{fufire.dominant_element}}
                     }}
                     className={`font-mono py-1 px-2 rounded-sm border flex items-center gap-1 cursor-pointer transition select-none ${
                       isActiveVar 
-                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200 font-bold' 
-                        : 'bg-white hover:bg-slate-100 text-slate-500 border-[#d1d1cf]'
+                        ? 'bg-b1 text-ac border-ac font-bold' 
+                        : 'bg-b1 hover:bg-b2 text-nt border-nt'
                     }`}
                   >
-                    {isActiveVar ? <Check className="w-3 h-3 text-emerald-600" /> : null}
+                    {isActiveVar ? <Check className="w-3 h-3 text-ac" /> : null}
                     {v}
                   </span>
                 );
