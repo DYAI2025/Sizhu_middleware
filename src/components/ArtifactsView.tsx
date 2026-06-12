@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { LocalDb } from '../mockStorage';
 import { ImageArtifact, ShopProduct } from '../types';
-import { CheckCircle2, AlertTriangle, HelpCircle, Eye, SlidersHorizontal, Layers, X, Calendar } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, HelpCircle, Eye, SlidersHorizontal, Layers, X, Calendar, Download } from 'lucide-react';
 
 export default function ArtifactsView() {
   const [artifacts, setArtifacts] = useState<ImageArtifact[]>([]);
@@ -16,6 +16,74 @@ export default function ArtifactsView() {
   const loadData = () => {
     setArtifacts(LocalDb.getImageArtifacts());
     setProducts(LocalDb.getProducts());
+  };
+
+  const exportArtifactsAsJSON = () => {
+    const blob = new Blob([JSON.stringify(filteredArtifacts, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `sizhu_staged_artifacts_${activeTab}_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+  };
+
+  const exportArtifactsAsCSV = () => {
+    const headers = [
+      'ID',
+      'WorkflowRunID',
+      'OrderNumber',
+      'ProductID',
+      'TemplateID',
+      'Iteration',
+      'CandidateIndex',
+      'StoragePath',
+      'Status',
+      'QaScore',
+      'RejectionReason',
+      'QaResultJson',
+      'GeneratedAt'
+    ];
+
+    const escapeCsv = (val: any) => {
+      if (val === null || val === undefined) return '';
+      const str = String(val);
+      if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
+    const rows = filteredArtifacts.map(art => {
+      return [
+        escapeCsv(art.id),
+        escapeCsv(art.workflowRunId),
+        escapeCsv(art.orderNumber),
+        escapeCsv(art.productId),
+        escapeCsv(art.templateId),
+        escapeCsv(art.iteration),
+        escapeCsv(art.candidateIndex),
+        escapeCsv(art.storagePath),
+        escapeCsv(art.status),
+        escapeCsv(art.qaScore),
+        escapeCsv(art.rejectionReason || ''),
+        escapeCsv(art.qaResultJson),
+        escapeCsv(art.generatedAt)
+      ].join(',');
+    });
+
+    const csvContent = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `sizhu_staged_artifacts_${activeTab}_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
   };
 
   const filteredArtifacts = artifacts.filter((a) => {
@@ -83,9 +151,33 @@ export default function ArtifactsView() {
             </button>
           ))}
         </div>
-        <span className="text-[10px] font-mono text-slate-500 font-bold bg-slate-50 border border-[#d1d1cf] px-2.5 py-1 rounded-sm">
-          ledger: {filteredArtifacts.length} images of {artifacts.length} total
-        </span>
+        <div className="flex items-center gap-2">
+          {filteredArtifacts.length > 0 && (
+            <div className="flex items-center gap-1 text-[10px] bg-slate-50 border border-[#d1d1cf] rounded-sm p-0.5">
+              <span className="font-bold text-slate-400 px-1 font-mono uppercase text-[8px] flex items-center gap-0.5">
+                <Download className="w-2.5 h-2.5" /> Export:
+              </span>
+              <button 
+                onClick={exportArtifactsAsJSON}
+                className="hover:bg-slate-200 text-slate-700 font-mono font-bold px-1.5 py-0.5 rounded-xs transition text-[9px] cursor-pointer"
+                title={`Export current ${activeTab} artifacts as JSON`}
+              >
+                JSON
+              </button>
+              <span className="text-[#d1d1cf]">&bull;</span>
+              <button 
+                onClick={exportArtifactsAsCSV}
+                className="hover:bg-slate-200 text-slate-750 font-mono font-bold px-1.5 py-0.5 rounded-xs transition text-[9px] cursor-pointer"
+                title={`Export current ${activeTab} artifacts as CSV`}
+              >
+                CSV
+              </button>
+            </div>
+          )}
+          <span className="text-[10px] font-mono text-slate-500 font-bold bg-slate-50 border border-[#d1d1cf] px-2.5 py-1 rounded-sm">
+            ledger: {filteredArtifacts.length} images of {artifacts.length} total
+          </span>
+        </div>
       </div>
 
       {artifacts.length === 0 ? (

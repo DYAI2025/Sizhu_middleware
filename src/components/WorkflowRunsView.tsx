@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { LocalDb, runFullWorkflowSimulator } from '../mockStorage';
 import { ShopProduct, WorkflowRun, WorkflowLog, ImageArtifact } from '../types';
-import { Play, Clipboard, Filter, Trash, User, Calendar, MapPin, Clock, Loader2, AlertCircle, RefreshCw, Layers, CheckCircle2, AlertTriangle, Eye } from 'lucide-react';
+import { Play, Clipboard, Filter, Trash, User, Calendar, MapPin, Clock, Loader2, AlertCircle, RefreshCw, Layers, CheckCircle2, AlertTriangle, Eye, Download } from 'lucide-react';
 
 export default function WorkflowRunsView() {
   const [products, setProducts] = useState<ShopProduct[]>([]);
@@ -113,6 +113,78 @@ export default function WorkflowRunsView() {
     setEscalationTemplateOutput(email);
   };
 
+  const exportRunsAsJSON = () => {
+    const blob = new Blob([JSON.stringify(runs, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `sizhu_workflow_runs_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+  };
+
+  const exportRunsAsCSV = () => {
+    const headers = [
+      'ID',
+      'OrderNumber',
+      'ProductID',
+      'CustomerName',
+      'BirthDate',
+      'BirthTime',
+      'BirthTimeKnown',
+      'BirthPlace',
+      'Status',
+      'StartedAt',
+      'CompletedAt',
+      'CurrentIteration',
+      'PersonalizationElement',
+      'PersonalizationAnimal',
+      'DominantElement'
+    ];
+
+    const escapeCsv = (val: any) => {
+      if (val === null || val === undefined) return '';
+      const str = String(val);
+      if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
+    const rows = runs.map(run => {
+      return [
+        escapeCsv(run.id),
+        escapeCsv(run.orderNumber),
+        escapeCsv(run.productId),
+        escapeCsv(run.customerName),
+        escapeCsv(run.birthDate),
+        escapeCsv(run.birthTime),
+        escapeCsv(String(run.birthTimeKnown)),
+        escapeCsv(run.birthPlace),
+        escapeCsv(run.status),
+        escapeCsv(run.startedAt),
+        escapeCsv(run.completedAt || ''),
+        escapeCsv(run.currentIteration),
+        escapeCsv(run.personalizationData?.element || ''),
+        escapeCsv(run.personalizationData?.animal || ''),
+        escapeCsv(run.personalizationData?.dominant_element || '')
+      ].join(',');
+    });
+
+    const csvContent = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `sizhu_workflow_runs_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+  };
+
   const getLogStatusClass = (status: string) => {
     switch (status) {
       case 'success': return 'text-emerald-700 bg-emerald-50 border-emerald-300';
@@ -148,6 +220,46 @@ export default function WorkflowRunsView() {
           >
             <RefreshCw className="w-3 h-3" /> Scramble Inputs
           </button>
+        </div>
+      </div>
+
+      {/* Summary Stats Row */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4" id="runs-summary-stats">
+        {/* Total Runs Card */}
+        <div className="bg-white border border-[#d1d1cf] rounded-sm p-4 flex items-center justify-between shadow-xs">
+          <div>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 font-mono block">Total Runs</span>
+            <div className="text-xl font-bold tracking-tight text-[#141414] mt-1 font-mono">{runs.length}</div>
+          </div>
+          <div className="p-2 ml-4 bg-slate-50 border border-[#e5e5e3] rounded-sm text-slate-655">
+            <Layers className="w-4 h-4" />
+          </div>
+        </div>
+
+        {/* Successful Runs Card */}
+        <div className="bg-white border border-emerald-250 rounded-sm p-4 flex items-center justify-between shadow-xs">
+          <div>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-[#15803d] font-mono block">Successful Runs</span>
+            <div className="text-xl font-bold tracking-tight text-emerald-800 mt-1 font-mono">
+              {runs.filter(r => r.status === 'completed').length}
+            </div>
+          </div>
+          <div className="p-2 ml-4 bg-emerald-50 border border-emerald-100 rounded-sm text-emerald-600">
+            <CheckCircle2 className="w-4 h-4" />
+          </div>
+        </div>
+
+        {/* Failed Runs Card */}
+        <div className="bg-white border border-red-250 rounded-sm p-4 flex items-center justify-between shadow-xs">
+          <div>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-[#b91c1c] font-mono block">Failed & Escalated</span>
+            <div className="text-xl font-bold tracking-tight text-red-800 mt-1 font-mono">
+              {runs.filter(r => r.status === 'failed' || r.status === 'escalated').length}
+            </div>
+          </div>
+          <div className="p-2 ml-4 bg-red-50 border border-red-100 rounded-sm text-red-600">
+            <AlertTriangle className="w-4 h-4" />
+          </div>
         </div>
       </div>
 
@@ -302,14 +414,38 @@ export default function WorkflowRunsView() {
 
         {/* WORKFLOW PIPELINE HISTORIES LIST */}
         <div className="lg:col-span-7 bg-white border border-[#d1d1cf] rounded-sm p-4 space-y-4">
-          <div className="border-b border-[#d1d1cf] pb-2 flex items-center justify-between">
+          <div className="border-b border-[#d1d1cf] pb-2 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400 font-mono flex items-center gap-1.5">
               <Layers className="w-3.5 h-3.5 text-slate-450" />
               Workflow Runs & Telemetry History
             </h2>
-            <span className="text-[9px] bg-slate-100 border border-[#d1d1cf] font-mono font-bold py-0.5 px-2 rounded-sm text-slate-655 tracking-wide uppercase">
-              Runs: {runs.length}
-            </span>
+            <div className="flex items-center gap-2">
+              {runs.length > 0 && (
+                <div className="flex items-center gap-1 text-[10px] bg-slate-50 border border-[#d1d1cf] rounded-sm p-0.5">
+                  <span className="font-bold text-slate-400 px-1 font-mono uppercase text-[8px] flex items-center gap-0.5">
+                    <Download className="w-2.5 h-2.5" /> Export:
+                  </span>
+                  <button 
+                    onClick={exportRunsAsJSON}
+                    className="hover:bg-slate-200 text-slate-700 font-mono font-bold px-1.5 py-0.5 rounded-xs transition text-[9px] cursor-pointer"
+                    title="Export all runs as JSON"
+                  >
+                    JSON
+                  </button>
+                  <span className="text-[#d1d1cf]">&bull;</span>
+                  <button 
+                    onClick={exportRunsAsCSV}
+                    className="hover:bg-slate-200 text-slate-705 font-mono font-bold px-1.5 py-0.5 rounded-xs transition text-[9px] cursor-pointer"
+                    title="Export all runs as CSV"
+                  >
+                    CSV
+                  </button>
+                </div>
+              )}
+              <span className="text-[9px] bg-slate-100 border border-[#d1d1cf] font-mono font-bold py-0.5 px-2 rounded-sm text-slate-655 tracking-wide uppercase">
+                Runs: {runs.length}
+              </span>
+            </div>
           </div>
 
           {runs.length === 0 ? (
