@@ -429,14 +429,23 @@ export default function WorkflowBuilderView() {
       if (pcNode) {
         const pConfig = {
           name: pcNode.config.name || 'FuFire API',
-          apiUrl: pcNode.config.apiUrl || 'https://api.fufire.io',
-          secretRef: pcNode.config.secretRef || 'SECRET_REF_FUFIRE',
-          birthTimeFallback: {
-            birth_time: '12:00',
-            birth_time_known: false,
-            birth_time_source: 'default_noon'
-          }
-        };
+          baseUrl: pcNode.config.baseUrl || 'https://api.fufire.space',
+          apiKeySecretRef: pcNode.config.apiKeySecretRef || 'SECRET_REF_FUFIRE',
+          enabled: true,
+          endpointPaths: {
+            chronometryResolve: '/v1/chronometry/resolve',
+            bazi: '/v1/calculate/bazi',
+            baziTrace: '/v1/calculate/bazi/trace',
+            wuxing: '/v1/calculate/wuxing'
+          },
+          defaultStandard: 'CIVIL',
+          defaultBoundary: 'midnight',
+          ambiguousTimePolicy: 'earlier',
+          nonexistentTimePolicy: 'error',
+          timeoutMs: 10000,
+          retryCount: 3,
+          healthStatus: 'unknown'
+        } as any;
         await appServices.settings.savePersonalizationConfig(pConfig);
       }
 

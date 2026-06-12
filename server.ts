@@ -11,6 +11,23 @@ async function startServer() {
 
   app.use(express.json());
 
+  // Health Endpoint
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok" });
+  });
+
+  // Readiness Endpoint
+  app.get("/api/readiness", (req, res) => {
+    const requiredEnvVars = ["GEMINI_API_KEY", "APP_URL"];
+    const missing = requiredEnvVars.filter(v => !process.env[v]);
+    
+    if (missing.length === 0) {
+      res.json({ status: "ready" });
+    } else {
+      res.status(503).json({ status: "not_ready", missing });
+    }
+  });
+
   // FuFire Proxy Routes
   app.post("/api/fufire/*", async (req, res) => {
     try {
