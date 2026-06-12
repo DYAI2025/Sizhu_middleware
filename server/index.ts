@@ -13,18 +13,18 @@ async function startServer() {
 
   // Health Endpoint
   app.get("/api/health", (req, res) => {
-    res.json({ status: "ok" });
+    res.json({ status: "READY" });
   });
 
   // Readiness Endpoint
   app.get("/api/readiness", (req, res) => {
-    const requiredEnvVars = ["GEMINI_API_KEY", "APP_URL"];
+    const requiredEnvVars = ["GEMINI_API_KEY", "APP_URL", "FUFIRE_BASE_URL", "SUPABASE_URL"];
     const missing = requiredEnvVars.filter(v => !process.env[v]);
     
     if (missing.length === 0) {
-      res.json({ status: "ready" });
+      res.json({ status: "READY" });
     } else {
-      res.status(503).json({ status: "not_ready", missing });
+      res.status(503).json({ status: "NOT_READY", missing });
     }
   });
 
