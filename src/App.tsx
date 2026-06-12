@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { LocalDb } from './mockStorage';
 import { AppRoleName } from './types';
+// @ts-ignore
+import SizhuLogo from './assets/images/sizhu_logo_1781277019051.jpg';
 
 // Import our modular sub-views
 import DashboardView from './components/DashboardView';
@@ -139,7 +141,7 @@ export default function App() {
       {/* Mobile Top Header */}
       <div className="md:hidden bg-[#1a1a1a] text-white p-4 flex items-center justify-between border-b border-[#141414]">
         <span className="font-sans font-extrabold tracking-wider text-xs flex items-center gap-2 uppercase">
-          <Database className="w-4 h-4 text-blue-500" /> Bazzi Console
+          <img src={SizhuLogo} alt="Sizhu API Logo" className="w-5 h-5 rounded-sm object-cover shrink-0" referrerPolicy="no-referrer" /> Sizhu API
         </span>
         <button
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -159,8 +161,8 @@ export default function App() {
           <div className="flex flex-col">
             {/* Brand header */}
             <div className="p-6 flex items-center gap-3 border-b border-[#2a2a2a]">
-              <div className="w-8 h-8 bg-blue-500 rounded-sm flex items-center justify-center text-white font-bold text-sm">B</div>
-              <span className="text-xs font-bold tracking-wider text-white uppercase font-mono">Bazzi Console</span>
+              <img src={SizhuLogo} alt="Sizhu API Logo" className="w-8 h-8 rounded-sm object-cover" referrerPolicy="no-referrer" />
+              <span className="text-xs font-bold tracking-wider text-white uppercase font-mono">Sizhu API</span>
             </div>
 
             {/* Active Sim state */}

@@ -37,7 +37,7 @@ export default function DashboardView({ onNavigate }: { onNavigate: (view: strin
       <div className="bg-[#1a1a1a] border border-[#141414] text-white p-6 rounded-sm flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm">
         <div>
           <h1 className="text-xl font-sans font-bold tracking-tight text-white flex items-center gap-2">
-            Bazzi Middleware Console <span className="text-[10px] bg-blue-500/10 text-blue-400 font-mono py-0.5 px-2.5 rounded-sm border border-blue-500/30 font-bold uppercase">Stable Sandbox v1.0</span>
+            Sizhu API Console <span className="text-[10px] bg-blue-500/10 text-blue-400 font-mono py-0.5 px-2.5 rounded-sm border border-blue-500/30 font-bold uppercase">Stable Sandbox v1.0</span>
           </h1>
           <p className="text-xs text-[#a0a0a0] mt-1.5 max-w-2xl">
             You are logged in as <strong className="text-white underline font-mono">{currentRole}</strong>. Automating personalized designs from Etsy and Eatsy webhooks into print-on-demand deliverables via LLM-powered Quality Gates.
