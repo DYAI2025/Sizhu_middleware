@@ -1,0 +1,6 @@
+{
+  "name": "Bazzi Middleware Console",
+  "description": "Admin console for managing automated personalized print-on-demand workflows for Etsy/Eatsy shops with image generation, quality gates, and fulfillment integration.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

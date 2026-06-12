@@ -1,0 +1,182 @@
+/**
+ * Bazzi Middleware Console
+ * TypeScript Interfaces & Types
+ */
+
+export type AppRoleName = 'Owner' | 'Admin' | 'Observer' | 'Custom';
+
+export interface AppRole {
+  role: AppRoleName;
+  description: string;
+}
+
+export interface Permission {
+  id: string;
+  name: string;
+  description: string;
+}
+
+export interface RolePermissions {
+  role: AppRoleName;
+  permissions: string[]; // List of permission IDs
+}
+
+export interface ShopProduct {
+  id: string;
+  shopProvider: 'Etsy' | 'Eatsy';
+  externalProductId: string;
+  externalVariantId: string;
+  title: string;
+  productType: string;
+  isActive: boolean;
+  activeTemplateId?: string; // Binds to a prompt template
+  createdAt: string;
+}
+
+export interface PromptTemplate {
+  id: string;
+  name: string;
+  content: string; // Markdown prompt template
+  version: number; // e.g. 1, 2, 3
+  status: 'draft' | 'active' | 'archived';
+  createdAt: string;
+  createdBy: string;
+}
+
+export interface ProductTemplateBinding {
+  id: string;
+  productId: string;
+  templateId: string;
+  boundAt: string;
+}
+
+export interface GenerationConfig {
+  productId: string;
+  numInitiallyGenerated: number;
+  imageFormat: 'png' | 'jpeg';
+  imageQuality: 'standard' | 'hd';
+  primaryProvider: 'Gemini' | 'OpenAI' | 'Midjourney' | 'Stability';
+  primaryModel: string;
+  primarySecretRef: string; // e.g. SECRET_REF_OPENAI_MAIN
+  fallbackProvider: 'Gemini' | 'OpenAI' | 'Stability';
+  fallbackModel: string;
+  fallbackLLM: string;
+  fallbackSecretRef: string;
+}
+
+export interface QualityGate1Config {
+  productId: string;
+  llmProvider: 'Gemini' | 'OpenAI' | 'Claude';
+  model: string;
+  secretRef: string; // e.g. SECRET_REF_OPENAI_QA
+  fallbackProvider: 'Gemini' | 'OpenAI';
+  fallbackModel: string;
+  fallbackSecretRef: string;
+  qaPrompt: string;
+  referenceImages: string[]; // Storage keys or base64 images
+  faultTolerance: 'low' | 'medium' | 'high';
+  minAcceptanceScore: number; // e.g. 80 out of 100
+  maxRejectedBeforeEscalation: number; // e.g. 3
+  escalationEmailTemplate: string;
+}
+
+export interface PersonalizationConfig {
+  name: string; // Default: FuFire API
+  apiUrl: string;
+  secretRef: string; // e.g. SECRET_REF_FUFIRE
+  birthTimeFallback: {
+    birth_time: string; // "12:00"
+    birth_time_known: boolean; // false
+    birth_time_source: string; // "default_noon"
+  };
+}
+
+export interface PodProviderConfig {
+  id: string;
+  name: string; // Default: Gelato
+  baseUrl: string;
+  secretRef: string; // e.g. SECRET_REF_GELATO
+  dispatchMode: 'draft' | 'order';
+  productUidMappings: Record<string, string>; // Maps productId -> External POD UID
+}
+
+export interface WorkflowRun {
+  id: string;
+  orderNumber: string;
+  productId: string;
+  customerName: string;
+  birthDate: string;
+  birthTime: string;
+  birthTimeKnown: boolean;
+  birthPlace: string;
+  status: 'running' | 'completed' | 'escalated' | 'failed';
+  startedAt: string;
+  completedAt?: string;
+  personalizationData?: any;
+  acceptedArtifactId?: string;
+  currentIteration: number;
+}
+
+export interface ImageArtifact {
+  id: string;
+  workflowRunId: string;
+  orderNumber: string;
+  productId: string;
+  templateId: string;
+  iteration: number;
+  candidateIndex: number;
+  storagePath: string; // URL or Mock Base64 Path
+  status: 'accepted' | 'rejected' | 'not_selected' | 'failed_generation';
+  qaScore: number;
+  rejectionReason?: string;
+  qaResultJson: string; // Detail string serialization
+  generatedAt: string;
+}
+
+export interface WorkflowLog {
+  id: string;
+  runId: string;
+  orderNumber: string;
+  timestamp: string;
+  step: string;
+  message: string;
+  providerUsed?: string;
+  modelUsed?: string;
+  iteration?: number;
+  status: 'info' | 'success' | 'warning' | 'error';
+}
+
+// ==========================================
+// Visual Workflow & RBAC Database Interfaces
+// ==========================================
+
+export interface WorkflowNode {
+  id: string;
+  type: 'template' | 'generation' | 'quality_gate' | 'personalization' | 'pod';
+  title: string;
+  description: string;
+  x: number;
+  y: number;
+  config: any; // Saves corresponding sub-config
+}
+
+export interface WorkflowConnection {
+  id: string;
+  source: string;
+  target: string;
+}
+
+export interface VisualWorkflow {
+  productId: string;
+  nodes: WorkflowNode[];
+  edges: WorkflowConnection[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AppUser {
+  id: string;
+  email: string;
+  role: AppRoleName;
+  createdAt: string;
+}
