@@ -15,7 +15,7 @@ async function startServer() {
   app.use(express.json());
 
   // CORS Configuration
-  const allowedOrigins = (process.env.ALLOWED_ORIGINS || "https://sizhu.fufire.space,http://localhost:5173,http://localhost:3000").split(",");
+  const allowedOrigins = (process.env.ALLOWED_ORIGINS || "https://sizhu.fufire.space,http://localhost:5173,http://localhost:3000").split(",").map(o => o.trim()).filter(Boolean);
   app.use(cors({
     origin: function (origin, callback) {
       if (!origin) return callback(null, true);
