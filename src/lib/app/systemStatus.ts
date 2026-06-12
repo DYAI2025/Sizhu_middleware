@@ -19,9 +19,9 @@ export function getSystemStatus(): SystemStatus {
   const domainTarget = 'sizhu.fufire.space';
   const defaultDomainStatus = 'UNVERIFIED';
 
-  if (mode === 'MOCK_LOCAL') {
+  if (mode === 'DEMO_LOCAL') {
     return {
-      appMode: 'MOCK_LOCAL',
+      appMode: 'DEMO_LOCAL',
       fufire: 'MOCK',
       gelato: 'MOCK',
       database: 'LOCAL MOCK',
@@ -30,33 +30,33 @@ export function getSystemStatus(): SystemStatus {
       domainTarget,
       domainStatus: defaultDomainStatus
     };
-  } else if (mode === 'SUPABASE_STUB') {
+  } else if (mode === 'SUPABASE_READY') {
     return {
-      appMode: 'SUPABASE_STUB',
-      fufire: 'LIVE_DISABLED',
-      gelato: 'LIVE_DISABLED',
-      database: 'SUPABASE STUB',
-      security: 'RLS NOT ACTIVE',
+      appMode: 'SUPABASE_READY',
+      fufire: 'CONFIGURED',
+      gelato: 'CONFIGURED',
+      database: 'SUPABASE READY',
+      security: 'RLS CONFIGURED',
       systemOperational: false,
       domainTarget,
       domainStatus: defaultDomainStatus
     };
-  } else if (mode === 'SUPABASE_DISABLED') {
+  } else if (mode === 'PRODUCTION') {
     return {
-      appMode: 'SUPABASE_DISABLED',
-      fufire: 'LIVE_DISABLED',
-      gelato: 'LIVE_DISABLED',
-      database: 'SUPABASE STUB',
-      security: 'RLS NOT ACTIVE',
+      appMode: 'PRODUCTION',
+      fufire: 'LIVE',
+      gelato: 'LIVE',
+      database: 'SUPABASE READY',
+      security: 'RLS CONFIGURED',
       systemOperational: false,
       domainTarget,
       domainStatus: defaultDomainStatus
     };
   } else {
     return {
-      appMode: 'PRODUCTION_NOT_READY',
-      fufire: 'ERROR',
-      gelato: 'ERROR',
+      appMode: 'CONFIG_REQUIRED',
+      fufire: 'LIVE_DISABLED',
+      gelato: 'LIVE_DISABLED',
       database: 'SUPABASE STUB',
       security: 'RLS NOT ACTIVE',
       systemOperational: false,

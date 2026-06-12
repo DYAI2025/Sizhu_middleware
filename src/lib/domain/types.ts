@@ -142,7 +142,7 @@ export interface PodProviderConfig {
   name: string;
   baseUrl: string;
   secretRef: string;
-  dispatchMode: 'draft' | 'order';
+  dispatchMode: 'disabled' | 'draft' | 'order';
   productUidMappings: Record<string, string>;
 }
 
@@ -165,7 +165,7 @@ export interface WorkflowRun {
   birthTime: string;
   birthTimeKnown: boolean;
   birthPlace: string;
-  status: 'running' | 'completed' | 'escalated' | 'failed';
+  status: 'running' | 'pod_ready' | 'completed' | 'escalated' | 'failed';
   startedAt: string;
   completedAt?: string;
   personalizationData?: any;

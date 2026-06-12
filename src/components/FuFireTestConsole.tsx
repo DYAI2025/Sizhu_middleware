@@ -32,93 +32,43 @@ export function FuFireTestConsole({ personalization }: { personalization: Person
     }
 
     try {
-      const chronometryBody = {
-        birth: {
-          calendar_policy: 'gregorian',
-          datetime: `${birthDate}T${testTime}`,
-          location: { lat: parseFloat(manualLat), lon: parseFloat(manualLon) },
-          timezone: manualTz
+      const payload = {
+        name,
+        birthDate,
+        birthTime: birthTimeKnown ? birthTime : '12:00:00',
+        birthTimeKnown,
+        birthPlaceRaw,
+        manualLat: parseFloat(manualLat) || undefined,
+        manualLon: parseFloat(manualLon) || undefined,
+        manualTimezone: manualTz,
+        language,
+        requestedOperations: ['chronometry', 'bazi', 'baziTrace', 'wuxing']
+      };
+
+      const res = await fetch('/api/data-requests/fufire/test-run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+      
+      if (!res.ok || data.gatewayIssues?.length > 0) {
+        // Find if there is a blocking API-level error inside the response
+        const majorIssue = data.gatewayIssues?.find((i: any) => i.severity === 'major');
+        if (majorIssue) {
+           throw new Error(majorIssue.errorCode || majorIssue.message || 'API Error');
         }
-      };
-
-      const chronoRes = await fetch('/api/fufire/chronometry/resolve', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fuFireConfig: personalization,
-          fufirePath: personalization.endpointPaths.chronometryResolve,
-          body: chronometryBody
-        })
-      });
-
-      if (!chronoRes.ok) {
-        const errorData = await chronoRes.json().catch(() => ({}));
-        throw new Error(errorData.error || 'FUFIRE_CHRONOMETRY_FAILED');
+        if (!res.ok) {
+           throw new Error(data.message || data.error_code || 'API Error');
+        }
       }
-
-      const chronoData = await chronoRes.json();
-
-      const baziBody = {
-        date: `${birthDate}T${testTime}`,
-        tz: manualTz,
-        lat: parseFloat(manualLat),
-        lon: parseFloat(manualLon),
-        standard: personalization.defaultStandard,
-        boundary: personalization.defaultBoundary,
-        ambiguousTime: personalization.ambiguousTimePolicy,
-        nonexistentTime: personalization.nonexistentTimePolicy,
-        birth_time_known: birthTimeKnown,
-        include_trace: true
-      };
-
-      const baziRes = await fetch('/api/fufire/calculate/bazi/trace', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fuFireConfig: personalization,
-          fufirePath: personalization.endpointPaths.baziTrace,
-          body: baziBody
-        })
-      });
-
-      if (!baziRes.ok) {
-        const errorData = await baziRes.json().catch(() => ({}));
-        throw new Error(errorData.error || 'FUFIRE_BAZI_FAILED');
-      }
-
-      const baziData = await baziRes.json();
-
-      const wuxingBody = {
-        date: `${birthDate}T${testTime}`,
-        tz: manualTz,
-        lat: parseFloat(manualLat),
-        lon: parseFloat(manualLon),
-        ambiguousTime: personalization.ambiguousTimePolicy,
-        nonexistentTime: personalization.nonexistentTimePolicy
-      };
-
-      const wuxingRes = await fetch('/api/fufire/calculate/wuxing', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fuFireConfig: personalization,
-          fufirePath: personalization.endpointPaths.wuxing,
-          body: wuxingBody
-        })
-      });
-
-      if (!wuxingRes.ok) {
-        const errorData = await wuxingRes.json().catch(() => ({}));
-        throw new Error(errorData.error || 'FUFIRE_WUXING_FAILED');
-      }
-
-      const wuxingData = await wuxingRes.json();
 
       setResults({
-        chronometry: { request: chronometryBody, response: chronoData },
-        bazi: { request: baziBody, response: baziData },
-        wuxing: { request: wuxingBody, response: wuxingData },
-        warnings
+        requests: data.requests,
+        responses: data.responses,
+        warnings: data.warnings,
+        gatewayIssues: data.gatewayIssues
       });
 
     } catch (err: any) {
@@ -189,7 +139,7 @@ export function FuFireTestConsole({ personalization }: { personalization: Person
 
       {results && (
         <div className="space-y-4">
-          {results.warnings.length > 0 && (
+          {results.warnings?.length > 0 && (
             <div className="p-3 border border-nt bg-b2 text-da text-[10px] font-mono rounded-sm">
               <strong className="text-nt">Warnings:</strong>
               <ul className="list-disc pl-4 mt-1">
@@ -197,45 +147,38 @@ export function FuFireTestConsole({ personalization }: { personalization: Person
               </ul>
             </div>
           )}
-          <div className="p-4 border border-nt bg-b1 rounded-sm text-[10px] font-mono">
-            <h4 className="font-bold text-nt uppercase mb-2 border-b border-nt pb-1">Chronometry</h4>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="font-bold mb-1">Request</p>
-                <pre className="bg-[#3C3C3C] text-[#EDE3DA] p-2 rounded overflow-x-auto">{JSON.stringify(results.chronometry.request, null, 2)}</pre>
-              </div>
-              <div>
-                <p className="font-bold mb-1">Response</p>
-                <pre className="bg-[#3C3C3C] text-[#EDE3DA] p-2 rounded overflow-x-auto">{JSON.stringify(results.chronometry.response, null, 2)}</pre>
-              </div>
+          
+          {results.gatewayIssues?.length > 0 && (
+            <div className="p-3 border border-red-500 bg-red-900/20 text-da text-[10px] font-mono rounded-sm">
+              <strong className="text-red-400">Gateway Issues:</strong>
+              <ul className="list-disc pl-4 mt-1">
+                {results.gatewayIssues.map((w: any, i: number) => (
+                  <li key={i} className="text-red-300">
+                    [{w.errorCode}] {w.message}
+                  </li>
+                ))}
+              </ul>
             </div>
-          </div>
-          <div className="p-4 border border-nt bg-b1 rounded-sm text-[10px] font-mono">
-            <h4 className="font-bold text-nt uppercase mb-2 border-b border-nt pb-1">BaZi</h4>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="font-bold mb-1">Request</p>
-                <pre className="bg-[#3C3C3C] text-[#EDE3DA] p-2 rounded overflow-x-auto">{JSON.stringify(results.bazi.request, null, 2)}</pre>
+          )}
+
+          {results.requests?.map((req: any, index: number) => {
+            const res = results.responses.find((r: any) => r.operation === req.operation);
+            return (
+              <div key={index} className="p-4 border border-nt bg-b1 rounded-sm text-[10px] font-mono">
+                <h4 className="font-bold text-nt uppercase mb-2 border-b border-nt pb-1">{req.operation}</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="font-bold mb-1">Request</p>
+                    <pre className="bg-[#3C3C3C] text-[#EDE3DA] p-2 rounded overflow-x-auto whitespace-pre-wrap">{JSON.stringify(req.body, null, 2)}</pre>
+                  </div>
+                  <div>
+                    <p className="font-bold mb-1">Response / Error</p>
+                    <pre className="bg-[#3C3C3C] text-[#EDE3DA] p-2 rounded overflow-x-auto whitespace-pre-wrap">{JSON.stringify(res?.data || res?.error, null, 2)}</pre>
+                  </div>
+                </div>
               </div>
-              <div>
-                <p className="font-bold mb-1">Response</p>
-                <pre className="bg-[#3C3C3C] text-[#EDE3DA] p-2 rounded overflow-x-auto">{JSON.stringify(results.bazi.response, null, 2)}</pre>
-              </div>
-            </div>
-          </div>
-          <div className="p-4 border border-nt bg-b1 rounded-sm text-[10px] font-mono">
-            <h4 className="font-bold text-nt uppercase mb-2 border-b border-nt pb-1">WuXing</h4>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="font-bold mb-1">Request</p>
-                <pre className="bg-[#3C3C3C] text-[#EDE3DA] p-2 rounded overflow-x-auto">{JSON.stringify(results.wuxing.request, null, 2)}</pre>
-              </div>
-              <div>
-                <p className="font-bold mb-1">Response</p>
-                <pre className="bg-[#3C3C3C] text-[#EDE3DA] p-2 rounded overflow-x-auto">{JSON.stringify(results.wuxing.response, null, 2)}</pre>
-              </div>
-            </div>
-          </div>
+            );
+          })}
         </div>
       )}
     </div>

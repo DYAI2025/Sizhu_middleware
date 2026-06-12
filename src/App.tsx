@@ -133,7 +133,7 @@ export default function App() {
     { name: 'Generation Providers', icon: Cpu },
     { name: 'Quality Gate 1', icon: ShieldCheck },
     { name: 'Personalization API', icon: Zap },
-    { name: 'POD Providers', icon: Printer }
+    { name: 'Fulfillment / Shipping APIs', icon: Printer }
   ];
 
   const opsMenus = [
@@ -166,8 +166,8 @@ export default function App() {
         return <ConfigurationViews activeSection="Quality Gate 1" />;
       case 'Personalization API':
         return <ConfigurationViews activeSection="Personalization API" />;
-      case 'POD Providers':
-        return <ConfigurationViews activeSection="POD Providers" />;
+      case 'Fulfillment / Shipping APIs':
+        return <ConfigurationViews activeSection="Fulfillment / Shipping APIs" />;
       case 'Workflow Runs':
         return <WorkflowRunsView />;
       case 'Image Artifacts':
@@ -345,8 +345,8 @@ export default function App() {
           <footer className="h-8 bg-b2 text-[9px] text-nt flex items-center justify-between px-6 border-t border-da select-none mt-12 mb-0 rounded-sm">
             <div className="flex items-center gap-6">
               <span className={`${status.systemOperational ? 'text-ac' : 'text-ac'} flex items-center gap-1 font-bold font-mono`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${status.systemOperational ? 'bg-ac' : 'bg-ac'}`}></span>
-                {status.systemOperational ? 'SYSTEM OPERATIONAL' : 'SYSTEM OFFLINE / TEST'}
+                <span className={`w-1.5 h-1.5 rounded-full ${status.systemOperational ? 'bg-ac' : 'bg-nt'}`}></span>
+                {status.appMode === 'DEMO_LOCAL' ? 'DEMO_LOCAL' : status.systemOperational ? 'LIVE_VERIFIED' : 'CONFIG_REQUIRED / NOT_READY'}
               </span>
               <span className="font-mono text-[9px]">DB: {status.database}</span>
               <span className="font-mono text-[9px]">SECURE: {status.security}</span>

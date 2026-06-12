@@ -122,7 +122,7 @@ describe('Bazzi Workflow System Tests', () => {
     // Verification of Workflow structure
     expect(resultRun).toBeDefined();
     expect(resultRun.orderNumber).toBe('ORD-77491');
-    expect(resultRun.status).toBe('completed'); // Passed iteration 1 successfully in Mock gate!
+    expect(resultRun.status).toBe('pod_ready'); // Passed iteration 1 successfully in Mock gate, waits for manual POD dispatch
 
     // Verify 4. Workflow creates N image artifacts for N candidates
     const postArtifacts = await artifactsRepo.getImageArtifacts();

@@ -15,7 +15,7 @@ export class MockPodProvider implements PodProvider {
   ): Promise<{
     success: boolean;
     podOrderId: string;
-    dispatchMode: 'draft' | 'order';
+    dispatchMode: 'disabled' | 'draft' | 'order';
     estimatedDelivery: string;
   }> {
     await new Promise((resolve) => setTimeout(resolve, 50));

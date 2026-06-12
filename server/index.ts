@@ -3,12 +3,14 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 import cors from "cors";
+import { FuFireDataService } from "./services/fufireDataService";
+import { PodDispatchService } from "./services/podDispatchService";
 
 dotenv.config();
 
 async function startServer() {
   const app = express();
-  const PORT = process.env.PORT || 3000;
+  const PORT = Number(process.env.PORT || 3000);
 
   app.use(express.json());
 
@@ -52,6 +54,64 @@ async function startServer() {
   });
 
   // FuFire Proxy Routes
+  
+  const fufireDataService = new FuFireDataService();
+
+  app.post("/api/data-requests/fufire/test-run", async (req, res) => {
+    try {
+      const result = await fufireDataService.executeTestRun(req.body);
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ 
+         ok: false, 
+         error_code: "INTERNAL_SERVER_ERROR", 
+         message: err.message, 
+         retryable: false 
+      });
+    }
+  });
+
+  const podDispatchService = new PodDispatchService();
+
+  app.get("/api/fulfillment/readiness", (req, res) => {
+    // Return whether we are configured to dispatch
+    const mode = process.env.POD_DISPATCH_MODE;
+    if (!mode || mode === 'disabled') {
+      return res.status(503).json({ status: "NOT_READY", reason: "POD dispatch is currently disabled via configuration." });
+    }
+    if (!process.env.SECRET_REF_GELATO_API_KEY) {
+      return res.status(503).json({ status: "NOT_READY", reason: "Missing POD credentials." });
+    }
+    res.json({ status: "READY" });
+  });
+
+  app.post("/api/fulfillment/pod/validate-dispatch", async (req, res) => {
+    // Just a dry-run check
+    const { workflowRunId, artifact } = req.body;
+    if (!workflowRunId || !artifact) {
+      return res.status(400).json({ ok: false, error_code: 'INVALID_REQUEST' });
+    }
+    res.json({ ok: true, status: "READY_FOR_DISPATCH" });
+  });
+
+  app.post("/api/fulfillment/pod/dispatch", async (req, res) => {
+    try {
+      const { workflowRunId, input, artifact } = req.body;
+      const result = await podDispatchService.dispatchArtifact(workflowRunId, input, artifact);
+      if (!result.ok) {
+        return res.status(400).json(result);
+      }
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ 
+         ok: false, 
+         error_code: "INTERNAL_SERVER_ERROR", 
+         message: err.message, 
+         retryable: false 
+      });
+    }
+  });
+
   app.post("/api/fufire/*", async (req, res) => {
     try {
       const { fuFireConfig, fufirePath, body } = req.body;

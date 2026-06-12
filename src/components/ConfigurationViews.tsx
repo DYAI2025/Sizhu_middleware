@@ -648,7 +648,7 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
       )}
 
       {/* 5. POD PROVIDER VIEW */}
-      {activeSection === 'POD Providers' && podConfig && (
+      {activeSection === 'Fulfillment / Shipping APIs' && podConfig && (
         <div className="bg-b1 border border-nt p-6 rounded-sm space-y-5 animate-fade-in text-da">
           <div className="flex border-b border-nt pb-3 items-center justify-between">
             <div>
@@ -656,7 +656,7 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
               <p className="text-xs text-nt mt-1">Configure automated dispatch specifications for Print-On-Demand dispatchers.</p>
             </div>
             <span className="bg-b1 border border-ac text-ac text-[10px] py-1 px-3.5 rounded-sm font-mono font-bold uppercase tracking-wide leading-none">
-              API_READY
+              {podConfig.dispatchMode === 'disabled' ? 'DISABLED' : 'CONFIG_REQUIRED'}
             </span>
           </div>
 
@@ -668,7 +668,8 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
                 disabled={isObserver}
                 value={podConfig.name}
                 onChange={(e) => setPodConfig({ ...podConfig, name: e.target.value })}
-                className="w-full border border-nt rounded-sm p-2 font-mono font-bold mt-1 text-xs"
+                className="w-full border border-nt rounded-sm p-2 font-mono font-bold mt-1 text-xs bg-b2 text-nt"
+                readOnly
               />
             </div>
 
@@ -702,6 +703,7 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
                 onChange={(e) => setPodConfig({ ...podConfig, dispatchMode: e.target.value as any })}
                 className="w-full border border-nt bg-b1 rounded-sm p-2 font-bold font-mono text-xs text-da mt-1"
               >
+                <option value="disabled">Disabled (No API connection)</option>
                 <option value="draft">Queue Creator Only (Build Draft Orders)</option>
                 <option value="order">Direct AutoSubmit (Instant Production)</option>
               </select>

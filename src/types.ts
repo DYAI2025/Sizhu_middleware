@@ -105,7 +105,7 @@ export interface PodProviderConfig {
   name: string; // Default: Gelato
   baseUrl: string;
   secretRef: string; // e.g. SECRET_REF_GELATO
-  dispatchMode: 'draft' | 'order';
+  dispatchMode: 'disabled' | 'draft' | 'order';
   productUidMappings: Record<string, string>; // Maps productId -> External POD UID
 }
 
@@ -118,7 +118,7 @@ export interface WorkflowRun {
   birthTime: string;
   birthTimeKnown: boolean;
   birthPlace: string;
-  status: 'running' | 'completed' | 'escalated' | 'failed';
+  status: 'running' | 'pod_ready' | 'completed' | 'escalated' | 'failed';
   startedAt: string;
   completedAt?: string;
   personalizationData?: any;

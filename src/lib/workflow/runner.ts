@@ -306,27 +306,17 @@ export class WorkflowRunner {
       // State Machine assert check
       WorkflowStateMachine.assertDispatchAllowed(newRun, matchedArtifact);
 
-      // 100% QA Passed! Auto submit to POD
-      await saveAndFireLog(`QA Verified. Connecting to POD fulfillment provider Gelato...`, 'POD_SUBMISSION', 'info');
-      
-      const submitResponse = await this.podProvider.submitOrder(
-        runId,
-        orderNumber,
-        productId,
-        matchedArtifact,
-        podConfig
-      );
-
-      await saveAndFireLog(`POD dispatch submitted successfully! Order Reference: ${submitResponse.podOrderId}. Dispatch Mode: ${submitResponse.dispatchMode.toUpperCase()}`, 'POD_SUBMISSION', 'success');
+      // 100% QA Passed! We stop here and set to pod_ready. No auto-submit.
+      await saveAndFireLog(`QA Verified. Artifact is ready for POD dispatch. Automatic dispatch disabled by config. Action required.`, 'POD_READY', 'info');
 
       if (lIdx !== -1) {
-        runsLatest[lIdx].status = 'completed';
+        runsLatest[lIdx].status = 'pod_ready'; // Wait for manual dispatch or configured auto-job later
         runsLatest[lIdx].acceptedArtifactId = matchedArtifact.id;
         runsLatest[lIdx].completedAt = new Date().toISOString();
         await this.workflowRepo.saveWorkflowRuns(runsLatest);
       }
 
-      await saveAndFireLog(`Automated orchestration completed successfully.`, 'PIPELINE_COMPLETE', 'success');
+      await saveAndFireLog(`Automated orchestration paused awaiting execution boundary.`, 'PIPELINE_COMPLETE', 'success');
     } else {
       // Escalate using EscalationService!
       await saveAndFireLog(`ESCALATION LIMIT TRIGGERED! Exceeded maximum limit of ${qualityConfig.maxRejectedBeforeEscalation} rejected iterations.`, 'ESCALATION_TRIGGER', 'error');

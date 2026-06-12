@@ -84,7 +84,7 @@ export interface PodProvider {
   ): Promise<{
     success: boolean;
     podOrderId: string;
-    dispatchMode: 'draft' | 'order';
+    dispatchMode: 'disabled' | 'draft' | 'order';
     estimatedDelivery: string;
   }>;
 }

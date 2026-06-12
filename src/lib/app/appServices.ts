@@ -82,34 +82,34 @@ export const appServices = {
   },
   
   get products() {
-    return getAppMode() === 'MOCK_LOCAL' ? localProductRepo : supabaseProductRepo;
+    return getAppMode() === 'DEMO_LOCAL' ? localProductRepo : supabaseProductRepo;
   },
   
   get templates() {
-    return getAppMode() === 'MOCK_LOCAL' ? localTemplateRepo : supabaseTemplateRepo;
+    return getAppMode() === 'DEMO_LOCAL' ? localTemplateRepo : supabaseTemplateRepo;
   },
   
   get workflows() {
-    return getAppMode() === 'MOCK_LOCAL' ? localWorkflowRepo : supabaseWorkflowRepo;
+    return getAppMode() === 'DEMO_LOCAL' ? localWorkflowRepo : supabaseWorkflowRepo;
   },
   
   get artifacts() {
-    return getAppMode() === 'MOCK_LOCAL' ? localArtifactRepo : supabaseArtifactRepo;
+    return getAppMode() === 'DEMO_LOCAL' ? localArtifactRepo : supabaseArtifactRepo;
   },
   
   get settings() {
-    return getAppMode() === 'MOCK_LOCAL' ? localSettingsRepo : supabaseSettingsRepo;
+    return getAppMode() === 'DEMO_LOCAL' ? localSettingsRepo : supabaseSettingsRepo;
   },
   
   get roles() {
-    return getAppMode() === 'MOCK_LOCAL' ? localRoleRepo : supabaseRoleRepo;
+    return getAppMode() === 'DEMO_LOCAL' ? localRoleRepo : supabaseRoleRepo;
   },
   
   get providers() {
-    return getAppMode() === 'MOCK_LOCAL' ? localProviderRepo : supabaseProviderRepo;
+    return getAppMode() === 'DEMO_LOCAL' ? localProviderRepo : supabaseProviderRepo;
   },
   
   get workflowRunner() {
-    return getAppMode() === 'MOCK_LOCAL' ? localRunner : supabaseRunner;
+    return getAppMode() === 'DEMO_LOCAL' ? localRunner : supabaseRunner;
   }
 };
