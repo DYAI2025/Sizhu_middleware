@@ -487,12 +487,14 @@ export default function WorkflowRunsView() {
                       <div className="flex items-center gap-3">
                         <span className={`p-1.5 rounded-sm border ${
                           run.status === 'completed' ? 'bg-emerald-50 border-emerald-300 text-emerald-700' :
-                          run.status === 'escalated' ? 'bg-red-50 border-red-300 text-red-700' :
-                          'bg-amber-50 border-amber-305 text-amber-700'
-                        }`}>
+                          run.status === 'failed' ? 'bg-red-50 border-red-300 text-red-700' :
+                          run.status === 'escalated' ? 'bg-amber-50 border-amber-300 text-amber-700' :
+                          'bg-indigo-50 border-indigo-300 text-indigo-700'
+                        }`} title={`State: ${run.status}`}>
                           {run.status === 'completed' ? <CheckCircle2 className="w-4 h-4" /> :
+                           run.status === 'failed' ? <AlertCircle className="w-4 h-4" /> :
                            run.status === 'escalated' ? <AlertTriangle className="w-4 h-4" /> :
-                           <Clock className="w-4 h-4" />}
+                           <Loader2 className="w-4 h-4 animate-spin" />}
                         </span>
                         <div>
                           <div className="font-bold text-[#141414] text-[13px] flex items-center gap-2">
@@ -508,11 +510,20 @@ export default function WorkflowRunsView() {
                       </div>
 
                       <div className="text-right flex items-center gap-2">
-                        <span className={`text-[9px] font-bold font-mono py-0.5 px-2 border uppercase rounded-sm ${
-                          run.status === 'completed' ? 'bg-emerald-100 text-emerald-800 border-emerald-250' :
-                          run.status === 'escalated' ? 'bg-red-100 text-red-800 border-red-250' :
-                          'bg-amber-100 text-amber-800 border-amber-250'
-                        }`}>
+                        <span 
+                          className={`text-[9px] font-bold font-mono py-0.5 px-2 border uppercase rounded-sm ${
+                            run.status === 'completed' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' :
+                            run.status === 'failed' ? 'bg-red-100 text-red-800 border-red-300' :
+                            run.status === 'escalated' ? 'bg-amber-100 text-amber-800 border-amber-300' :
+                            'bg-indigo-100 text-indigo-800 border-indigo-300'
+                          }`}
+                          title={
+                            run.status === 'completed' ? 'Workflow successfully executed the complete generation pipeline and accepted an artifact' :
+                            run.status === 'failed' ? 'Workflow encountered a hard system failure or crash before completion' :
+                            run.status === 'escalated' ? 'Workflow exceeded maximum rejected iterations and triggered a human escalation sequence' :
+                            'Workflow is currently processing and iterating through the pipeline'
+                          }
+                        >
                           {run.status}
                         </span>
                         <span className="text-[10px] font-mono text-slate-400 uppercase font-bold">{isExpanded ? 'CLOSE' : 'OPEN'}</span>

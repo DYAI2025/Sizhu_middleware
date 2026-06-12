@@ -41,6 +41,7 @@ export default function App() {
   const [activeMenu, setActiveMenu] = useState<string>('Dashboard');
   const [currentRole, setCurrentRole] = useState<AppRoleName>('Owner');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
+  const [hasRunningWorkflows, setHasRunningWorkflows] = useState<boolean>(false);
 
   const status = getSystemStatus();
 
@@ -69,6 +70,22 @@ export default function App() {
     return () => {
       window.removeEventListener('bazzi_role_changed', handleRoleChange);
     };
+  }, []);
+
+  useEffect(() => {
+    // Poll for running workflows to animate nav link
+    const checkRunningWorkflows = async () => {
+      try {
+        const runs = await appServices.workflows.getWorkflowRuns();
+        setHasRunningWorkflows(runs.some(r => r.status === 'running'));
+      } catch (e) {
+        // silently ignore
+      }
+    };
+    
+    checkRunningWorkflows();
+    const interval = setInterval(checkRunningWorkflows, 2500); // Check every 2.5s
+    return () => clearInterval(interval);
   }, []);
 
   const managementMenus = [
@@ -134,19 +151,31 @@ export default function App() {
   const renderNavLink = (m: { name: string; icon: any }) => {
     const Icon = m.icon;
     const isActive = activeMenu === m.name;
+    const isWorkflowRuns = m.name === 'Workflow Runs';
+    const showPulse = isWorkflowRuns && hasRunningWorkflows;
+
     return (
       <button
         key={m.name}
         id={`nav-link-${m.name.replace(/\s+/g, '-').toLowerCase()}`}
         onClick={() => handleNavigate(m.name)}
-        className={`w-full flex items-center gap-3 py-2 px-6 text-xs transition-colors text-left cursor-pointer ${
+        className={`w-full flex items-center justify-between py-2 px-6 text-xs transition-colors text-left cursor-pointer ${
           isActive 
             ? 'bg-[#2a2a2a] text-white border-r-2 border-blue-500 font-bold' 
             : 'text-[#a0a0a0] hover:bg-[#2a2a2a] hover:text-white font-medium'
         }`}
       >
-        <Icon className="w-3.5 h-3.5 shrink-0" />
-        <span>{m.name}</span>
+        <div className="flex items-center gap-3">
+          <Icon className={`w-3.5 h-3.5 shrink-0 ${showPulse && !isActive ? 'text-indigo-400' : ''}`} />
+          <span className={`${showPulse && !isActive ? 'text-indigo-200' : ''}`}>{m.name}</span>
+        </div>
+        
+        {showPulse && (
+          <span className="relative flex h-2 w-2 shrink-0">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+          </span>
+        )}
       </button>
     );
   };
