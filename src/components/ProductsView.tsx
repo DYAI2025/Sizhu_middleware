@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { LocalDb } from '../mockStorage';
+import { appServices } from '../lib/app/appServices';
 import { ShopProduct, PromptTemplate, GenerationConfig } from '../types';
 import { Plus, Edit2, ToggleLeft, ToggleRight, Settings, Loader2, Save, Trash, HelpCircle, X } from 'lucide-react';
 
@@ -36,14 +36,27 @@ export default function ProductsView() {
   const [notification, setNotification] = useState<string | null>(null);
 
   useEffect(() => {
-    loadData();
-    setRole(LocalDb.getActiveRole());
+    const init = async () => {
+      const activeRole = await appServices.roles.getActiveRole();
+      setRole(activeRole);
+      await loadData();
+    };
+    init();
   }, []);
 
-  const loadData = () => {
-    setProducts(LocalDb.getProducts());
-    setTemplates(LocalDb.getTemplates().filter(t => t.status === 'active'));
-    setGenConfigs(LocalDb.getGenConfigs());
+  const loadData = async () => {
+    try {
+      const [allProducts, allTemplates, allConfigs] = await Promise.all([
+        appServices.products.getProducts(),
+        appServices.templates.getTemplates(),
+        appServices.settings.getGenConfigs()
+      ]);
+      setProducts(allProducts);
+      setTemplates(allTemplates.filter(t => t.status === 'active'));
+      setGenConfigs(allConfigs);
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const isObserver = role === 'Observer';
@@ -114,7 +127,7 @@ export default function ProductsView() {
     setFallbackSecret(config.fallbackSecretRef);
   };
 
-  const toggleProductActive = (product: ShopProduct) => {
+  const toggleProductActive = async (product: ShopProduct) => {
     if (isObserver) return;
     const updated = products.map(p => {
       if (p.id === product.id) {
@@ -122,12 +135,16 @@ export default function ProductsView() {
       }
       return p;
     });
-    LocalDb.saveProducts(updated);
-    setProducts(updated);
-    showNotification(`Product status updated successfully`);
+    try {
+      await appServices.products.saveProducts(updated);
+      setProducts(updated);
+      showNotification(`Product status updated successfully`);
+    } catch (e) {
+      alert((e as Error).message);
+    }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (isObserver || !editingProduct) return;
 
     if (!title || !extId || !variantId || !productType) {
@@ -176,15 +193,19 @@ export default function ProductsView() {
       updatedConfigs.push(savedConfig);
     }
 
-    LocalDb.saveProducts(updatedProducts);
-    LocalDb.saveGenConfigs(updatedConfigs);
-    
-    setProducts(updatedProducts);
-    setGenConfigs(updatedConfigs);
+    try {
+      await appServices.products.saveProducts(updatedProducts);
+      await appServices.settings.saveGenConfigs(updatedConfigs);
+      
+      setProducts(updatedProducts);
+      setGenConfigs(updatedConfigs);
 
-    setEditingProduct(null);
-    setSelectedConfig(null);
-    showNotification(`Product "${title}" saved successfully`);
+      setEditingProduct(null);
+      setSelectedConfig(null);
+      showNotification(`Product "${title}" saved successfully`);
+    } catch (e) {
+      alert((e as Error).message);
+    }
   };
 
   return (

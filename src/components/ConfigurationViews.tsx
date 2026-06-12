@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { LocalDb } from '../mockStorage';
+import { appServices } from '../lib/app/appServices';
 import { PromptTemplate, ShopProduct, GenerationConfig, QualityGate1Config, PersonalizationConfig, PodProviderConfig } from '../types';
 import { Save, AlertTriangle, HelpCircle, Key, RefreshCw, Layers, CheckCircle, Info, Mail, Target } from 'lucide-react';
 
@@ -18,17 +18,40 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
   const [notification, setNotification] = useState<string | null>(null);
 
   useEffect(() => {
-    loadAllConfigs();
-    setRole(LocalDb.getActiveRole());
+    const init = async () => {
+      const activeRole = await appServices.roles.getActiveRole();
+      setRole(activeRole);
+      await loadAllConfigs();
+    };
+    init();
   }, [activeSection]);
 
-  const loadAllConfigs = () => {
-    setProducts(LocalDb.getProducts());
-    setTemplates(LocalDb.getTemplates());
-    setGenConfigs(LocalDb.getGenConfigs());
-    setQualityConfigs(LocalDb.getQualityConfigs());
-    setPersonalization(LocalDb.getPersonalizationConfig());
-    setPodConfig(LocalDb.getPodConfig());
+  const loadAllConfigs = async () => {
+    try {
+      const [
+        allProducts,
+        allTemplates,
+        allConfigs,
+        allQualityConfigs,
+        allPersonalization,
+        allPodConfig
+      ] = await Promise.all([
+        appServices.products.getProducts(),
+        appServices.templates.getTemplates(),
+        appServices.settings.getGenConfigs(),
+        appServices.settings.getQualityConfigs(),
+        appServices.settings.getPersonalizationConfig(),
+        appServices.settings.getPodConfig()
+      ]);
+      setProducts(allProducts);
+      setTemplates(allTemplates);
+      setGenConfigs(allConfigs);
+      setQualityConfigs(allQualityConfigs as QualityGate1Config[]);
+      setPersonalization(allPersonalization);
+      setPodConfig(allPodConfig);
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const isObserver = role === 'Observer';
@@ -41,15 +64,19 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
   // ==========================================
   // Section A: Product-Template Mappings Binding
   // ==========================================
-  const handleBindTemplate = (productId: string, templateId: string) => {
+  const handleBindTemplate = async (productId: string, templateId: string) => {
     if (isObserver) return;
     const list = [...products];
     const index = list.findIndex(p => p.id === productId);
     if (index !== -1) {
       list[index].activeTemplateId = templateId || undefined;
-      LocalDb.saveProducts(list);
-      setProducts(list);
-      triggerNotification('Product-template binder successfully updated.');
+      try {
+        await appServices.products.saveProducts(list);
+        setProducts(list);
+        triggerNotification('Product-template binder successfully updated.');
+      } catch (e) {
+        alert((e as Error).message);
+      }
     }
   };
 
@@ -73,7 +100,7 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
     escalationEmailTemplate: ''
   };
 
-  const saveGateConfig = (updated: QualityGate1Config) => {
+  const saveGateConfig = async (updated: QualityGate1Config) => {
     if (isObserver) return;
     let list = [...qualityConfigs];
     const index = list.findIndex(q => q.productId === updated.productId);
@@ -82,27 +109,39 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
     } else {
       list.push(updated);
     }
-    LocalDb.saveQualityConfigs(list);
-    setQualityConfigs(list);
-    triggerNotification('LLM Quality Gate parameters saved.');
+    try {
+      await appServices.settings.saveQualityConfigs(list);
+      setQualityConfigs(list);
+      triggerNotification('LLM Quality Gate parameters saved.');
+    } catch (e) {
+      alert((e as Error).message);
+    }
   };
 
   // ==========================================
   // Section C: Personalization (FuFire) Save
   // ==========================================
-  const handleSavePersonalization = () => {
+  const handleSavePersonalization = async () => {
     if (isObserver || !personalization) return;
-    LocalDb.savePersonalizationConfig(personalization);
-    triggerNotification('FuFire core endpoint config stored.');
+    try {
+      await appServices.settings.savePersonalizationConfig(personalization);
+      triggerNotification('FuFire core endpoint config stored.');
+    } catch (e) {
+      alert((e as Error).message);
+    }
   };
 
   // ==========================================
   // Section D: POD Provider Configuration (Gelato)
   // ==========================================
-  const handleSavePod = () => {
+  const handleSavePod = async () => {
     if (isObserver || !podConfig) return;
-    LocalDb.savePodConfig(podConfig);
-    triggerNotification('POD Fulfillment dispatch mode written.');
+    try {
+      await appServices.settings.savePodConfig(podConfig);
+      triggerNotification('POD Fulfillment dispatch mode written.');
+    } catch (e) {
+      alert((e as Error).message);
+    }
   };
 
   const handleUpdateProductUid = (productId: string, newUid: string) => {

@@ -1,4 +1,5 @@
 /**
+ * LEGACY ONLY — DO NOT IMPORT IN UI
  * Bazzi Middleware Console
  * DB Mock Storage & Service Core
  * Implements Supabase client mocks, Postgres table replicas (persist in localStorage),

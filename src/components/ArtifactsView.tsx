@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { LocalDb } from '../mockStorage';
+import { appServices } from '../lib/app/appServices';
 import { ImageArtifact, ShopProduct } from '../types';
 import { CheckCircle2, AlertTriangle, HelpCircle, Eye, SlidersHorizontal, Layers, X, Calendar, Download } from 'lucide-react';
 
@@ -13,9 +13,17 @@ export default function ArtifactsView() {
     loadData();
   }, []);
 
-  const loadData = () => {
-    setArtifacts(LocalDb.getImageArtifacts());
-    setProducts(LocalDb.getProducts());
+  const loadData = async () => {
+    try {
+      const [artList, prodList] = await Promise.all([
+        appServices.artifacts.getImageArtifacts(),
+        appServices.products.getProducts()
+      ]);
+      setArtifacts(artList);
+      setProducts(prodList);
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const exportArtifactsAsJSON = () => {

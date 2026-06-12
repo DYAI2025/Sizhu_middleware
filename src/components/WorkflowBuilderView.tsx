@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { LocalDb } from '../mockStorage';
+import { appServices } from '../lib/app/appServices';
 import {
   PromptTemplate,
   ShopProduct,
@@ -44,20 +44,35 @@ export default function WorkflowBuilderView() {
 
   useEffect(() => {
     // Sync initial datasets
-    setProducts(LocalDb.getProducts());
-    setTemplates(LocalDb.getTemplates().filter(t => t.status === 'active'));
-    setRole(LocalDb.getActiveRole());
+    const init = async () => {
+      try {
+        const [allProds, allTemps, activeRole] = await Promise.all([
+          appServices.products.getProducts(),
+          appServices.templates.getTemplates(),
+          appServices.roles.getActiveRole()
+        ]);
+        setProducts(allProds);
+        setTemplates(allTemps.filter(t => t.status === 'active'));
+        setRole(activeRole);
 
-    // Load first product by default
-    const currentProducts = LocalDb.getProducts();
-    if (currentProducts.length > 0) {
-      const pid = currentProducts[0].id;
-      setSelectedProductId(pid);
-      loadWorkflowForProduct(pid);
-    }
+        if (allProds.length > 0) {
+          const pid = allProds[0].id;
+          setSelectedProductId(pid);
+          await loadWorkflowForProduct(pid);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    init();
 
-    const handleRoleChanged = () => {
-      setRole(LocalDb.getActiveRole());
+    const handleRoleChanged = async () => {
+      try {
+        const activeRole = await appServices.roles.getActiveRole();
+        setRole(activeRole);
+      } catch (e) {
+        console.error(e);
+      }
     };
     window.addEventListener('bazzi_role_changed', handleRoleChanged);
     return () => {
@@ -72,14 +87,18 @@ export default function WorkflowBuilderView() {
     setTimeout(() => setNotification(null), 3000);
   };
 
-  const loadWorkflowForProduct = (productId: string) => {
-    const config = LocalDb.getVisualWorkflow(productId);
-    setActiveWorkflow(config);
-    // Select first node by default if available
-    if (config.nodes.length > 0) {
-      setSelectedNodeId(config.nodes[0].id);
-    } else {
-      setSelectedNodeId(null);
+  const loadWorkflowForProduct = async (productId: string) => {
+    try {
+      const config = await appServices.workflows.getVisualWorkflow(productId);
+      setActiveWorkflow(config);
+      // Select first node by default if available
+      if (config.nodes.length > 0) {
+        setSelectedNodeId(config.nodes[0].id);
+      } else {
+        setSelectedNodeId(null);
+      }
+    } catch (e) {
+      console.error(e);
     }
   };
 
@@ -311,7 +330,7 @@ export default function WorkflowBuilderView() {
   };
 
   // PROPAGATE AND CRITICAL SAVE TO CLOUD CORE STORAGE (Bridge to active databases!)
-  const handleSaveAll = () => {
+  const handleSaveAll = async () => {
     if (isObserver || !activeWorkflow) return;
 
     // Verify all nodes are connected and robust
@@ -340,127 +359,135 @@ export default function WorkflowBuilderView() {
     // Critical Step: Propagate visual node configurations directly into our database mock collections
     // This allows visual adjustments to instantaneously drive the simulation pipeline!
     
-    // A. Propagate template bind
-    if (tmNode) {
-      const allProds = LocalDb.getProducts();
-      const pIdx = allProds.findIndex(p => p.id === selectedProductId);
-      if (pIdx !== -1) {
-        allProds[pIdx].activeTemplateId = tmNode.config.templateId;
-        LocalDb.saveProducts(allProds);
-      }
-    }
-
-    // B. Propagate generation settings
-    const genNode = activeWorkflow.nodes.find(n => n.type === 'generation');
-    if (genNode) {
-      const allGens = LocalDb.getGenConfigs();
-      const gConfig = {
-        productId: selectedProductId,
-        numInitiallyGenerated: Number(genNode.config.numInitiallyGenerated || 3),
-        imageFormat: genNode.config.imageFormat || 'png',
-        imageQuality: genNode.config.imageQuality || 'standard',
-        primaryProvider: genNode.config.primaryProvider || 'OpenAI',
-        primaryModel: genNode.config.primaryModel || 'dall-e-3',
-        primarySecretRef: genNode.config.primarySecretRef || 'SECRET_REF_DEFAULT',
-        fallbackProvider: genNode.config.fallbackProvider || 'Gemini',
-        fallbackModel: genNode.config.fallbackModel || 'imagen-3.0-generate-002',
-        fallbackLLM: genNode.config.fallbackLLM || 'gemini-1.5-pro',
-        fallbackSecretRef: genNode.config.fallbackSecretRef || 'SECRET_REF_DEFAULT_FALLBACK'
-      };
-      const gIdx = allGens.findIndex(g => g.productId === selectedProductId);
-      if (gIdx !== -1) {
-        allGens[gIdx] = gConfig;
-      } else {
-        allGens.push(gConfig);
-      }
-      LocalDb.saveGenConfigs(allGens);
-    }
-
-    // C. Propagate Quality gate configs
-    const qaNode = activeWorkflow.nodes.find(n => n.type === 'quality_gate');
-    if (qaNode) {
-      const allQas = LocalDb.getQualityConfigs();
-      const qConfig = {
-        productId: selectedProductId,
-        llmProvider: qaNode.config.llmProvider || 'Gemini',
-        model: qaNode.config.model || 'gemini-2.5-pro',
-        secretRef: qaNode.config.secretRef || 'SECRET_REF_GEMINI_QA',
-        fallbackProvider: 'OpenAI' as const,
-        fallbackModel: 'gpt-4o',
-        fallbackSecretRef: 'SECRET_REF_GPT_QA_FALLBACK',
-        qaPrompt: qaNode.config.qaPrompt || 'Inspect and review candidate...',
-        referenceImages: [],
-        faultTolerance: 'medium' as const,
-        minAcceptanceScore: Number(qaNode.config.minAcceptanceScore || 80),
-        maxRejectedBeforeEscalation: Number(qaNode.config.maxRejectedBeforeEscalation || 3),
-        escalationEmailTemplate: 'Subject: Escalation for order {{order_number}}'
-      };
-      const qIdx = allQas.findIndex(q => q.productId === selectedProductId);
-      if (qIdx !== -1) {
-        allQas[qIdx] = qConfig;
-      } else {
-        allQas.push(qConfig);
-      }
-      LocalDb.saveQualityConfigs(allQas);
-    }
-
-    // D. Propagate Personalization details
-    const pcNode = activeWorkflow.nodes.find(n => n.type === 'personalization');
-    if (pcNode) {
-      const pConfig = {
-        name: pcNode.config.name || 'FuFire API',
-        apiUrl: pcNode.config.apiUrl || 'https://api.fufire.io',
-        secretRef: pcNode.config.secretRef || 'SECRET_REF_FUFIRE',
-        birthTimeFallback: {
-          birth_time: '12:00',
-          birth_time_known: false,
-          birth_time_source: 'default_noon'
+    try {
+      // A. Propagate template bind
+      if (tmNode) {
+        const allProds = await appServices.products.getProducts();
+        const pIdx = allProds.findIndex(p => p.id === selectedProductId);
+        if (pIdx !== -1) {
+          allProds[pIdx].activeTemplateId = tmNode.config.templateId;
+          await appServices.products.saveProducts(allProds);
         }
-      };
-      LocalDb.savePersonalizationConfig(pConfig);
-    }
+      }
 
-    // E. Propagate POD dispatch params
-    const podNode = activeWorkflow.nodes.find(n => n.type === 'pod');
-    if (podNode) {
-      const allPod = LocalDb.getPodConfig();
-      const updatedPod = {
-        ...allPod,
-        name: podNode.config.name || 'Gelato',
-        baseUrl: podNode.config.baseUrl || 'https://api.gelato.com',
-        secretRef: podNode.config.secretRef || 'SECRET_REF_GELATO',
-        dispatchMode: podNode.config.dispatchMode || 'draft',
-        productUidMappings: {
-          ...allPod.productUidMappings,
-          [selectedProductId]: podNode.config.productUid || 'gelato-fallback-canvas'
+      // B. Propagate generation settings
+      const genNode = activeWorkflow.nodes.find(n => n.type === 'generation');
+      if (genNode) {
+        const allGens = await appServices.settings.getGenConfigs();
+        const gConfig = {
+          productId: selectedProductId,
+          numInitiallyGenerated: Number(genNode.config.numInitiallyGenerated || 3),
+          imageFormat: genNode.config.imageFormat || 'png',
+          imageQuality: genNode.config.imageQuality || 'standard',
+          primaryProvider: genNode.config.primaryProvider || 'OpenAI',
+          primaryModel: genNode.config.primaryModel || 'dall-e-3',
+          primarySecretRef: genNode.config.primarySecretRef || 'SECRET_REF_DEFAULT',
+          fallbackProvider: genNode.config.fallbackProvider || 'Gemini',
+          fallbackModel: genNode.config.fallbackModel || 'imagen-3.0-generate-002',
+          fallbackLLM: genNode.config.fallbackLLM || 'gemini-1.5-pro',
+          fallbackSecretRef: genNode.config.fallbackSecretRef || 'SECRET_REF_DEFAULT_FALLBACK'
+        };
+        const gIdx = allGens.findIndex(g => g.productId === selectedProductId);
+        if (gIdx !== -1) {
+          allGens[gIdx] = gConfig;
+        } else {
+          allGens.push(gConfig);
         }
-      };
-      LocalDb.savePodConfig(updatedPod);
-    }
+        await appServices.settings.saveGenConfigs(allGens);
+      }
 
-    // F. Persist visual schematic itself
-    LocalDb.saveVisualWorkflow(selectedProductId, activeWorkflow);
-    showNotification('Visual pipeline states deployed & mapped to Core API Services');
-    
-    // Broadcast updates to rest of console context
-    window.dispatchEvent(new Event('bazzi_role_changed'));
+      // C. Propagate Quality gate configs
+      const qaNode = activeWorkflow.nodes.find(n => n.type === 'quality_gate');
+      if (qaNode) {
+        const allQas = await appServices.settings.getQualityConfigs();
+        const qConfig = {
+          productId: selectedProductId,
+          llmProvider: qaNode.config.llmProvider || 'Gemini',
+          model: qaNode.config.model || 'gemini-2.5-pro',
+          secretRef: qaNode.config.secretRef || 'SECRET_REF_GEMINI_QA',
+          fallbackProvider: 'OpenAI' as const,
+          fallbackModel: 'gpt-4o',
+          fallbackSecretRef: 'SECRET_REF_GPT_QA_FALLBACK',
+          qaPrompt: qaNode.config.qaPrompt || 'Inspect and review candidate...',
+          referenceImages: [],
+          faultTolerance: 'medium' as const,
+          minAcceptanceScore: Number(qaNode.config.minAcceptanceScore || 80),
+          maxRejectedBeforeEscalation: Number(qaNode.config.maxRejectedBeforeEscalation || 3),
+          escalationEmailTemplate: 'Subject: Escalation for order {{order_number}}'
+        };
+        const qIdx = allQas.findIndex(q => q.productId === selectedProductId);
+        if (qIdx !== -1) {
+          allQas[qIdx] = qConfig;
+        } else {
+          allQas.push(qConfig);
+        }
+        await appServices.settings.saveQualityConfigs(allQas);
+      }
+
+      // D. Propagate Personalization details
+      const pcNode = activeWorkflow.nodes.find(n => n.type === 'personalization');
+      if (pcNode) {
+        const pConfig = {
+          name: pcNode.config.name || 'FuFire API',
+          apiUrl: pcNode.config.apiUrl || 'https://api.fufire.io',
+          secretRef: pcNode.config.secretRef || 'SECRET_REF_FUFIRE',
+          birthTimeFallback: {
+            birth_time: '12:00',
+            birth_time_known: false,
+            birth_time_source: 'default_noon'
+          }
+        };
+        await appServices.settings.savePersonalizationConfig(pConfig);
+      }
+
+      // E. Propagate POD dispatch params
+      const podNode = activeWorkflow.nodes.find(n => n.type === 'pod');
+      if (podNode) {
+        const allPod = await appServices.settings.getPodConfig();
+        const updatedPod = {
+          ...allPod,
+          name: podNode.config.name || 'Gelato',
+          baseUrl: podNode.config.baseUrl || 'https://api.gelato.com',
+          secretRef: podNode.config.secretRef || 'SECRET_REF_GELATO',
+          dispatchMode: podNode.config.dispatchMode || 'draft',
+          productUidMappings: {
+            ...allPod.productUidMappings,
+            [selectedProductId]: podNode.config.productUid || 'gelato-fallback-canvas'
+          }
+        };
+        await appServices.settings.savePodConfig(updatedPod);
+      }
+
+      // F. Persist visual schematic itself
+      await appServices.workflows.saveVisualWorkflow(selectedProductId, activeWorkflow);
+      showNotification('Visual pipeline states deployed & mapped to Core API Services');
+      
+      // Broadcast updates to rest of console context
+      window.dispatchEvent(new Event('bazzi_role_changed'));
+    } catch (e) {
+      alert((e as Error).message);
+    }
   };
 
   // REST RESET PRESETS
-  const resetToPresetSequential = () => {
+  const resetToPresetSequential = async () => {
     if (isObserver || !activeWorkflow) return;
     if (window.confirm('Reset this product’s visual grid to the standard 5-step serial pipeline?')) {
-      const defaults = LocalDb.getVisualWorkflow('prod-001'); // prod-001 is the standard 5 step preset
-      const configured = {
-        ...defaults,
-        productId: selectedProductId,
-        updatedAt: new Date().toISOString()
-      };
-      setActiveWorkflow(configured);
-      if (configured.nodes.length > 0) {
-        setSelectedNodeId(configured.nodes[0].id);
+      try {
+        const defaults = await appServices.workflows.getVisualWorkflow('prod-001'); // prod-001 is the standard 5 step preset
+        const configured = {
+          ...defaults,
+          productId: selectedProductId,
+          updatedAt: new Date().toISOString()
+        };
+        setActiveWorkflow(configured);
+        if (configured.nodes.length > 0) {
+          setSelectedNodeId(configured.nodes[0].id);
+        }
+        showNotification('Reverted to sequential print workflow preset.');
+      } catch (e) {
+        console.error(e);
       }
-      showNotification('Reverted to sequential print workflow preset.');
     }
   };
 

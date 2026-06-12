@@ -70,7 +70,6 @@ export class MockQualityGateProvider implements QualityGateProvider {
         detailedJson: JSON.stringify({
           evaluation_timestamp: new Date().toISOString(),
           qa_prompt_used: qaPrompt.substring(0, 100),
-          secret_used: secretRef,
           llm_model: model,
           scores: {
             composition: score,

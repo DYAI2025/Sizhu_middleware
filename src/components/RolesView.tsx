@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LocalDb } from '../mockStorage';
+import { appServices } from '../lib/app/appServices';
 import { AppRole, RolePermissions, AppRoleName, AppUser } from '../types';
 import {
   Shield,
@@ -23,8 +23,8 @@ export default function RolesView() {
   const [activeTab, setActiveTab] = useState<'matrix' | 'sql'>('matrix');
   const [activeRoleName, setActiveRoleName] = useState<AppRoleName>('Owner');
   const [roleBindings, setRoleBindings] = useState<RolePermissions[]>([]);
-  const [roles] = useState<AppRole[]>(LocalDb.getRoles());
-  const [permissions] = useState(LocalDb.getPermissions());
+  const [roles, setRoles] = useState<AppRole[]>([]);
+  const [permissions, setPermissions] = useState<{ id: string; name: string; description: string }[]>([]);
   
   // Real Persistent Mock Users State
   const [users, setUsers] = useState<AppUser[]>([]);
@@ -33,19 +33,40 @@ export default function RolesView() {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    setActiveRoleName(LocalDb.getActiveRole());
-    setRoleBindings(LocalDb.getRolePermissions());
-    setUsers(LocalDb.getUsers());
+    loadData();
   }, []);
 
-  const handleRoleSwitch = (role: AppRoleName) => {
-    LocalDb.setActiveRole(role);
-    setActiveRoleName(role);
-    // Broadcast active role update
-    window.dispatchEvent(new Event('bazzi_role_changed'));
+  const loadData = async () => {
+    try {
+      const [roleName, bindings, rolesList, permsList, usersList] = await Promise.all([
+        appServices.roles.getActiveRole(),
+        appServices.roles.getRolePermissions(),
+        appServices.roles.getRoles(),
+        appServices.roles.getPermissions(),
+        appServices.roles.getUsers()
+      ]);
+      setActiveRoleName(roleName);
+      setRoleBindings(bindings);
+      setRoles(rolesList as AppRole[]);
+      setPermissions(permsList);
+      setUsers(usersList);
+    } catch (e) {
+      console.error(e);
+    }
   };
 
-  const handleTogglePermission = (role: AppRoleName, permId: string) => {
+  const handleRoleSwitch = async (role: AppRoleName) => {
+    try {
+      await appServices.roles.setActiveRole(role);
+      setActiveRoleName(role);
+      // Broadcast active role update
+      window.dispatchEvent(new Event('bazzi_role_changed'));
+    } catch (e) {
+      alert((e as Error).message);
+    }
+  };
+
+  const handleTogglePermission = async (role: AppRoleName, permId: string) => {
     // Safety check: Owner and Admin cannot be degraded in this console.
     if (role === 'Owner' || role === 'Admin') return;
     
@@ -62,13 +83,17 @@ export default function RolesView() {
       }
       
       list[bindingIndex].permissions = perms;
-      LocalDb.saveRolePermissions(list);
-      setRoleBindings(list);
+      try {
+        await appServices.roles.saveRolePermissions(list);
+        setRoleBindings(list);
+      } catch (e) {
+        alert((e as Error).message);
+      }
     }
   };
 
   // ADD simulated TEAM MEMBER (Enforces Supabase auth metadata simulation)
-  const handleAddUser = (e: React.FormEvent) => {
+  const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newUserEmail || !newUserEmail.includes('@')) {
       alert('Provide a valid email address.');
@@ -83,16 +108,20 @@ export default function RolesView() {
     };
 
     const updated = [...users, newUser];
-    LocalDb.saveUsers(updated);
-    setUsers(updated);
-    setNewUserEmail('');
-    
-    // Broadcast updates to alert surrounding layouts
-    window.dispatchEvent(new Event('bazzi_role_changed'));
+    try {
+      await appServices.roles.saveUsers(updated);
+      setUsers(updated);
+      setNewUserEmail('');
+      
+      // Broadcast updates to alert surrounding layouts
+      window.dispatchEvent(new Event('bazzi_role_changed'));
+    } catch (e) {
+      alert((e as Error).message);
+    }
   };
 
   // REMOVE simulated user
-  const handleDeleteUser = (id: string) => {
+  const handleDeleteUser = async (id: string) => {
     const backup = users.find(u => u.id === id);
     if (backup && backup.email === 'Ben.Poersch@gmail.com') {
       alert('The primary system owner account cannot be deleted.');
@@ -101,21 +130,29 @@ export default function RolesView() {
 
     if (window.confirm(`Delete user ${backup?.email}?`)) {
       const filtered = users.filter(u => u.id !== id);
-      LocalDb.saveUsers(filtered);
-      setUsers(filtered);
+      try {
+        await appServices.roles.saveUsers(filtered);
+        setUsers(filtered);
+      } catch (e) {
+        alert((e as Error).message);
+      }
     }
   };
 
   // UPDATE role assigned to existing simulated user
-  const handleUpdateUserRole = (id: string, newRole: AppRoleName) => {
+  const handleUpdateUserRole = async (id: string, newRole: AppRoleName) => {
     const updated = users.map(u => {
       if (u.id === id) {
         return { ...u, role: newRole };
       }
       return u;
     });
-    LocalDb.saveUsers(updated);
-    setUsers(updated);
+    try {
+      await appServices.roles.saveUsers(updated);
+      setUsers(updated);
+    } catch (e) {
+      alert((e as Error).message);
+    }
   };
 
   const handleCopySQL = () => {

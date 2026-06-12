@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { LocalDb } from '../mockStorage';
+import { appServices } from '../lib/app/appServices';
 import { PromptTemplate } from '../types';
 import { Clipboard, Eye, Code, Save, History, Check, AlertCircle, FileText, Plus } from 'lucide-react';
 
@@ -32,15 +32,23 @@ export default function TemplatesView() {
   const [validationMsg, setValidationMsg] = useState<{ type: 'ok' | 'warning'; text: string } | null>(null);
 
   useEffect(() => {
-    loadTemplates();
-    setRole(LocalDb.getActiveRole());
+    const init = async () => {
+      const activeRole = await appServices.roles.getActiveRole();
+      setRole(activeRole);
+      await loadTemplates();
+    };
+    init();
   }, []);
 
-  const loadTemplates = () => {
-    const list = LocalDb.getTemplates();
-    setTemplates(list);
-    if (list.length > 0 && !selectedTemplate) {
-      handleSelect(list[0]);
+  const loadTemplates = async () => {
+    try {
+      const list = await appServices.templates.getTemplates();
+      setTemplates(list);
+      if (list.length > 0 && !selectedTemplate) {
+        handleSelect(list[0]);
+      }
+    } catch (e) {
+      console.error(e);
     }
   };
 
@@ -82,91 +90,95 @@ Dominant Elemental Path: {{fufire.dominant_element}}
     setStatus('draft');
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (isObserver) return;
     if (!name.trim()) {
       alert('Template Name is required.');
       return;
     }
 
-    const list = LocalDb.getTemplates();
+    try {
+      const list = await appServices.templates.getTemplates();
 
-    if (isCreating) {
-      const newTemp: PromptTemplate = {
-        id: `temp-${Math.floor(1000 + Math.random() * 9000)}`,
-        name,
-        content,
-        version: 1,
-        status,
-        createdAt: new Date().toISOString(),
-        createdBy: role
-      };
-
-      // If making active, archive others
-      let updated = [...list];
-      if (status === 'active') {
-        updated = updated.map(t => t.status === 'active' ? { ...t, status: 'archived' as const } : t);
-      }
-      updated.unshift(newTemp);
-      LocalDb.saveTemplates(updated);
-      setTemplates(updated);
-      setSelectedTemplate(newTemp);
-      setIsCreating(false);
-      alert('Prompt Template created successfully at version 1 (Draft)');
-    } else if (selectedTemplate) {
-      // Rule Checklist: "Never overwrite active template content; create a new version instead."
-      let updatedList = [...list];
-      
-      const requiresNewVersion = selectedTemplate.status === 'active';
-
-      if (requiresNewVersion) {
-        // Create incremented version!
-        const newVersionNum = selectedTemplate.version + 1;
-        const newVerTemp: PromptTemplate = {
+      if (isCreating) {
+        const newTemp: PromptTemplate = {
           id: `temp-${Math.floor(1000 + Math.random() * 9000)}`,
           name,
           content,
-          version: newVersionNum,
-          status, // e.g. draft or active
+          version: 1,
+          status,
           createdAt: new Date().toISOString(),
           createdBy: role
         };
 
-        // If newly saved version is active, archive previous revisions of the same ID/name
+        // If making active, archive others
+        let updated = [...list];
         if (status === 'active') {
-          updatedList = updatedList.map(t => t.name === name && t.status === 'active' ? { ...t, status: 'archived' as const } : t);
+          updated = updated.map(t => t.status === 'active' ? { ...t, status: 'archived' as const } : t);
         }
+        updated.unshift(newTemp);
+        await appServices.templates.saveTemplates(updated);
+        setTemplates(updated);
+        setSelectedTemplate(newTemp);
+        setIsCreating(false);
+        alert('Prompt Template created successfully at version 1 (Draft)');
+      } else if (selectedTemplate) {
+        // Rule Checklist: "Never overwrite active template content; create a new version instead."
+        let updatedList = [...list];
+        
+        const requiresNewVersion = selectedTemplate.status === 'active';
 
-        updatedList.unshift(newVerTemp);
-        LocalDb.saveTemplates(updatedList);
-        setTemplates(updatedList);
-        setSelectedTemplate(newVerTemp);
-        alert(`Content update rules applied: Safeguarded version v${selectedTemplate.version}. Created incremented revision version v${newVersionNum} instead.`);
-      } else {
-        // Draft/Archived can be overridden directly
-        updatedList = updatedList.map(t => {
-          if (t.id === selectedTemplate.id) {
-            return {
-              ...t,
-              name,
-              content,
-              status
-            };
+        if (requiresNewVersion) {
+          // Create incremented version!
+          const newVersionNum = selectedTemplate.version + 1;
+          const newVerTemp: PromptTemplate = {
+            id: `temp-${Math.floor(1000 + Math.random() * 9000)}`,
+            name,
+            content,
+            version: newVersionNum,
+            status, // e.g. draft or active
+            createdAt: new Date().toISOString(),
+            createdBy: role
+          };
+
+          // If newly saved version is active, archive previous revisions of the same ID/name
+          if (status === 'active') {
+            updatedList = updatedList.map(t => t.name === name && t.status === 'active' ? { ...t, status: 'archived' as const } : t);
           }
-          return t;
-        });
 
-        // enforce single active template rules
-        if (status === 'active') {
-          updatedList = updatedList.map(t => t.id !== selectedTemplate.id && t.status === 'active' ? { ...t, status: 'archived' as const } : t);
+          updatedList.unshift(newVerTemp);
+          await appServices.templates.saveTemplates(updatedList);
+          setTemplates(updatedList);
+          setSelectedTemplate(newVerTemp);
+          alert(`Content update rules applied: Safeguarded version v${selectedTemplate.version}. Created incremented revision version v${newVersionNum} instead.`);
+        } else {
+          // Draft/Archived can be overridden directly
+          updatedList = updatedList.map(t => {
+            if (t.id === selectedTemplate.id) {
+              return {
+                ...t,
+                name,
+                content,
+                status
+              };
+            }
+            return t;
+          });
+
+          // enforce single active template rules
+          if (status === 'active') {
+            updatedList = updatedList.map(t => t.id !== selectedTemplate.id && t.status === 'active' ? { ...t, status: 'archived' as const } : t);
+          }
+
+          await appServices.templates.saveTemplates(updatedList);
+          setTemplates(updatedList);
+          alert('Prompt template status/meta updated cleanly.');
         }
-
-        LocalDb.saveTemplates(updatedList);
-        setTemplates(updatedList);
-        alert('Prompt template status/meta updated cleanly.');
       }
+      await loadTemplates();
+    } catch (e) {
+      alert((e as Error).message);
     }
-    loadTemplates();
   };
 
   // Basic HTML markdown parser representation for the live layout preview box

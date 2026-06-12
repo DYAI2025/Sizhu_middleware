@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { LocalDb } from '../mockStorage';
 import { Database, AlertCircle, RefreshCw, Layers, Terminal, Copy, Check } from 'lucide-react';
 
 export default function SettingsView() {
@@ -80,7 +79,7 @@ CREATE POLICY "Observers can read catalog"
 
   const handleReset = () => {
     if (window.confirm('Wipe Bazzi console states completely? This restores default templates, products, and configurations.')) {
-      LocalDb.resetAll();
+      localStorage.clear();
       window.location.reload();
     }
   };

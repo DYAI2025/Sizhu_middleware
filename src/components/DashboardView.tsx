@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { LocalDb } from '../mockStorage';
+import { appServices } from '../lib/app/appServices';
 import { WorkflowRun, ImageArtifact } from '../types';
 import { LayoutDashboard, Target, AlertTriangle, Image as ImageIcon, CheckCircle, TrendingUp, Clock, ShieldCheck } from 'lucide-react';
 
@@ -9,9 +9,21 @@ export default function DashboardView({ onNavigate }: { onNavigate: (view: strin
   const [currentRole, setCurrentRole] = useState<string>('Owner');
 
   useEffect(() => {
-    setRuns(LocalDb.getWorkflowRuns());
-    setArtifacts(LocalDb.getImageArtifacts());
-    setCurrentRole(LocalDb.getActiveRole());
+    const load = async () => {
+      try {
+        const [runsData, artifactsData, roleData] = await Promise.all([
+          appServices.workflows.getWorkflowRuns(),
+          appServices.artifacts.getImageArtifacts(),
+          appServices.roles.getActiveRole()
+        ]);
+        setRuns(runsData);
+        setArtifacts(artifactsData);
+        setCurrentRole(roleData);
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    load();
   }, []);
 
   const totalRuns = runs.length;

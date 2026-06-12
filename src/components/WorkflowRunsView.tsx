@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { LocalDb, runFullWorkflowSimulator } from '../mockStorage';
+import { appServices } from '../lib/app/appServices';
 import { ShopProduct, WorkflowRun, WorkflowLog, ImageArtifact } from '../types';
 import { Play, Clipboard, Filter, Trash, User, Calendar, MapPin, Clock, Loader2, AlertCircle, RefreshCw, Layers, CheckCircle2, AlertTriangle, Eye, Download } from 'lucide-react';
 
@@ -34,15 +34,26 @@ export default function WorkflowRunsView() {
     generateRandomOrderNo();
   }, []);
 
-  const loadData = () => {
-    const prods = LocalDb.getProducts().filter(p => p.isActive);
-    setProducts(prods);
-    if (prods.length > 0 && !selectedProductId) {
-      setSelectedProductId(prods[0].id);
+  const loadData = async () => {
+    try {
+      const prodsAll = await appServices.products.getProducts();
+      const prods = prodsAll.filter(p => p.isActive);
+      setProducts(prods);
+      if (prods.length > 0 && !selectedProductId) {
+        setSelectedProductId(prods[0].id);
+      }
+      
+      const [runsData, logsData, artifactsData] = await Promise.all([
+        appServices.workflows.getWorkflowRuns(),
+        appServices.workflows.getWorkflowLogs(),
+        appServices.artifacts.getImageArtifacts()
+      ]);
+      setRuns(runsData);
+      setLogs(logsData);
+      setArtifacts(artifactsData);
+    } catch (e) {
+      console.error(e);
     }
-    setRuns(LocalDb.getWorkflowRuns());
-    setLogs(LocalDb.getWorkflowLogs());
-    setArtifacts(LocalDb.getImageArtifacts());
   };
 
   const generateRandomOrderNo = () => {
@@ -73,7 +84,7 @@ export default function WorkflowRunsView() {
         return;
       }
 
-      await runFullWorkflowSimulator(
+      await appServices.workflowRunner.run(
         orderNumber,
         selectedProductId,
         customerName,
@@ -86,7 +97,7 @@ export default function WorkflowRunsView() {
         }
       );
 
-      loadData();
+      await loadData();
       setIsSimulating(false);
       generateRandomOrderNo();
     } catch (e: any) {
@@ -95,15 +106,19 @@ export default function WorkflowRunsView() {
     }
   };
 
-  const clearRunsMemory = () => {
+  const clearRunsMemory = async () => {
     if (window.confirm('Wipe simulated logs/artifacts/runs memory? Settings databases are preserved.')) {
-      localStorage.removeItem('bazzi_workflow_runs');
-      localStorage.removeItem('bazzi_image_artifacts');
-      localStorage.removeItem('bazzi_workflow_logs');
-      loadData();
-      setSimLogStream([]);
-      setActiveRunId(null);
-      setEscalationTemplateOutput(null);
+      try {
+        await appServices.workflows.saveWorkflowRuns([]);
+        await appServices.workflows.saveWorkflowLogs([]);
+        await appServices.artifacts.saveImageArtifacts([]);
+        await loadData();
+        setSimLogStream([]);
+        setActiveRunId(null);
+        setEscalationTemplateOutput(null);
+      } catch (e) {
+        console.error(e);
+      }
     }
   };
 

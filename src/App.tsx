@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { LocalDb } from './mockStorage';
 import { AppRoleName } from './types';
+import { appServices } from './lib/app/appServices';
+import { getSystemStatus } from './lib/app/systemStatus';
 // @ts-ignore
 import SizhuLogo from './assets/images/sizhu_logo_1781277019051.jpg';
 
@@ -41,13 +42,28 @@ export default function App() {
   const [currentRole, setCurrentRole] = useState<AppRoleName>('Owner');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
 
+  const status = getSystemStatus();
+
   useEffect(() => {
     // Initial load
-    setCurrentRole(LocalDb.getActiveRole());
+    const loadRole = async () => {
+      try {
+        const role = await appServices.roles.getActiveRole();
+        setCurrentRole(role);
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    loadRole();
 
     // Event listener to synchronize active simulated role instantly
-    const handleRoleChange = () => {
-      setCurrentRole(LocalDb.getActiveRole());
+    const handleRoleChange = async () => {
+      try {
+        const role = await appServices.roles.getActiveRole();
+        setCurrentRole(role);
+      } catch (e) {
+        console.error(e);
+      }
     };
     window.addEventListener('bazzi_role_changed', handleRoleChange);
     return () => {
@@ -216,13 +232,16 @@ export default function App() {
 
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-2 text-[10px] uppercase font-mono font-semibold text-[#555]">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-              FuFire: Connected
+              <span className={`w-1.5 h-1.5 rounded-full ${status.fufire === 'MOCK' || status.fufire === 'LIVE' || status.fufire === 'CONFIGURED' ? 'bg-emerald-500' : 'bg-red-500'}`}></span>
+              FuFire: {status.fufire}
             </div>
             <div className="flex items-center gap-2 text-[10px] uppercase font-mono font-semibold text-[#555]">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-              Gelato: Live
+              <span className={`w-1.5 h-1.5 rounded-full ${status.gelato === 'MOCK' || status.gelato === 'LIVE' || status.gelato === 'CONFIGURED' ? 'bg-emerald-500' : 'bg-red-500'}`}></span>
+              Gelato: {status.gelato}
             </div>
+            <span className="text-[10px] uppercase font-mono font-bold bg-slate-100 px-2 py-0.5 rounded border border-[#d1d1cf]" title="Current Mode">
+              MODE: {status.appMode}
+            </span>
             <button
               onClick={() => {
                 window.dispatchEvent(new Event('bazzi_role_changed'));
@@ -243,11 +262,12 @@ export default function App() {
           {/* Bottom Status Bar */}
           <footer className="h-8 bg-[#141414] text-[9px] text-[#777] flex items-center justify-between px-6 border-t border-black select-none mt-12 mb-0 rounded-sm">
             <div className="flex items-center gap-6">
-              <span className="text-green-500 flex items-center gap-1 font-bold font-mono">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span> SYSTEM OPERATIONAL
+              <span className={`${status.systemOperational ? 'text-green-500' : 'text-amber-500'} flex items-center gap-1 font-bold font-mono`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${status.systemOperational ? 'bg-green-500' : 'bg-amber-500'}`}></span>
+                {status.systemOperational ? 'SYSTEM OPERATIONAL' : 'SYSTEM OFFLINE / TEST'}
               </span>
-              <span className="font-mono">DB: SUPABASE (POSTGRESQL 15.6)</span>
-              <span className="font-mono">SECURE STATE: VALIDATED</span>
+              <span className="font-mono text-[9px]">DB: {status.database}</span>
+              <span className="font-mono text-[9px]">SECURE: {status.security}</span>
             </div>
             <div className="flex items-center gap-4">
               <span className="font-mono">v1.1.0-STABLE</span>
