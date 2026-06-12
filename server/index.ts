@@ -2,23 +2,46 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
+import cors from "cors";
 
 dotenv.config();
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = process.env.PORT || 3000;
 
   app.use(express.json());
 
+  // CORS Configuration
+  const allowedOrigins = (process.env.ALLOWED_ORIGINS || "https://sizhu.fufire.space,http://localhost:5173,http://localhost:3000").split(",");
+  app.use(cors({
+    origin: function (origin, callback) {
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.indexOf(origin) !== -1) {
+        callback(null, true);
+      } else {
+        if (process.env.NODE_ENV === 'production') {
+          callback(new Error('Not allowed by CORS'));
+        } else {
+          callback(null, true);
+        }
+      }
+    }
+  }));
+
   // Health Endpoint
   app.get("/api/health", (req, res) => {
-    res.json({ status: "READY" });
+    res.json({ status: "ok" });
   });
 
   // Readiness Endpoint
   app.get("/api/readiness", (req, res) => {
-    const requiredEnvVars = ["GEMINI_API_KEY", "APP_URL", "FUFIRE_BASE_URL", "SUPABASE_URL"];
+    // Tests: readiness returns NOT_READY when FuFire/Supabase secrets are missing.
+    // Readiness never returns READY just because mock mode works.
+    const fuFireSecretRef = process.env.FUFIRE_API_KEY_SECRET_REF || "SECRET_REF_FUFIRE_API_KEY";
+    const supabaseSecretRef = process.env.SUPABASE_SERVICE_ROLE_SECRET_REF || "SECRET_REF_SUPABASE_SERVICE_ROLE";
+    
+    const requiredEnvVars = [fuFireSecretRef, supabaseSecretRef, "FUFIRE_BASE_URL", "SUPABASE_URL"];
     const missing = requiredEnvVars.filter(v => !process.env[v]);
     
     if (missing.length === 0) {

@@ -1,61 +1,64 @@
 # Railway Deployment Guide
 
-This guide provides instructions on how to deploy this application to [Railway](https://railway.app/), specifically emphasizing the configuration required to deploy to the custom domain `sizhu.c2.fufire.space`.
+This guide provides instructions to deploy this full-stack Vite & Express service to Railway.
 
-## Prerequisites
+## Custom Domain Target
+The intended public domain is: `sizhu.fufire.space`
 
-1. A Railway account.
-2. Your project pushed to a GitHub repository.
-3. Access to your DNS provider for the `fufire.space` domain.
+## Environment Variables
 
-## Setup Steps
+Configure these variables in your Railway project to ensure exact production settings:
 
-1. Log in to your Railway dashboard and click **New Project**.
-2. Select **Deploy from GitHub repo** and choose your repository.
-3. Railway will automatically detect the Node.js environment.
+```
+APP_MODE=CONFIG_REQUIRED
+PUBLIC_APP_BASE_URL=https://sizhu.fufire.space
+ALLOWED_ORIGINS=https://sizhu.fufire.space,http://localhost:5173,http://localhost:3000
+FUFIRE_BASE_URL=https://api.fufire.space
+FUFIRE_API_KEY_SECRET_REF=SECRET_REF_FUFIRE_API_KEY
+FUFIRE_AUTH_HEADER_NAME=X-API-Key
+FUFIRE_TIMEOUT_MS=15000
+FUFIRE_RETRY_COUNT=1
+SUPABASE_URL=
+SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_SECRET_REF=SECRET_REF_SUPABASE_SERVICE_ROLE
+RAILWAY_PUBLIC_DOMAIN=sizhu.fufire.space
+GEMINI_API_KEY=your_gemini_key
+APP_URL=https://sizhu.fufire.space
+```
 
-## Environment Variables Structure
+### Secret Handling Rules
+- Database credentials and Third-party API keys (like `GEMINI_API_KEY`, `SUPABASE_SERVICE_ROLE_SECRET_REF`) must never be exposed or prefixed with `VITE_`.
+- Update your Railway specific environment variables in the variables tab and NEVER commit them via `.env`.
 
-Once the service is created, go to the **Variables** tab and configure the following required environment variables to ensure the application starts and reaches a ready state.
+## Build and Start Commands
 
-- `GEMINI_API_KEY`: Your Google Gemini API Key.
-- `APP_URL`: The public URL of your deployed application on Railway (should be `https://sizhu.c2.fufire.space`).
-- *Optional/Contextual*: Include `SECRET_REF_FUFIRE_LIVE_KEY` or `FUFIRE_API_KEY` if communicating directly with other FuFire API nodes.
-
-## Build and Start Command Requirements
-
-Railway automatically detects `package.json` scripts. Our production flow bundles the Express server and Vite frontend:
+Railway automatically detects `package.json` scripts:
 
 - **Build Command**: `npm run build`
-  - This inherently executes: `vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs`
+  - Runs `vite build` followed by `esbuild` to compile `server/index.ts`.
 - **Start Command**: `npm run start`
-  - This executes: `node dist/server.cjs`
+  - Runs `node dist/server.cjs`.
 
-Railway will use these by default. You can manually verify or override them in the **Settings** -> **Deploy** options.
+## Expected Port Behavior
+Railway automatically injects the `PORT` environment variable. Our Express app binds to `process.env.PORT || 3000`. You do not need to expose ports manually.
 
-## Health and Readiness Check URLs
+## Health and Readiness URLs
+Configure Railway Healthchecks to use the following paths to ensure zero-downtime routing:
 
-The application exposes standard endpoints to verify its health and initialization status. Configure Railway's instance Healthchecks in the **Settings** panel using these paths:
+- **Health Check URL**: `https://sizhu.fufire.space/api/health`
+  - Validates basic Express container liveness.
+- **Readiness URL**: `https://sizhu.fufire.space/api/readiness`
+  - Prevents traffic routing until the server confirms the presence of essential secrets (`FUFIRE_API_KEY_SECRET_REF`, `SUPABASE_SERVICE_ROLE_SECRET_REF`).
 
-- **Health Endpoint**: `/api/health`
-  - Returns `{"status": "ok"}`.
-  - Purpose: Basic liveness ping to ensure the Express container is active and accepting connections.
+## DNS Setup Checklist
+Use this manual checklist to configure your custom domain:
 
-- **Readiness Endpoint**: `/api/readiness`
-  - Returns `{"status": "ready"}` if the server is both online and successfully configured with all required environment variables (`GEMINI_API_KEY`, `APP_URL`).
-  - Returns `503 Service Unavailable` with a payload of missing variables if configuration is incomplete.
-  - Purpose: Boot-time checks to prevent Railway from routing traffic to your instance before it is fully configured.
+- [ ] Obtain the Railway provided `CNAME` assigned to your environment (e.g. `example.up.railway.app`).
+- [ ] Go to your DNS provider for the `fufire.space` domain.
+- [ ] Add a `CNAME` record targeting `sizhu` mapped to the Railway host URL.
+- [ ] Verify TLS/SSL certificate generation in the Railway networking settings.
+- [ ] Wait for propagation before assuming the domain is active.
 
-## DNS Configuration Steps (sizhu.c2.fufire.space)
-
-To map the application to your specific custom domain:
-
-1. In the Railway dashboard for your service, go to **Settings** -> **Networking** -> **Custom Domains**.
-2. Click **Custom Domain** and enter `sizhu.c2.fufire.space`.
-3. Railway will provide a CNAME record target (usually in the format of `<hash>.up.railway.app`).
-4. Log into your DNS provider for `fufire.space`.
-5. Create a new **CNAME** record:
-   - **Name/Host**: `sizhu.c2`
-   - **Target/Value**: Enter the Railway-provided CNAME string.
-   - **TTL**: Auto or default (e.g., 3600).
-6. Save the record. It may take a few minutes for propagation. Railway will automatically provision TLS/SSL certificates once propagation completes and the domain will be marked active.
+## Rollback Notes
+If a deployment fails the readiness check, the instance will be marked unhealthy. Railway will continue routing traffic to the previously healthy deployment.
+Check the Railway logs to identify missing secrets or start command failures if rollback occurs repeatedly.

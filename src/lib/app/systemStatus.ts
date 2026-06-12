@@ -7,11 +7,18 @@ export interface SystemStatus {
   database: 'LOCAL MOCK' | 'SUPABASE STUB' | 'SUPABASE READY';
   security: 'SIMULATED RBAC' | 'RLS NOT ACTIVE' | 'RLS CONFIGURED';
   systemOperational: boolean;
+  domainTarget: string;
+  domainStatus: 'UNVERIFIED' | 'CONFIGURED' | 'LIVE' | 'ERROR';
 }
 
 export function getSystemStatus(): SystemStatus {
   const mode = getAppMode();
   
+  // We cannot assume domain is LIVE synchronously.
+  // App.tsx should perform the async check.
+  const domainTarget = 'sizhu.fufire.space';
+  const defaultDomainStatus = 'UNVERIFIED';
+
   if (mode === 'MOCK_LOCAL') {
     return {
       appMode: 'MOCK_LOCAL',
@@ -19,7 +26,9 @@ export function getSystemStatus(): SystemStatus {
       gelato: 'MOCK',
       database: 'LOCAL MOCK',
       security: 'SIMULATED RBAC',
-      systemOperational: true
+      systemOperational: true,
+      domainTarget,
+      domainStatus: defaultDomainStatus
     };
   } else if (mode === 'SUPABASE_STUB') {
     return {
@@ -28,7 +37,9 @@ export function getSystemStatus(): SystemStatus {
       gelato: 'LIVE_DISABLED',
       database: 'SUPABASE STUB',
       security: 'RLS NOT ACTIVE',
-      systemOperational: false
+      systemOperational: false,
+      domainTarget,
+      domainStatus: defaultDomainStatus
     };
   } else if (mode === 'SUPABASE_DISABLED') {
     return {
@@ -37,7 +48,9 @@ export function getSystemStatus(): SystemStatus {
       gelato: 'LIVE_DISABLED',
       database: 'SUPABASE STUB',
       security: 'RLS NOT ACTIVE',
-      systemOperational: false
+      systemOperational: false,
+      domainTarget,
+      domainStatus: defaultDomainStatus
     };
   } else {
     return {
@@ -46,7 +59,9 @@ export function getSystemStatus(): SystemStatus {
       gelato: 'ERROR',
       database: 'SUPABASE STUB',
       security: 'RLS NOT ACTIVE',
-      systemOperational: false
+      systemOperational: false,
+      domainTarget,
+      domainStatus: defaultDomainStatus
     };
   }
 }

@@ -43,8 +43,32 @@ export default function App() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const [hasRunningWorkflows, setHasRunningWorkflows] = useState<boolean>(false);
   const [workflowHealth, setWorkflowHealth] = useState<'green' | 'amber' | 'red'>('green');
+  const [domainStatus, setDomainStatus] = useState<'UNVERIFIED' | 'CONFIGURED' | 'LIVE' | 'ERROR'>('UNVERIFIED');
 
-  const status = getSystemStatus();
+  const baseStatus = getSystemStatus();
+  const status = { ...baseStatus, domainStatus };
+
+  useEffect(() => {
+    const checkDomain = async () => {
+      try {
+        const targetUrl = `https://${baseStatus.domainTarget}/api/health`;
+        const res = await fetch(targetUrl);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.status === 'ok') {
+            setDomainStatus('LIVE');
+          } else {
+            setDomainStatus('ERROR');
+          }
+        } else {
+          setDomainStatus('ERROR');
+        }
+      } catch (err) {
+        setDomainStatus('ERROR');
+      }
+    };
+    checkDomain();
+  }, [baseStatus.domainTarget]);
 
   useEffect(() => {
     // Initial load
@@ -285,6 +309,10 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2 text-[10px] uppercase font-mono font-semibold text-nt">
+              <span className={`w-1.5 h-1.5 rounded-full ${status.domainStatus === 'LIVE' ? 'bg-ac' : status.domainStatus === 'ERROR' ? 'bg-red-500' : 'bg-nt'}`}></span>
+              DOMAIN: {status.domainTarget} [{status.domainStatus}]
+            </div>
             <div className="flex items-center gap-2 text-[10px] uppercase font-mono font-semibold text-nt">
               <span className={`w-1.5 h-1.5 rounded-full ${status.fufire === 'MOCK' || status.fufire === 'LIVE' || status.fufire === 'CONFIGURED' ? 'bg-ac' : 'bg-ac'}`}></span>
               FuFire: {status.fufire}
