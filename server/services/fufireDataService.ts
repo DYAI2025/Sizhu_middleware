@@ -1,26 +1,71 @@
 import { fufireDataConfig } from '../../src/lib/apiConnections/dataRequestConfig';
 import { GatewayIssue } from '../../src/lib/apiConnections/types';
+import { ALLOWED_FUFIRE_OPERATIONS, isAllowedFuFireOperation } from './fufireOperations';
+import {
+  buildChronometryRequest,
+  buildBaziRequest,
+  buildBaziTraceRequest,
+  buildWuxingRequest,
+  type NormalizedBirthInput,
+} from './fufireRequestBuilders';
+import { normalizeBirthInputWithWarnings } from './birthInputNormalizer';
+
+/**
+ * Single source of truth for the op-name → outbound config key + body builder.
+ *
+ * The op NAMES are the same server-owned allowlist enforced at the route
+ * boundary ({@link ALLOWED_FUFIRE_OPERATIONS} in `fufireOperations.ts`); this
+ * map only adds the per-op projection (which config entry resolves the path,
+ * and which T3 builder shapes the body). It carries NO URL / header / secret —
+ * those come exclusively from `fufireDataConfig` / env (T1 SSRF fix).
+ */
+const FUFIRE_OPERATION_DISPATCH: Record<
+  (typeof ALLOWED_FUFIRE_OPERATIONS)[number],
+  { configKey: keyof typeof fufireDataConfig.operations; build: (input: NormalizedBirthInput) => unknown }
+> = {
+  chronometry: { configKey: 'chronometry_resolve', build: buildChronometryRequest },
+  bazi: { configKey: 'bazi', build: buildBaziRequest },
+  baziTrace: { configKey: 'bazi_trace', build: buildBaziTraceRequest },
+  wuxing: { configKey: 'wuxing', build: buildWuxingRequest },
+};
 
 export class FuFireDataService {
   async executeTestRun(input: any): Promise<any> {
     const issues: GatewayIssue[] = [];
-    const warnings: string[] = [];
 
-    // Validate Input
-    let normalizedBirthPayload = { ...input };
-    
-    // Default Noon Rule
-    if (!input.birthTimeKnown && !input.birthTime) {
-      normalizedBirthPayload.birthTime = '12:00';
-      normalizedBirthPayload.birthTimeKnown = false;
-      normalizedBirthPayload.birthTimeSource = 'default_noon';
-      warnings.push('BIRTH_TIME_UNKNOWN_DEFAULT_NOON');
-    }
+    // Project the caller's birth fields into the normalized builder input.
+    // `manual*` are the test-run's manual location fields (no geocoder in this
+    // iteration). The normalizer owns the default-noon rule + its warning, so
+    // there is no duplicated default-noon logic here anymore.
+    const rawNormalized: NormalizedBirthInput = {
+      birthDate: input.birthDate,
+      birthTime: input.birthTime,
+      birthTimeKnown: input.birthTimeKnown !== false ? Boolean(input.birthTime) : false,
+      lat: input.manualLat,
+      lon: input.manualLon,
+      timezone: input.manualTimezone,
+      standard: input.standard,
+      boundary: input.boundary,
+      ambiguousTime: input.ambiguousTime,
+      nonexistentTime: input.nonexistentTime,
+      calendarPolicy: input.calendarPolicy,
+    };
+    const { normalized: normalizedBirthInput, warnings } = normalizeBirthInputWithWarnings(rawNormalized);
 
-    // Checking if Lat/Lon mapping exists if no geocoder configure
-    if (!input.manualLat && !input.manualLon) {
+    // Echo a normalized payload for the run output (back-compat with prior shape).
+    const normalizedBirthPayload = {
+      ...input,
+      birthTime: normalizedBirthInput.birthTime,
+      birthTimeKnown: normalizedBirthInput.birthTimeKnown,
+      ...(normalizedBirthInput.birthTimeSource
+        ? { birthTimeSource: normalizedBirthInput.birthTimeSource }
+        : {}),
+    };
+
+    // Checking if Lat/Lon mapping exists if no geocoder configured
+    if (input.manualLat === undefined && input.manualLon === undefined) {
       // In this iteration we do not have a real geocoder configured
-      return { 
+      return {
         input,
         normalizedBirthPayload,
         requests: [],
@@ -110,36 +155,37 @@ export class FuFireDataService {
     }
 
     for (const op of requestedOps) {
-      let operationCfg;
-      let reqBody: any = {};
-      
-      if (op === 'chronometry') {
-         operationCfg = config.operations['chronometry_resolve'];
-         reqBody = {
-            date: normalizedBirthPayload.birthDate,
-            time: normalizedBirthPayload.birthTime,
-            lat: normalizedBirthPayload.manualLat,
-            lon: normalizedBirthPayload.manualLon,
-            timezone: normalizedBirthPayload.manualTimezone
-         };
-      } else if (op === 'bazi') {
-         operationCfg = config.operations['bazi'];
-         reqBody = {
-            year: 2026, month: 6, day: 12, hour: 12 // Simplified for tests
-         };
-      } else if (op === 'baziTrace') {
-         operationCfg = config.operations['bazi_trace'];
-         reqBody = {
-            year: 2026, month: 6, day: 12, hour: 12 // Simplified for tests
-         };
-      } else if (op === 'wuxing') {
-         operationCfg = config.operations['wuxing'];
-         reqBody = {
-            elements: []
-         };
+      // Single source of truth: only the server-owned allowlist may dispatch.
+      // (The route boundary already rejects disallowed ops; this is the
+      // defense-in-depth guarantee that the service itself never builds/fetches
+      // for an op outside the allowlist.)
+      if (!isAllowedFuFireOperation(op)) {
+        issues.push({
+          id: crypto.randomUUID(),
+          providerKind: 'data_request',
+          providerName: 'FuFire',
+          operation: op,
+          errorCode: 'FUFIRE_OPERATION_NOT_ALLOWED',
+          message: `Operation not allowed: ${op}`,
+          retryable: false,
+          retryCount: 0,
+          severity: 'major',
+          status: 'open',
+          sanitizedRequestMetadata: {},
+          sanitizedResponseMetadata: {},
+          createdAt: new Date().toISOString()
+        } as GatewayIssue);
+        responses.push({ operation: op, error: 'FUFIRE_OPERATION_NOT_ALLOWED' });
+        continue;
       }
-      
+
+      const dispatch = FUFIRE_OPERATION_DISPATCH[op];
+      const operationCfg = config.operations[dispatch.configKey];
       if (!operationCfg) continue;
+
+      // Body is shaped ONLY by the T3 builders from normalized birth input.
+      // No URL / path / header / secret is taken from the request body (T1).
+      const reqBody = dispatch.build(normalizedBirthInput);
 
       requests.push({ operation: op, body: reqBody });
 
@@ -147,7 +193,7 @@ export class FuFireDataService {
         const fufireUrl = `${config.baseUrl.replace(/\/$/, '')}${operationCfg.path}`;
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), config.timeoutMs);
-        
+
         const response = await fetch(fufireUrl, {
           method: operationCfg.method,
           headers: {
@@ -157,7 +203,7 @@ export class FuFireDataService {
           body: JSON.stringify(reqBody),
           signal: controller.signal
         });
-        
+
         clearTimeout(timeoutId);
 
         if (!response.ok) {

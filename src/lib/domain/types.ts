@@ -89,10 +89,11 @@ export interface GenerationConfig {
   numInitiallyGenerated: number;
   imageFormat: 'png' | 'jpeg';
   imageQuality: 'standard' | 'hd';
-  primaryProvider: 'Gemini' | 'OpenAI' | 'Midjourney' | 'Stability';
+  // 'OpenRouter' is the default model gateway (REQ-A-002); legacy providers kept for back-compat.
+  primaryProvider: 'OpenRouter' | 'Gemini' | 'OpenAI' | 'Midjourney' | 'Stability';
   primaryModel: string;
   primarySecretRef: string;
-  fallbackProvider: 'Gemini' | 'OpenAI' | 'Stability';
+  fallbackProvider: 'OpenRouter' | 'Gemini' | 'OpenAI' | 'Stability';
   fallbackModel: string;
   fallbackLLM: string;
   fallbackSecretRef: string;
@@ -101,10 +102,11 @@ export interface GenerationConfig {
 // 10. quality_gate_configs
 export interface QualityGateConfig {
   productId: string;
-  llmProvider: 'Gemini' | 'OpenAI' | 'Claude';
+  // 'OpenRouter' is the default model gateway (REQ-A-002).
+  llmProvider: 'OpenRouter' | 'Gemini' | 'OpenAI' | 'Claude';
   model: string;
   secretRef: string;
-  fallbackProvider: 'Gemini' | 'OpenAI';
+  fallbackProvider: 'OpenRouter' | 'Gemini' | 'OpenAI';
   fallbackModel: string;
   fallbackSecretRef: string;
   qaPrompt: string;

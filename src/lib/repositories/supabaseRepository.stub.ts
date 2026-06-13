@@ -22,7 +22,7 @@ import {
   PodProviderConfig 
 } from '../domain/models';
 
-import { 
+import {
   ProductRepository,
   TemplateRepository,
   ProviderRepository,
@@ -32,32 +32,39 @@ import {
   SettingsRepository
 } from './interfaces';
 
-const SUPABASE_OFFLINE_ERR = "Supabase integration is currently offline. Please configure active client secret keys.";
+import { SupabaseNotConfiguredError } from './errors';
+
+// AC-D-001a: outside DEMO_LOCAL the persistence boundary raises an EXPLICIT, typed
+// error carrying the machine-readable SUPABASE_NOT_CONFIGURED code — never a vague
+// "offline" string and never a silent mock/localStorage fallback.
+function notConfigured(): never {
+  throw new SupabaseNotConfiguredError();
+}
 
 export class SupabaseProductRepository implements ProductRepository {
   async getProducts(): Promise<Product[]> {
-    throw new Error(SUPABASE_OFFLINE_ERR);
+    return notConfigured();
   }
   async saveProducts(): Promise<void> {
-    throw new Error(SUPABASE_OFFLINE_ERR);
+    return notConfigured();
   }
 }
 
 export class SupabaseTemplateRepository implements TemplateRepository {
   async getTemplates(): Promise<PromptTemplate[]> {
-    throw new Error(SUPABASE_OFFLINE_ERR);
+    return notConfigured();
   }
   async saveTemplates(): Promise<void> {
-    throw new Error(SUPABASE_OFFLINE_ERR);
+    return notConfigured();
   }
 }
 
 export class SupabaseProviderRepository implements ProviderRepository {
   async getProviders(): Promise<ApiProvider[]> {
-    throw new Error(SUPABASE_OFFLINE_ERR);
+    return notConfigured();
   }
   async saveProvider(): Promise<void> {
-    throw new Error(SUPABASE_OFFLINE_ERR);
+    return notConfigured();
   }
   async performHealthCheck(): Promise<ApiProvider['status']> {
     return 'LIVE_DISABLED';
@@ -66,87 +73,87 @@ export class SupabaseProviderRepository implements ProviderRepository {
 
 export class SupabaseWorkflowRepository implements WorkflowRepository {
   async getWorkflowRuns(): Promise<WorkflowRun[]> {
-    throw new Error(SUPABASE_OFFLINE_ERR);
+    return notConfigured();
   }
   async saveWorkflowRuns(): Promise<void> {
-    throw new Error(SUPABASE_OFFLINE_ERR);
+    return notConfigured();
   }
   async getWorkflowLogs(): Promise<WorkflowLog[]> {
-    throw new Error(SUPABASE_OFFLINE_ERR);
+    return notConfigured();
   }
   async saveWorkflowLogs(): Promise<void> {
-    throw new Error(SUPABASE_OFFLINE_ERR);
+    return notConfigured();
   }
   async getVisualWorkflows(): Promise<VisualWorkflow[]> {
-    throw new Error(SUPABASE_OFFLINE_ERR);
+    return notConfigured();
   }
   async saveVisualWorkflow(): Promise<void> {
-    throw new Error(SUPABASE_OFFLINE_ERR);
+    return notConfigured();
   }
   async getVisualWorkflow(): Promise<VisualWorkflow> {
-    throw new Error(SUPABASE_OFFLINE_ERR);
+    return notConfigured();
   }
 }
 
 export class SupabaseArtifactRepository implements ArtifactRepository {
   async getImageArtifacts(): Promise<ImageArtifact[]> {
-    throw new Error(SUPABASE_OFFLINE_ERR);
+    return notConfigured();
   }
   async saveImageArtifacts(): Promise<void> {
-    throw new Error(SUPABASE_OFFLINE_ERR);
+    return notConfigured();
   }
 }
 
 export class SupabaseRoleRepository implements RoleRepository {
   async getRoles(): Promise<Role[]> {
-    throw new Error(SUPABASE_OFFLINE_ERR);
+    return notConfigured();
   }
   async getPermissions(): Promise<Permission[]> {
-    throw new Error(SUPABASE_OFFLINE_ERR);
+    return notConfigured();
   }
   async getRolePermissions(): Promise<RolePermissions[]> {
-    throw new Error(SUPABASE_OFFLINE_ERR);
+    return notConfigured();
   }
   async saveRolePermissions(): Promise<void> {
-    throw new Error(SUPABASE_OFFLINE_ERR);
+    return notConfigured();
   }
   async getUsers(): Promise<AppUser[]> {
-    throw new Error(SUPABASE_OFFLINE_ERR);
+    return notConfigured();
   }
   async saveUsers(): Promise<void> {
-    throw new Error(SUPABASE_OFFLINE_ERR);
+    return notConfigured();
   }
   async getActiveRole(): Promise<AppRoleName> {
     return 'Observer';
   }
   async setActiveRole(): Promise<void> {
-    throw new Error(SUPABASE_OFFLINE_ERR);
+    return notConfigured();
   }
 }
 
 export class SupabaseSettingsRepository implements SettingsRepository {
   async getGenConfigs(): Promise<GenerationConfig[]> {
-    throw new Error(SUPABASE_OFFLINE_ERR);
+    return notConfigured();
   }
   async saveGenConfigs(): Promise<void> {
-    throw new Error(SUPABASE_OFFLINE_ERR);
+    return notConfigured();
   }
   async getQualityConfigs(): Promise<QualityGateConfig[]> {
-    throw new Error(SUPABASE_OFFLINE_ERR);
+    return notConfigured();
   }
   async saveQualityConfigs(): Promise<void> {
-    throw new Error(SUPABASE_OFFLINE_ERR);
+    return notConfigured();
   }
   async getPersonalizationConfig(): Promise<PersonalizationApiConfig> {
-    throw new Error(SUPABASE_OFFLINE_ERR);
+    return notConfigured();
   }
   async savePersonalizationConfig(): Promise<void> {
-    throw new Error(SUPABASE_OFFLINE_ERR);
+    return notConfigured();
   }
   async getPodConfig(): Promise<PodProviderConfig> {
-    throw new Error(SUPABASE_OFFLINE_ERR);
+    return notConfigured();
   }
   async savePodConfig(): Promise<void> {
-    throw new Error(SUPABASE_OFFLINE_ERR);
+    return notConfigured();
   }
 }

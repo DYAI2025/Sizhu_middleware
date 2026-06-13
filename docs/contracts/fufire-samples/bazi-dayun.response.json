@@ -1,0 +1,41 @@
+{
+  "_note": "Real /v1/calculate/bazi/dayun response sample (user, 2026-06-13). OUT of sizhu-secure-fufire-baseline scope (dayun is not a baseline operation) — kept as reference for a later run. Day master here is 'Jia' (different subject than bazi.response.json).",
+  "dayun": {
+    "label": "Da Yun",
+    "display_label_de": "Dekaden-Säule",
+    "direction": "forward",
+    "direction_method": "explicit",
+    "start": {
+      "anchor_term": { "name": "Xiao Shu", "direction": "next", "local_dt": "1987-07-07T17:38:39+02:00" },
+      "delta": { "days": 2, "hours": 20, "minutes": 8 },
+      "start_age": { "years": 0, "months": 11, "days": 10, "decimal_years": 0.9462962962962963 },
+      "method": "three_days_one_year"
+    },
+    "cycles": [
+      { "sequence": 1, "age_start": 0.95, "age_end": 10.95, "date_start": "1988-06-09", "date_end": "1998-04-18", "pillar": { "stem": "Ding", "branch": "Wei", "stem_cn": "丁", "branch_cn": "未", "element": "fire", "polarity": "yin", "index60": 43 }, "relation_to_day_master": { "day_master": "Jia", "ten_god": "Shang Guan", "element_relation": "produced_by_day_master", "label_de": "Disruptive Ausgabe" }, "is_current": false },
+      { "sequence": 2, "age_start": 10.95, "age_end": 20.95, "date_start": "1998-04-18", "date_end": "2008-02-25", "pillar": { "stem": "Wu", "branch": "Shen", "stem_cn": "戊", "branch_cn": "申", "element": "earth", "polarity": "yang", "index60": 44 }, "relation_to_day_master": { "day_master": "Jia", "ten_god": "Pian Cai", "element_relation": "controlled_by_day_master", "label_de": "Indirektes Vermögen" }, "is_current": false },
+      { "sequence": 3, "age_start": 20.95, "age_end": 30.95, "date_start": "2008-02-25", "date_end": "2018-01-03", "pillar": { "stem": "Ji", "branch": "You", "stem_cn": "己", "branch_cn": "酉", "element": "earth", "polarity": "yin", "index60": 45 }, "relation_to_day_master": { "day_master": "Jia", "ten_god": "Zheng Cai", "element_relation": "controlled_by_day_master", "label_de": "Direktes Vermögen" }, "is_current": false },
+      { "sequence": 4, "age_start": 30.95, "age_end": 40.95, "date_start": "2018-01-03", "date_end": "2027-11-12", "pillar": { "stem": "Geng", "branch": "Xu", "stem_cn": "庚", "branch_cn": "戌", "element": "metal", "polarity": "yang", "index60": 46 }, "relation_to_day_master": { "day_master": "Jia", "ten_god": "Qi Sha", "element_relation": "controls_day_master", "label_de": "Druck / Struktur" }, "is_current": true },
+      { "sequence": 5, "age_start": 40.95, "age_end": 50.95, "date_start": "2027-11-12", "date_end": "2037-09-20", "pillar": { "stem": "Xin", "branch": "Hai", "stem_cn": "辛", "branch_cn": "亥", "element": "metal", "polarity": "yin", "index60": 47 }, "relation_to_day_master": { "day_master": "Jia", "ten_god": "Zheng Guan", "element_relation": "controls_day_master", "label_de": "Verantwortung" }, "is_current": false },
+      { "sequence": 6, "age_start": 50.95, "age_end": 60.95, "date_start": "2037-09-20", "date_end": "2047-07-30", "pillar": { "stem": "Ren", "branch": "Zi", "stem_cn": "壬", "branch_cn": "子", "element": "water", "polarity": "yang", "index60": 48 }, "relation_to_day_master": { "day_master": "Jia", "ten_god": "Pian Yin", "element_relation": "produces_day_master", "label_de": "Indirekte Quelle" }, "is_current": false },
+      { "sequence": 7, "age_start": 60.95, "age_end": 70.95, "date_start": "2047-07-30", "date_end": "2057-06-07", "pillar": { "stem": "Gui", "branch": "Chou", "stem_cn": "癸", "branch_cn": "丑", "element": "water", "polarity": "yin", "index60": 49 }, "relation_to_day_master": { "day_master": "Jia", "ten_god": "Zheng Yin", "element_relation": "produces_day_master", "label_de": "Direkte Quelle" }, "is_current": false },
+      { "sequence": 8, "age_start": 70.95, "age_end": 80.95, "date_start": "2057-06-07", "date_end": "2067-04-16", "pillar": { "stem": "Jia", "branch": "Yin", "stem_cn": "甲", "branch_cn": "寅", "element": "wood", "polarity": "yang", "index60": 50 }, "relation_to_day_master": { "day_master": "Jia", "ten_god": "Bi Jian", "element_relation": "same_element", "label_de": "Gefährte" }, "is_current": false }
+    ],
+    "current": {
+      "sequence": 4, "age_start": 30.95, "age_end": 40.95,
+      "pillar": { "stem": "Geng", "branch": "Xu", "stem_cn": "庚", "branch_cn": "戌", "element": "metal", "polarity": "yang", "index60": 46 },
+      "semantic_summary": {
+        "road_metaphor": "Diese Dekade beschreibt die Strasse, auf der dein Jia-Kern gerade wirkt.",
+        "supports": [], "frictions": [], "practice": []
+      }
+    }
+  },
+  "provenance": {
+    "source": "FuFirE",
+    "ruleset_id": "dayun_v1",
+    "solar_terms_source": "existing_bazi_jieqi_engine",
+    "computed_at": "2026-06-13T11:36:19Z"
+  },
+  "precision": { "birth_time_known": true, "direction_basis": "explicit", "provisional_fields": [] },
+  "warnings": []
+}

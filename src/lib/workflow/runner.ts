@@ -31,8 +31,37 @@ import { renderPrompt } from './promptRenderer';
 import { WorkflowStateMachine } from './stateMachine';
 import { ArtifactService } from './artifactService';
 import { EscalationService } from './escalationService';
+import { selectModelForOperation } from '../modelGateway';
+import type { ModelGatewayOperation } from '../modelGateway';
 
 export { getPropertyByPath, renderPrompt } from './promptRenderer';
+
+/**
+ * Safe env source for the model gateway. The runner runs client-side in
+ * DEMO_LOCAL, where `process` is undefined; passing `{}` makes the gateway fall
+ * back to its built-in OpenRouter defaults. On the server, the real env (with
+ * any OPENROUTER_MODEL_* overrides) is read. Secrets are never read here — only
+ * the per-operation model id is resolved.
+ */
+function gatewayEnv(): Record<string, string | undefined> {
+  return typeof process !== 'undefined' && process.env ? process.env : {};
+}
+
+/**
+ * Resolve the model id for an operation through the OpenRouter model gateway
+ * (REQ-A-002) when the configured provider is the gateway. For legacy direct
+ * providers the explicitly-configured model id is preserved (back-compat).
+ */
+function resolveModelId(
+  provider: string,
+  operation: ModelGatewayOperation,
+  configuredModel: string
+): string {
+  if (provider === 'OpenRouter') {
+    return selectModelForOperation(operation, gatewayEnv());
+  }
+  return configuredModel;
+}
 
 export class WorkflowRunner {
   private escalationService: EscalationService;
@@ -230,8 +259,11 @@ export class WorkflowRunner {
 
       // Candidate execution
       const providerUsed = currentIteration > 1 ? genConfig.fallbackProvider : genConfig.primaryProvider;
-      const modelUsed = currentIteration > 1 ? genConfig.fallbackModel : genConfig.primaryModel;
-      
+      const configuredModel = currentIteration > 1 ? genConfig.fallbackModel : genConfig.primaryModel;
+      // REQ-A-002: route the image-generation model id through the OpenRouter
+      // gateway when the configured provider is the gateway (capability-checked).
+      const modelUsed = resolveModelId(providerUsed, 'image_generation', configuredModel);
+
       const generationParams = {
         productTitle: product.title,
         orderNumber,
@@ -252,12 +284,20 @@ export class WorkflowRunner {
       );
 
       // QA Evaluation Stage
+      // REQ-A-002: route the quality-gate model id through the OpenRouter
+      // gateway when the configured provider is the gateway (vision-capability
+      // checked); legacy providers keep their explicitly-configured model.
+      const qaModelUsed = resolveModelId(
+        qualityConfig.llmProvider,
+        'quality_gate',
+        qualityConfig.model
+      );
       const evaluations = await this.qaProvider.evaluate(
         generatedCandidates,
         qualityConfig.minAcceptanceScore,
         qualityConfig.qaPrompt,
         qualityConfig.secretRef,
-        qualityConfig.model,
+        qaModelUsed,
         personalizationVars,
         currentIteration
       );
