@@ -1,10 +1,13 @@
 import { GatewayIssue } from '../../src/lib/apiConnections/types';
-import { gelatoFulfillmentConfig } from '../../src/lib/apiConnections/fulfillmentConfig';
+import { getGelatoFulfillmentConfig } from '../../src/lib/apiConnections/fulfillmentConfig';
 import { getAppMode } from '../../src/lib/app/appMode';
 
 export class PodDispatchService {
   async dispatchArtifact(workflowRunId: string, input: any, artifact: any): Promise<any> {
-    const config = gelatoFulfillmentConfig;
+    // FP4 (F3): read the config at CALL time so a runtime env change
+    // (POD_ENABLED / POD_DISPATCH_MODE / POD_BASE_URL) actually takes effect.
+    // The prior import-time-frozen const made such a change a silent no-op.
+    const config = getGelatoFulfillmentConfig();
     const isMock = getAppMode() === 'DEMO_LOCAL';
 
     if (isMock) {

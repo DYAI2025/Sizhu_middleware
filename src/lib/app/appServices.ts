@@ -65,16 +65,24 @@ const supabaseSettingsRepo = new SupabaseSettingsRepository();
 const supabaseRoleRepo = new SupabaseRoleRepository();
 const supabaseProviderRepo = new SupabaseProviderRepository();
 
-// Stub runner that matches interface but throws the explicit, typed boundary error.
-// AC-D-001a/b: outside DEMO_LOCAL the pipeline never runs against the local mock providers.
-const supabaseRunner = {
+// Stub runner that matches the runner's PUBLIC surface but throws the explicit,
+// typed boundary error. AC-D-001a/b: outside DEMO_LOCAL the pipeline never runs
+// against the local mock providers.
+//
+// L12: typed via `Pick<WorkflowRunner, 'run' | 'dispatchManualApproval'>` instead
+// of `as unknown as WorkflowRunner`. Adding a NEW public method to WorkflowRunner
+// without listing it here is a compile error at this site (the stub no longer
+// satisfies the Pick), forcing the boundary stub to stay in lockstep with the
+// real runner's public API. The single `as WorkflowRunner` projection is the only
+// remaining cast (the facade exposes the full type for back-compat).
+const supabaseRunner: Pick<WorkflowRunner, 'run' | 'dispatchManualApproval'> = {
   run: async () => {
     throw new SupabaseNotConfiguredError();
   },
   dispatchManualApproval: async () => {
     throw new SupabaseNotConfiguredError();
   }
-} as unknown as WorkflowRunner;
+};
 
 /**
  * AC-D-001b/d — single, explicit selection guard. The production-vs-DEMO_LOCAL
@@ -119,7 +127,10 @@ export const appServices = {
     return selectDependency(localProviderRepo, supabaseProviderRepo);
   },
 
-  get workflowRunner() {
-    return selectDependency(localRunner, supabaseRunner);
+  get workflowRunner(): WorkflowRunner {
+    // The Supabase boundary stub implements only the public runner surface
+    // (Pick<...>); the single explicit projection lives here so the facade keeps
+    // exposing the full WorkflowRunner type for back-compat (L12).
+    return selectDependency(localRunner, supabaseRunner as WorkflowRunner);
   }
 };

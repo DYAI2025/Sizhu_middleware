@@ -55,6 +55,41 @@ export {
 type RequestBody<T> = T & { [key: string]: unknown };
 
 /**
+ * Thrown by a builder when a REQUIRED field is absent. This should never fire in
+ * production: the data-service validates required coordinates/timezone BEFORE
+ * dispatch (FP1 / the `||` geocoder gate), so this is the defense-in-depth floor
+ * that guarantees a builder can never silently emit `{ lat: undefined }` /
+ * `{ lon: undefined }` / `{ timezone: undefined }`. Replaces the prior unsound
+ * `input.lat as number` casts.
+ */
+export class FuFireRequestBuilderError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "FuFireRequestBuilderError";
+  }
+}
+
+/** Narrow a required finite-number coordinate (no `as` cast). */
+function requireCoord(value: number | undefined, field: string): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new FuFireRequestBuilderError(
+      `Required coordinate "${field}" is missing or not a finite number`,
+    );
+  }
+  return value;
+}
+
+/** Narrow a required non-empty string (no `as` cast). */
+function requireString(value: string | undefined, field: string): string {
+  if (typeof value !== "string" || value.trim() === "") {
+    throw new FuFireRequestBuilderError(
+      `Required field "${field}" is missing or empty`,
+    );
+  }
+  return value;
+}
+
+/**
  * Combine the (already-normalized or raw) birth date + time into a single ISO
  * datetime string `YYYY-MM-DDTHH:MM:SS` (local wall-clock, no offset — matching
  * the contract example `"1990-06-15T14:30:00"`).
@@ -90,15 +125,17 @@ export function toIsoDatetime(input: NormalizedBirthInput): string {
 export function buildChronometryRequest(
   input: NormalizedBirthInput,
 ): RequestBody<ChronometryResolveRequest> {
+  // Required by the contract; validated here (no `as` cast). The data-service
+  // guarantees presence before dispatch — this is the defense-in-depth floor.
   return {
     birth: {
       calendar_policy: input.calendarPolicy ?? DEFAULT_CALENDAR_POLICY,
       datetime: toIsoDatetime(input),
       location: {
-        lat: input.lat as number,
-        lon: input.lon as number,
+        lat: requireCoord(input.lat, "lat"),
+        lon: requireCoord(input.lon, "lon"),
       },
-      timezone: input.timezone as string,
+      timezone: requireString(input.timezone, "timezone"),
     },
   };
 }
@@ -144,10 +181,11 @@ export function buildBaziTraceRequest(
  * contract; carries NO `elements`.
  */
 export function buildWuxingRequest(input: NormalizedBirthInput): RequestBody<WuxingRequest> {
+  // `lat`/`lon` are REQUIRED by the contract; validated here (no `as` cast).
   const body: RequestBody<WuxingRequest> = {
     date: toIsoDatetime(input),
-    lat: input.lat as number,
-    lon: input.lon as number,
+    lat: requireCoord(input.lat, "lat"),
+    lon: requireCoord(input.lon, "lon"),
   };
 
   if (input.timezone !== undefined) body.tz = input.timezone;
