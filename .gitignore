@@ -6,3 +6,9 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Local PRIL enforcement shims (agileteam infra; resolves repo-relative hook path to the global install)
+config/claude/
+
+# Local Claude Code agent state (homunculus observer etc.) — never product content
+.claude/

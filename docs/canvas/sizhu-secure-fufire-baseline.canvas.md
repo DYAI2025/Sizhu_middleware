@@ -328,6 +328,7 @@ Allowed change scope:
 - `src/lib/modelGateway/**`
 - `src/lib/workflow/**`
 - `src/lib/domain/**`
+- `src/lib/app/**`
 - `src/lib/repositories/**`
 - `src/components/auth/**`
 - `src/components/FuFireTestConsole.tsx`
@@ -352,6 +353,8 @@ Allowed change scope:
 - `.env.example`
 - `package.json`
 - `package-lock.json`
+- `.gitignore`
+- `CLAUDE.md`
 
 > ENTSCHIEDEN (User 2026-06-13): UI-Pfade für Login/Account-Security und FuFire-Test-Console sind
 > Teil dieses Runs. Out-of-scope bleiben UI-Pfade zu deferred Sprints (Gelato/QG2,
@@ -370,6 +373,14 @@ Allowed change scope:
 > `docs/architecture/**`, `package-lock.json`; und der falsche Plan-Pfad
 > `…-production-middleware-hardening.md` ersetzt durch `docs/plans/**` (Spec-Auditor-Befund N3).
 > Formatierung parser-fest gemacht (Globs ohne Inline-Klammern).
+>
+> ERWEITERUNG 2026-06-13 (PRIL-Stop-Hook-Reconcile, vom Orchestrator deklariert): die
+> committete Feature-Fläche berührte legitim auch `src/lib/app/**` (T6 appServices-Guard +
+> getAppMode-Boundary, Teil der Option-A-Wiring-Genehmigung), `.gitignore` (Install-Fix für die
+> lokalen PRIL-Shims) und `CLAUDE.md` (/init-Projekt-Doc) — diese sind oben ergänzt, damit der
+> Scope-Guard die reale Fläche abdeckt (kein stilles Broadening: alle drei sind erklärte,
+> beabsichtigte Änderungen; Infra/Doc, kein neuer Feature-Value-Pfad). `.claude/` (lokaler
+> Agent-State) wurde gitignored, nicht in Scope genommen.
 >
 > ERWEITERUNG 2026-06-13 (REQ-A-002 Scope-Shift = Option A, vom User genehmigt): ergänzt um
 > `src/components/ConfigurationViews.tsx`, `src/components/SettingsView.tsx`,
