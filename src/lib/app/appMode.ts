@@ -13,5 +13,5 @@ export function getAppMode(): AppMode {
   if (modeStr === 'PRODUCTION_NOT_READY' || modeStr === 'CONFIG_REQUIRED') return 'CONFIG_REQUIRED';
   if (modeStr === 'SUPABASE_STUB' || modeStr === 'SUPABASE_DISABLED') return 'CONFIG_REQUIRED'; // Mapping old modes
   
-  return 'CONFIG_REQUIRED'; // Default to CONFIG_REQUIRED
+  return 'DEMO_LOCAL'; // Default to DEMO_LOCAL
 }

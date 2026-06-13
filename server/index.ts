@@ -16,6 +16,7 @@ dotenv.config();
  */
 export function createApp(): Express {
   const app = express();
+  const PORT = Number(process.env.PORT || 8080);
 
   app.use(express.json());
 
