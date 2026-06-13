@@ -33,6 +33,17 @@ import {
 } from './interfaces';
 
 import { DEFAULT_ROLE_PERMISSIONS } from '../domain/permissions';
+import { buildOpenRouterGatewayConfig } from '../modelGateway';
+
+/**
+ * Default model-gateway descriptors (REQ-A-002). OpenRouter is the single
+ * default model gateway, so the seeded configs route through it rather than a
+ * forced direct Gemini/OpenAI default. Model ids are sourced from the gateway
+ * (with no env overrides) so the seed never drifts from the gateway defaults.
+ */
+const OPENROUTER_GATEWAY_DEFAULTS = buildOpenRouterGatewayConfig({});
+/** Secret reference the OpenRouter key is read from (server-side only). */
+const SECRET_REF_OPENROUTER_API_KEY = 'SECRET_REF_OPENROUTER_API_KEY';
 
 // Default mock seeds
 const DEFAULT_USERS: AppUser[] = [
@@ -112,13 +123,14 @@ const DEFAULT_GENERATION_CONFIGS: GenerationConfig[] = [
     numInitiallyGenerated: 3,
     imageFormat: 'png',
     imageQuality: 'hd',
-    primaryProvider: 'OpenAI',
-    primaryModel: 'dall-e-3',
-    primarySecretRef: 'SECRET_REF_OPENAI_MAIN',
-    fallbackProvider: 'Gemini',
-    fallbackModel: 'imagen-3.0-generate-002',
-    fallbackLLM: 'gemini-1.5-pro',
-    fallbackSecretRef: 'SECRET_REF_GEMINI_FALLBACK'
+    // REQ-A-002: OpenRouter is the single default model gateway.
+    primaryProvider: 'OpenRouter',
+    primaryModel: OPENROUTER_GATEWAY_DEFAULTS.models.image_generation.id,
+    primarySecretRef: SECRET_REF_OPENROUTER_API_KEY,
+    fallbackProvider: 'OpenRouter',
+    fallbackModel: OPENROUTER_GATEWAY_DEFAULTS.models.image_generation.id,
+    fallbackLLM: OPENROUTER_GATEWAY_DEFAULTS.models.quality_gate.id,
+    fallbackSecretRef: SECRET_REF_OPENROUTER_API_KEY
   },
   {
     productId: 'prod-002',
@@ -138,12 +150,13 @@ const DEFAULT_GENERATION_CONFIGS: GenerationConfig[] = [
 const DEFAULT_QUALITY_GATE_CONFIGS: QualityGateConfig[] = [
   {
     productId: 'prod-001',
-    llmProvider: 'Gemini',
-    model: 'gemini-2.5-pro',
-    secretRef: 'SECRET_REF_GEMINI_QA',
-    fallbackProvider: 'OpenAI',
-    fallbackModel: 'gpt-4o',
-    fallbackSecretRef: 'SECRET_REF_GPT_QA_FALLBACK',
+    // REQ-A-002: OpenRouter is the single default model gateway.
+    llmProvider: 'OpenRouter',
+    model: OPENROUTER_GATEWAY_DEFAULTS.models.quality_gate.id,
+    secretRef: SECRET_REF_OPENROUTER_API_KEY,
+    fallbackProvider: 'OpenRouter',
+    fallbackModel: OPENROUTER_GATEWAY_DEFAULTS.models.quality_gate.id,
+    fallbackSecretRef: SECRET_REF_OPENROUTER_API_KEY,
     qaPrompt: 'Evaluate stars alignment...',
     referenceImages: [],
     faultTolerance: 'low',

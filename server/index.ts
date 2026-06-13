@@ -5,7 +5,12 @@ import dotenv from "dotenv";
 import cors from "cors";
 import { FuFireDataService } from "./services/fufireDataService";
 import { PodDispatchService } from "./services/podDispatchService";
+import {
+  sanitizeTestRunBody,
+  validateRequestedOperations,
+} from "./services/fufireOperations";
 import { apiGuard } from "./middleware/auth";
+import { getAppMode } from "../src/lib/app/appMode";
 
 dotenv.config();
 
@@ -84,10 +89,17 @@ export function createApp(): Express {
   });
 
   // Non-secret configuration snapshot. Never returns secret VALUES, only refs.
+  //
+  // AC-D-001d (audit note N5): the reported appMode is resolved through the SINGLE
+  // real source of truth — getAppMode() — not a hardcoded "CONFIG_REQUIRED" default
+  // that drifted from the app's DEMO_LOCAL default (commit 4980ee9). This removes the
+  // demo-mode-leakage surface where the console showed one mode while the running
+  // pipeline behaved as another. getAppMode() itself fails closed: the unset default is
+  // an explicit, mock-permitted DEMO_LOCAL — never an implicit production mode.
   app.get("/api/config/*", (_req, res) => {
     res.json({
       status: "OK",
-      appMode: process.env.APP_MODE || "CONFIG_REQUIRED",
+      appMode: getAppMode(),
       authRequired: (process.env.AUTH_REQUIRED || "true").toLowerCase() === "true",
       mfaRequired:
         (process.env.MFA_REQUIRED_FOR_SENSITIVE_ACTIONS || "true").toLowerCase() ===
@@ -122,7 +134,27 @@ export function createApp(): Express {
 
   app.post("/api/data-requests/fufire/test-run", async (req, res) => {
     try {
-      const result = await fufireDataService.executeTestRun(req.body);
+      // REQ-A-001 / AC-A-001d: only server-owned operations may be executed.
+      // An unknown/disallowed operation is rejected up front, before any
+      // outbound work, with a controlled error.
+      const opCheck = validateRequestedOperations(req.body);
+      if (!opCheck.ok) {
+        return res.status(400).json({
+          ok: false,
+          error_code: "FUFIRE_OPERATION_NOT_ALLOWED",
+          message: `Operation(s) not allowed: ${opCheck.disallowed.join(", ")}`,
+          disallowedOperations: opCheck.disallowed,
+          retryable: false,
+        });
+      }
+
+      // REQ-A-001 / AC-A-001b: strip every body-controlled steering field
+      // (fuFireConfig / fufirePath / baseUrl / apiKeySecretRef / authHeaderName)
+      // so the request body can never influence the outbound URL, header, or
+      // which secret env var is read — nor be echoed back in the response.
+      const safeBody = sanitizeTestRunBody(req.body);
+
+      const result = await fufireDataService.executeTestRun(safeBody);
       res.json(result);
     } catch (err: any) {
       res.status(500).json({
@@ -193,73 +225,38 @@ export function createApp(): Express {
     res.json({ ok: true, ref, present: Boolean(process.env[ref]) });
   });
 
-  app.post("/api/fufire/*", async (req, res) => {
-    try {
-      const { fuFireConfig, fufirePath, body } = req.body;
+  // ---------------------------------------------------------------------------
+  // REQ-A-001: the arbitrary, body-controlled FuFire proxy (`POST /api/fufire/*`)
+  // has been REMOVED, not re-authed. It previously read `fuFireConfig.baseUrl`,
+  // `fuFireConfig.apiKeySecretRef`, and `fufirePath` from the request body and
+  // fetched that attacker-chosen URL with the FuFire secret (SSRF /
+  // config-bypass). The only legitimate FuFire operation path is
+  // `POST /api/data-requests/fufire/test-run`, which resolves baseUrl / path /
+  // header / secret exclusively from server config/env. Any `POST /api/fufire/*`
+  // request now falls through to the default-deny / not-found behavior.
+  // ---------------------------------------------------------------------------
 
-      const apiKey =
-        process.env[fuFireConfig.apiKeySecretRef] || process.env.FUFIRE_API_KEY;
-      if (!apiKey) {
-        return res.status(500).json({ error: "NO_FUFIRE_API_KEY_CONFIGURED" });
+  // ---------------------------------------------------------------------------
+  // CORS error handler. In production an unallowed origin causes the cors()
+  // middleware to call back with an Error; without this handler Express would
+  // surface that as an unhandled 500 with a stack trace (AC-O-001c). Convert it
+  // into a controlled 403 instead.
+  // ---------------------------------------------------------------------------
+  app.use(
+    (
+      err: Error,
+      _req: express.Request,
+      res: express.Response,
+      next: express.NextFunction,
+    ) => {
+      if (err && err.message === "Not allowed by CORS") {
+        return res
+          .status(403)
+          .json({ status: "FORBIDDEN", error_code: "CORS_ORIGIN_NOT_ALLOWED" });
       }
-      if (!fuFireConfig.baseUrl) {
-        return res.status(500).json({ error: "NO_FUFIRE_BASE_URL_CONFIGURED" });
-      }
-      if (!fuFireConfig.enabled) {
-        return res.status(500).json({ error: "FUFIRE_ENDPOINT_DISABLED" });
-      }
-
-      const fufireUrl = `${fuFireConfig.baseUrl.replace(/\/$/, "")}${fufirePath}`;
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(
-        () => controller.abort(),
-        fuFireConfig.timeoutMs || 10000,
-      );
-
-      try {
-        const response = await fetch(fufireUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-API-Key": apiKey,
-          },
-          body: JSON.stringify(body),
-          signal: controller.signal,
-        });
-
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-          if (response.status === 401) {
-            return res.status(response.status).json({ error: "FUFIRE_UNAUTHORIZED" });
-          }
-          if (response.status === 429) {
-            return res.status(response.status).json({ error: "FUFIRE_RATE_LIMITED" });
-          }
-          let errorText = "FUFIRE_INVALID_RESPONSE";
-          if (fufirePath.includes("chronometry")) errorText = "FUFIRE_CHRONOMETRY_FAILED";
-          else if (fufirePath.includes("wuxing")) errorText = "FUFIRE_WUXING_FAILED";
-          else if (fufirePath.includes("bazi")) errorText = "FUFIRE_BAZI_FAILED";
-
-          return res
-            .status(response.status)
-            .json({ error: errorText, details: await response.text() });
-        }
-
-        const data = await response.json();
-        return res.json(data);
-      } catch (fetchError: any) {
-        if (fetchError.name === "AbortError") {
-          return res.status(504).json({ error: "FUFIRE_TIMEOUT" });
-        }
-        throw fetchError;
-      }
-    } catch (err: any) {
-      console.error("FuFire server boundary error:", err);
-      res.status(500).json({ error: "INTERNAL_SERVER_ERROR", message: err.message });
-    }
-  });
+      return next(err);
+    },
+  );
 
   return app;
 }

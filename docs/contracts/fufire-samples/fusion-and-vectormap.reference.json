@@ -1,0 +1,42 @@
+{
+  "_note": "Real /v1/calculate/fusion and /v1/calculate/fusion/vector-map response samples (user, 2026-06-13). OUT of sizhu-secure-fufire-baseline scope (fusion is north-star, later run). Kept as structural reference. Key insight for prompt design: fusion reports TWO dominances — western vs eastern — so a single 'dominant_element' is endpoint-dependent (wuxing top-level = western dominance).",
+  "fusion": {
+    "input": { "date": "1990-06-15T14:30:00", "tz": "Europe/Berlin", "lon": 13.405, "lat": 52.52 },
+    "wu_xing_vectors": {
+      "western_planets": { "Holz": 0.6101955043925309, "Feuer": 0.43774894880333737, "Erde": 0.30509775219626545, "Metall": 0.13265119660707195, "Wasser": 0.5704001454104093 },
+      "bazi_pillars": { "Holz": 0.3882882936379463, "Feuer": 0.5392892967193699, "Erde": 0.4314314373754959, "Metall": 0.4314314373754959, "Wasser": 0.4314314373754959 }
+    },
+    "harmony_index": { "harmony_index": 0.908, "interpretation": "Starke Resonanz - Westliche und östliche Matrix stehen in perfekter Harmonie", "method": "dot_product" },
+    "calibration": { "h_raw": 0.908, "h_calibrated": 0.6144, "h_baseline": 0.7614, "h_sigma": 0.1445, "sigma_above": 1.015, "quality": "ok", "interpretation_band": "Überdurchschnittliche Kongruenz", "n_west": 14, "n_bazi_contributions": 13 },
+    "elemental_comparison": {
+      "Holz": { "western": 0.61, "bazi": 0.388, "difference": 0.222 },
+      "Feuer": { "western": 0.438, "bazi": 0.539, "difference": -0.102 },
+      "Erde": { "western": 0.305, "bazi": 0.431, "difference": -0.126 },
+      "Metall": { "western": 0.133, "bazi": 0.431, "difference": -0.299 },
+      "Wasser": { "western": 0.57, "bazi": 0.431, "difference": 0.139 }
+    },
+    "cosmic_state": 0.908,
+    "fusion_interpretation": "Harmonie-Index: 90.80%\nStarke Resonanz...\n\nWestliche Dominanz: Holz\nÖstliche Dominanz: Feuer\n...",
+    "house_quality": { "flag": "exact", "system": "placidus", "requested": "placidus", "reason": null },
+    "quality_flags": { "house_system_fallback": false, "ephemeris_mode": "SWIEPH", "chart_type_quality": "exact" },
+    "_contribution_ledger": "present (western[14] + bazi[13] entries with pillar/source/element/weight/category); omitted here for brevity — full data in original transcript"
+  },
+  "fusion_vector_map": {
+    "request_id": "7c252d84-c470-4838-af6d-6d9f6ab9300a",
+    "input": { "date": "1990-06-15T14:30:00", "tz": "Europe/Berlin", "lon": 13.405, "lat": 52.52 },
+    "vector_map": {
+      "western_planets": {
+        "raw": { "Holz": 4.6, "Feuer": 3.3, "Erde": 2.3, "Metall": 1, "Wasser": 4.3 },
+        "sum_l1": { "Holz": 0.2967741935483871, "Feuer": 0.2129032258064516, "Erde": 0.14838709677419354, "Metall": 0.06451612903225806, "Wasser": 0.27741935483870966 },
+        "l2_cosine": { "Holz": 0.6101955043925309, "Feuer": 0.43774894880333737, "Erde": 0.30509775219626545, "Metall": 0.13265119660707195, "Wasser": 0.5704001454104093 }
+      },
+      "bazi_pillars": {
+        "raw": { "Holz": 1.8, "Feuer": 2.5, "Erde": 2, "Metall": 2, "Wasser": 2 },
+        "sum_l1": { "Holz": 0.17475728155339806, "Feuer": 0.24271844660194172, "Erde": 0.1941747572815534, "Metall": 0.1941747572815534, "Wasser": 0.1941747572815534 },
+        "l2_cosine": { "Holz": 0.3882882936379463, "Feuer": 0.5392892967193699, "Erde": 0.4314314373754959, "Metall": 0.4314314373754959, "Wasser": 0.4314314373754959 }
+      }
+    },
+    "harmony": { "elemental_overlap_h": 0.1987, "cosine_similarity": 0.908 },
+    "metadata": { "mapping_version": "fufire-wuxing-map-v1", "algorithm_version": "1.0.0-rc1-20260220" }
+  }
+}

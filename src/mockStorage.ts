@@ -223,13 +223,14 @@ const DEFAULT_GENERATION_CONFIGS: GenerationConfig[] = [
     numInitiallyGenerated: 3,
     imageFormat: 'png',
     imageQuality: 'hd',
-    primaryProvider: 'OpenAI',
-    primaryModel: 'dall-e-3',
-    primarySecretRef: 'SECRET_REF_OPENAI_MAIN',
-    fallbackProvider: 'Gemini',
-    fallbackModel: 'imagen-3.0-generate-002',
-    fallbackLLM: 'gemini-1.5-pro',
-    fallbackSecretRef: 'SECRET_REF_GEMINI_FALLBACK'
+    // REQ-A-002: OpenRouter is the single default model gateway.
+    primaryProvider: 'OpenRouter',
+    primaryModel: 'google/gemini-2.5-flash-image-preview',
+    primarySecretRef: 'SECRET_REF_OPENROUTER_API_KEY',
+    fallbackProvider: 'OpenRouter',
+    fallbackModel: 'google/gemini-2.5-flash-image-preview',
+    fallbackLLM: 'google/gemini-2.5-flash',
+    fallbackSecretRef: 'SECRET_REF_OPENROUTER_API_KEY'
   },
   {
     productId: 'prod-002',
@@ -249,12 +250,13 @@ const DEFAULT_GENERATION_CONFIGS: GenerationConfig[] = [
 const DEFAULT_QUALITY_GATE_CONFIGS: QualityGate1Config[] = [
   {
     productId: 'prod-001',
-    llmProvider: 'Gemini',
-    model: 'gemini-2.5-pro',
-    secretRef: 'SECRET_REF_GEMINI_QA',
-    fallbackProvider: 'OpenAI',
-    fallbackModel: 'gpt-4o',
-    fallbackSecretRef: 'SECRET_REF_GPT_QA_FALLBACK',
+    // REQ-A-002: OpenRouter is the single default model gateway.
+    llmProvider: 'OpenRouter',
+    model: 'google/gemini-2.5-flash',
+    secretRef: 'SECRET_REF_OPENROUTER_API_KEY',
+    fallbackProvider: 'OpenRouter',
+    fallbackModel: 'google/gemini-2.5-flash',
+    fallbackSecretRef: 'SECRET_REF_OPENROUTER_API_KEY',
     qaPrompt: 'Evaluate if the generated map shows a clear celestial ring, accurate star placement aligned with a vintage engraved style, clean indigo hue, and containing NO modern digital artifacts or misspelled banners of text. Verify the animal guardian elements look coherent.',
     referenceImages: [
       'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="%231a202c"/><circle cx="50" cy="50" r="35" stroke="gold" stroke-width="2" fill="none"/><path d="M50,15 L50,85 M15,50 L85,50" stroke="gold" stroke-opacity="0.3"/></svg>'

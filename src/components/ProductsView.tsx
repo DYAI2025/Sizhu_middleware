@@ -25,10 +25,11 @@ export default function ProductsView() {
   const [numGenerated, setNumGenerated] = useState(3);
   const [imageFormat, setImageFormat] = useState<'png' | 'jpeg'>('png');
   const [imageQuality, setImageQuality] = useState<'standard' | 'hd'>('standard');
-  const [primaryProv, setPrimaryProv] = useState<'Gemini' | 'OpenAI' | 'Midjourney' | 'Stability'>('OpenAI');
+  // REQ-A-002: OpenRouter is the single default model gateway.
+  const [primaryProv, setPrimaryProv] = useState<'OpenRouter' | 'Gemini' | 'OpenAI' | 'Midjourney' | 'Stability'>('OpenRouter');
   const [primaryModel, setPrimaryModel] = useState('');
   const [primarySecret, setPrimarySecret] = useState('');
-  const [fallbackProv, setFallbackProv] = useState<'Gemini' | 'OpenAI' | 'Stability'>('Gemini');
+  const [fallbackProv, setFallbackProv] = useState<'OpenRouter' | 'Gemini' | 'OpenAI' | 'Stability'>('OpenRouter');
   const [fallbackModel, setFallbackModel] = useState('');
   const [fallbackLLM, setFallbackLLM] = useState('');
   const [fallbackSecret, setFallbackSecret] = useState('');
@@ -105,13 +106,14 @@ export default function ProductsView() {
       numInitiallyGenerated: 3,
       imageFormat: 'png',
       imageQuality: 'standard',
-      primaryProvider: 'OpenAI',
-      primaryModel: 'dall-e-3',
-      primarySecretRef: 'SECRET_REF_OPENAI_MAIN',
-      fallbackProvider: 'Gemini',
-      fallbackModel: 'imagen-3.0-generate-002',
-      fallbackLLM: 'gemini-1.5-pro',
-      fallbackSecretRef: 'SECRET_REF_GEMINI_FALLBACK'
+      // REQ-A-002: OpenRouter is the single default model gateway.
+      primaryProvider: 'OpenRouter',
+      primaryModel: 'google/gemini-2.5-flash-image-preview',
+      primarySecretRef: 'SECRET_REF_OPENROUTER_API_KEY',
+      fallbackProvider: 'OpenRouter',
+      fallbackModel: 'google/gemini-2.5-flash-image-preview',
+      fallbackLLM: 'google/gemini-2.5-flash',
+      fallbackSecretRef: 'SECRET_REF_OPENROUTER_API_KEY'
     };
     setSelectedConfig(config);
 
@@ -123,7 +125,7 @@ export default function ProductsView() {
     setPrimarySecret(config.primarySecretRef);
     setFallbackProv(config.fallbackProvider);
     setFallbackModel(config.fallbackModel);
-    setFallbackLLM(config.fallbackLLM || 'gemini-1.5-pro');
+    setFallbackLLM(config.fallbackLLM || 'google/gemini-2.5-flash');
     setFallbackSecret(config.fallbackSecretRef);
   };
 
@@ -464,15 +466,16 @@ export default function ProductsView() {
                 </div>
 
                 <div className="border-t border-nt pt-3">
-                  <div className="text-[10px] font-bold uppercase tracking-widest font-mono text-da mb-2 font-bold">Primary Provider Adaptive Chain</div>
+                  <div className="text-[10px] font-bold uppercase tracking-widest font-mono text-da mb-2 font-bold">Primary Model Gateway Adaptive Chain</div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-[9px] font-bold font-mono text-nt uppercase">Provider</label>
+                      <label className="block text-[9px] font-bold font-mono text-nt uppercase">Model Gateway / Provider</label>
                       <select
                         value={primaryProv}
                         onChange={(e) => setPrimaryProv(e.target.value as any)}
                         className="mt-1 w-full text-xs border border-nt bg-b1 rounded-sm p-1.5 outline-none font-mono"
                       >
+                        <option value="OpenRouter">Model Gateway / OpenRouter (default)</option>
                         <option value="OpenAI">OpenAI (DALL-E)</option>
                         <option value="Gemini">Gemini (Imagen)</option>
                         <option value="Stability">Stability SD</option>
@@ -486,7 +489,7 @@ export default function ProductsView() {
                         type="text"
                         value={primaryModel}
                         onChange={(e) => setPrimaryModel(e.target.value)}
-                        placeholder="dall-e-3"
+                        placeholder="google/gemini-2.5-flash-image-preview"
                         className="mt-1 w-full text-xs border border-nt bg-b1 rounded-sm p-1.5 font-mono"
                       />
                     </div>
@@ -497,7 +500,7 @@ export default function ProductsView() {
                         type="text"
                         value={primarySecret}
                         onChange={(e) => setPrimarySecret(e.target.value)}
-                        placeholder="SECRET_REF_OPENAI_MAIN"
+                        placeholder="SECRET_REF_OPENROUTER_API_KEY"
                         className="mt-1 w-full text-xs border border-nt bg-b2 rounded-sm p-1.5 font-mono text-ac font-bold"
                       />
                     </div>
@@ -505,15 +508,16 @@ export default function ProductsView() {
                 </div>
 
                 <div className="border-t border-nt pt-3">
-                  <div className="text-[10px] font-bold uppercase tracking-widest font-mono text-da mb-2 font-bold">Fallback Provider Adaptive Chain</div>
+                  <div className="text-[10px] font-bold uppercase tracking-widest font-mono text-da mb-2 font-bold">Fallback Model Gateway Adaptive Chain</div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-[9px] font-bold font-mono text-nt uppercase">Fallback Provider</label>
+                      <label className="block text-[9px] font-bold font-mono text-nt uppercase">Fallback Model Gateway / Provider</label>
                       <select
                         value={fallbackProv}
                         onChange={(e) => setFallbackProv(e.target.value as any)}
                         className="mt-1 w-full text-xs border border-nt bg-b1 rounded-sm p-1.5 outline-none font-mono"
                       >
+                        <option value="OpenRouter">Model Gateway / OpenRouter (default)</option>
                         <option value="Gemini">Gemini (Imagen)</option>
                         <option value="OpenAI">OpenAI (DALL-E)</option>
                         <option value="Stability">Stability SD</option>

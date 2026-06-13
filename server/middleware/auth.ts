@@ -140,12 +140,16 @@ const PUBLIC_API_ROUTES: Array<{ method: string; pattern: RegExp }> = [
  */
 const SENSITIVE_API_ROUTES: Array<{ method: string; pattern: RegExp }> = [
   { method: "POST", pattern: /^\/data-requests\/fufire\/test-run\/?$/ },
-  { method: "POST", pattern: /^\/fufire(\/.*)?$/ },
+  // NOTE: the legacy POST /fufire/* sensitive entry was removed with the
+  // arbitrary FuFire proxy (REQ-A-001 / AC-A-001e). It pointed at a route that
+  // no longer exists. Default-deny is unchanged: any unlisted route still
+  // classifies as `session`.
   { method: "POST", pattern: /^\/model-gateway(\/.*)?$/ },
   { method: "POST", pattern: /^\/workflows\/[^/]+\/generate\/?$/ },
   { method: "POST", pattern: /^\/workflows\/[^/]+\/quality-gate-1\/?$/ },
   { method: "POST", pattern: /^\/workflows\/[^/]+\/quality-gate-2\/?$/ },
   { method: "POST", pattern: /^\/workflows\/[^/]+\/approve-final-artifact\/?$/ },
+  { method: "POST", pattern: /^\/fulfillment\/pod\/validate-dispatch\/?$/ },
   { method: "POST", pattern: /^\/fulfillment\/pod\/dispatch\/?$/ },
   { method: "POST", pattern: /^\/config(\/.*)?$/ },
   { method: "POST", pattern: /^\/secret-references\/check\/?$/ },

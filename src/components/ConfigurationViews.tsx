@@ -87,12 +87,13 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
   const [selectedGateProdId, setSelectedGateProdId] = useState('prod-001');
   const activeGateConfig = qualityConfigs.find(q => q.productId === selectedGateProdId) || {
     productId: selectedGateProdId,
-    llmProvider: 'Gemini' as const,
-    model: 'gemini-2.5-pro',
-    secretRef: 'SECRET_REF_GEMINI_QA',
-    fallbackProvider: 'OpenAI' as const,
-    fallbackModel: 'gpt-4o',
-    fallbackSecretRef: 'SECRET_REF_GPT_QA_FALLBACK',
+    // REQ-A-002: OpenRouter is the single default model gateway.
+    llmProvider: 'OpenRouter' as const,
+    model: 'google/gemini-2.5-flash',
+    secretRef: 'SECRET_REF_OPENROUTER_API_KEY',
+    fallbackProvider: 'OpenRouter' as const,
+    fallbackModel: 'google/gemini-2.5-flash',
+    fallbackSecretRef: 'SECRET_REF_OPENROUTER_API_KEY',
     qaPrompt: '',
     referenceImages: [],
     faultTolerance: 'medium' as const,
@@ -308,7 +309,7 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
             <div className="border-b border-nt pb-3 flex items-center justify-between">
               <div>
                 <h3 className="font-bold text-da font-mono text-[13px] uppercase">Inspection Engine: Quality Gate 1</h3>
-                <p className="text-xs text-nt mt-0.5">Define Gemini Vision constraints, visual markers, and auto-escalations.</p>
+                <p className="text-xs text-nt mt-0.5">Define Model Gateway / OpenRouter vision constraints, visual markers, and auto-escalations.</p>
               </div>
               <span className="font-mono text-[9px] bg-ac text-ac border border-ac py-1 px-2 rounded-sm font-bold tracking-widest">
                 GATE_1_LOCK
@@ -319,13 +320,14 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
               
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] font-bold text-nt uppercase font-mono tracking-wider">LLM Vision Provider</label>
+                  <label className="block text-[10px] font-bold text-nt uppercase font-mono tracking-wider">Model Gateway / LLM Vision Provider</label>
                   <select
                     disabled={isObserver}
                     value={activeGateConfig.llmProvider}
                     onChange={(e) => saveGateConfig({ ...activeGateConfig, llmProvider: e.target.value as any })}
                     className="mt-1 w-full border border-nt bg-b1 rounded-sm p-1.5 font-mono text-xs outline-none"
                   >
+                    <option value="OpenRouter">Model Gateway / OpenRouter (default)</option>
                     <option value="Gemini">Gemini (Imagen QA Model)</option>
                     <option value="OpenAI">OpenAI (GPT-4o Vision)</option>
                     <option value="Claude">Claude 3.5 Sonnet</option>
