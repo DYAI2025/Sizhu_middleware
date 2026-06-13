@@ -15,6 +15,9 @@ import WorkflowRunsView from './components/WorkflowRunsView';
 import ArtifactsView from './components/ArtifactsView';
 import RolesView from './components/RolesView';
 import SettingsView from './components/SettingsView';
+import ProtectedRoute from './components/auth/ProtectedRoute';
+import AccountSecurityView from './components/auth/AccountSecurityView';
+import { useAuthState, signOut } from './lib/auth/authState';
 
 // Import Icons
 import {
@@ -34,10 +37,12 @@ import {
   Menu,
   X,
   Database,
-  GitBranch
+  GitBranch,
+  Lock
 } from 'lucide-react';
 
 export default function App() {
+  const auth = useAuthState();
   const [activeMenu, setActiveMenu] = useState<string>('Dashboard');
   const [currentRole, setCurrentRole] = useState<AppRoleName>('Owner');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
@@ -140,6 +145,7 @@ export default function App() {
     { name: 'Workflow Runs', icon: PlayCircle },
     { name: 'Image Artifacts', icon: ImageIcon },
     { name: 'Roles & Permissions', icon: Users },
+    { name: 'Admin Security', icon: Lock },
     { name: 'Settings', icon: SettingsIcon }
   ];
 
@@ -174,6 +180,8 @@ export default function App() {
         return <ArtifactsView />;
       case 'Roles & Permissions':
         return <RolesView />;
+      case 'Admin Security':
+        return <AccountSecurityView />;
       case 'Settings':
         return <SettingsView />;
       default:
@@ -230,6 +238,7 @@ export default function App() {
   };
 
   return (
+    <ProtectedRoute>
     <div className="min-h-screen bg-b1 text-da flex flex-col md:flex-row antialiased select-none font-sans" id="bazzi-console-application-root">
       
       {/* Mobile Top Header */}
@@ -324,6 +333,39 @@ export default function App() {
             <span className="text-[10px] uppercase font-mono font-bold bg-b2 px-2 py-0.5 rounded border border-nt" title="Current Mode">
               MODE: {status.appMode}
             </span>
+
+            {/* Admin Security panel: live, server-backed auth state */}
+            <div
+              className="flex items-center gap-2 text-[10px] uppercase font-mono font-semibold bg-b2 px-2 py-0.5 rounded border border-da"
+              title={`Auth: ${auth.loggedIn ? 'logged in' : 'not logged in'} | Email ${auth.emailVerified ? 'verified' : 'unverified'} | Role ${auth.role} | ${auth.aal} | MFA ${auth.mfaEnrolled ? 'enrolled' : 'not enrolled'}`}
+            >
+              <Lock className={`w-3 h-3 ${auth.aal === 'aal2' ? 'text-ac' : 'text-nt'}`} />
+              <span className={auth.loggedIn ? 'text-ac' : 'text-nt'}>
+                {auth.loggedIn ? (auth.email || 'AUTHED') : 'GUEST'}
+              </span>
+              <span className="text-nt">·</span>
+              <span className={auth.emailVerified ? 'text-ac' : 'text-nt'}>
+                {auth.emailVerified ? 'EMAIL OK' : 'EMAIL?'}
+              </span>
+              <span className="text-nt">·</span>
+              <span className="text-da">{auth.role}</span>
+              <span className="text-nt">·</span>
+              <span className={auth.aal === 'aal2' ? 'text-ac' : 'text-nt'}>{auth.aal.toUpperCase()}</span>
+              <span className="text-nt">·</span>
+              <span className={auth.mfaEnrolled ? 'text-ac' : 'text-nt'}>
+                {auth.mfaEnrolled ? 'MFA ON' : 'MFA OFF'}
+              </span>
+            </div>
+
+            {auth.loggedIn && (
+              <button
+                onClick={() => signOut()}
+                className="px-3 py-1.5 bg-b2 text-da text-xs font-bold rounded-sm hover:opacity-90 transition cursor-pointer font-semibold uppercase tracking-wider font-mono text-[10px]"
+                title="Sign out"
+              >
+                Logout
+              </button>
+            )}
             <button
               onClick={() => {
                 window.dispatchEvent(new Event('bazzi_role_changed'));
@@ -359,5 +401,6 @@ export default function App() {
       </main>
 
     </div>
+    </ProtectedRoute>
   );
 }
