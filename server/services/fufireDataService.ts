@@ -66,7 +66,14 @@ export interface FuFireTestRunInput {
 
 /** L3 — typed boundary result. */
 export interface FuFireTestRunResult {
-  input: FuFireTestRunInput;
+  /**
+   * FX8 (2026-06-14, user "strip the echo"): the raw caller `input` is NO LONGER
+   * echoed at the top level — it was a redundant copy of the admin's own submission
+   * carrying birth PII (date/name/coords). The birth instant that is genuinely part
+   * of the console's debugging purpose remains visible in {@link requests}
+   * (the built outbound bodies) and {@link normalizedBirthPayload} (the normalized
+   * birth fields ONLY — no customerName / arbitrary passthrough).
+   */
   normalizedBirthPayload: Record<string, unknown>;
   requests: Array<{ operation: string; body: unknown }>;
   responses: Array<{ operation: string; data?: unknown; error?: string }>;
@@ -172,11 +179,18 @@ export class FuFireDataService {
     };
     const { normalized: normalizedBirthInput, warnings } = normalizeBirthInputWithWarnings(rawNormalized);
 
-    // Echo a normalized payload for the run output (back-compat with prior shape).
+    // FX8: the normalized payload reports ONLY the explicit normalized BIRTH fields
+    // — NOT `...input`, which previously spread the raw caller object (leaking
+    // customerName + any arbitrary passthrough keys into a field returned to the
+    // client). The birth instant here is the legitimate "what we normalized + sent"
+    // view (also present in `requests`); customerName and unknown keys are excluded.
     const normalizedBirthPayload = {
-      ...input,
+      birthDate: normalizedBirthInput.birthDate,
       birthTime: normalizedBirthInput.birthTime,
       birthTimeKnown: normalizedBirthInput.birthTimeKnown,
+      lat: normalizedBirthInput.lat,
+      lon: normalizedBirthInput.lon,
+      timezone: normalizedBirthInput.timezone,
       ...(normalizedBirthInput.birthTimeSource
         ? { birthTimeSource: normalizedBirthInput.birthTimeSource }
         : {}),
@@ -195,7 +209,6 @@ export class FuFireDataService {
     if (!latReady || !lonReady) {
       // In this iteration we do not have a real geocoder configured
       return {
-        input,
         normalizedBirthPayload,
         requests: [],
         responses: [],
@@ -248,7 +261,7 @@ export class FuFireDataService {
           sanitizedResponseMetadata: {},
           createdAt: new Date().toISOString()
         } as GatewayIssue);
-        return { input, normalizedBirthPayload, requests, responses, warnings, gatewayIssues: issues, readinessStatus: 'NOT_READY' };
+        return { normalizedBirthPayload, requests, responses, warnings, gatewayIssues: issues, readinessStatus: 'NOT_READY' };
     }
 
     // L1: read the key SOLELY from the configured secret reference — no bare
@@ -273,7 +286,7 @@ export class FuFireDataService {
         sanitizedResponseMetadata: {},
         createdAt: new Date().toISOString()
       });
-      return { input, normalizedBirthPayload, requests, responses, warnings, gatewayIssues: issues, readinessStatus: 'NOT_READY' };
+      return { normalizedBirthPayload, requests, responses, warnings, gatewayIssues: issues, readinessStatus: 'NOT_READY' };
     }
 
     if (!config.baseUrl) {
@@ -292,7 +305,7 @@ export class FuFireDataService {
         sanitizedResponseMetadata: {},
         createdAt: new Date().toISOString()
       });
-      return { input, normalizedBirthPayload, requests, responses, warnings, gatewayIssues: issues, readinessStatus: 'NOT_READY' };
+      return { normalizedBirthPayload, requests, responses, warnings, gatewayIssues: issues, readinessStatus: 'NOT_READY' };
     }
 
     for (const op of requestedOps) {
@@ -497,7 +510,6 @@ export class FuFireDataService {
       });
 
     return {
-       input,
        normalizedBirthPayload,
        requests,
        responses,

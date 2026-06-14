@@ -88,9 +88,12 @@ user-confirmed deferred non-goals. None of these is reported as "done"; each is 
    sample-verified but not composed into a live path (executeTestRun returns the raw FuFire response
    unmapped). SCOPE DECISION for the user: wire it into executeTestRun now, or accept it as a
    built-but-unwired primitive with wiring deferred (REQ-F-002/F-003 then NOT fully done).
-2. **FuFire test-run top-level `input` echo** (result.input returned to the admin): debatable —
-   admin's own data, synchronous, not logged, not in a "sanitized"-named field. User decision: leave
-   (test-console shows submitted input) or PII-strip the echo too.
+2. **FuFire test-run top-level `input` echo** — **RESOLVED by FX8 (2026-06-14, user "strip the echo").**
+   Removed the redundant top-level `result.input`, and replaced `normalizedBirthPayload = { ...input }`
+   (which spread customerName + arbitrary passthrough keys) with the explicit normalized birth fields
+   only. Guard test `server/tests/fufire.testrun.inputecho.test.ts` (sentinel name absent; no `input`
+   key; payload key allowlist), mutation RED-on-revert confirmed. The birth instant still appears in
+   `result.requests` (the console's debugging purpose — the built outbound bodies) by design.
 
 ## Status
 Gates A–E cleared (B/C/D pass-with-notes, E pass; the two Important findings fixed/corrected).
