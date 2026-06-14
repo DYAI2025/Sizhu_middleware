@@ -25,6 +25,7 @@ import {
 import { normalizeBirthInputWithWarnings } from './birthInputNormalizer';
 import {
   resolvePromptVariables,
+  interpretFufireResponse,
   type PromptVariables,
 } from './fufireResponseInterpreter';
 
@@ -89,7 +90,33 @@ export interface FuFireTestRunResult {
    * `PROMPT_VARIABLE_SOURCE_MISSING` token (REQ-F-002 / AC-F-002b/f).
    */
   promptVariableIssues?: string[];
+  /**
+   * REQ-F-002 (Task FX3) — provider-declared caveats surfaced VERBATIM from each
+   * successful response by {@link interpretFufireResponse}, the trust-boundary
+   * caveat reader (AC-F-002e / AC-F-003c). The day-pillar `anchor_verification`
+   * status (bazi) is carried through here without ever being relabeled; deferred
+   * ops (bazi_trace / chronometry) carry their render-block issue. ADDITIVE — the
+   * raw {@link FuFireTestRunResult.responses} array is untouched. Absent on early
+   * returns that never reach the fetch loop.
+   */
+  responseInterpretation?: Array<{
+    operation: string;
+    verified: boolean;
+    caveats: string[];
+    issues: string[];
+    note: string;
+  }>;
 }
+
+/**
+ * Internal op-name → authoritative contract op-name for the interpreter. The
+ * service uses camelCase internal names (`baziTrace`); interpretFufireResponse's
+ * deferred set + branches key on the contract names (`bazi_trace`). Mapping here
+ * keeps the interpreter's deferred-op render-block correct on the live path.
+ */
+const INTERPRETER_OP_NAME: Record<string, string> = {
+  baziTrace: 'bazi_trace',
+};
 
 /**
  * Single source of truth for the op-name → outbound config key + body builder.
@@ -449,6 +476,26 @@ export class FuFireDataService {
       subject: { lat: input.manualLat as number, lon: input.manualLon as number },
     });
 
+    // FX3 (REQ-F-002 / AC-F-002e): surface the provider-declared caveats on the
+    // LIVE path. interpretFufireResponse reads each SUCCESSFUL op's response and
+    // carries the day-pillar `anchor_verification` caveat (bazi) verbatim — never
+    // relabeling "unverified" as verified. ADDITIVE: `responses` is untouched. This
+    // gives interpretFufireResponse its first production caller (closing the
+    // lens-4 finding that the caveat half had zero prod importers).
+    const responseInterpretation = responses
+      .filter((r) => 'data' in r && r.data !== undefined)
+      .map((r) => {
+        const opName = INTERPRETER_OP_NAME[r.operation] ?? r.operation;
+        const i = interpretFufireResponse({ operation: opName, response: r.data });
+        return {
+          operation: r.operation,
+          verified: i.verified,
+          caveats: i.caveats,
+          issues: i.issues,
+          note: i.note,
+        };
+      });
+
     return {
        input,
        normalizedBirthPayload,
@@ -459,6 +506,7 @@ export class FuFireDataService {
        readinessStatus: 'READY',
        promptVariables: resolved.variables,
        promptVariableIssues: resolved.issues,
+       responseInterpretation,
     };
   }
 }

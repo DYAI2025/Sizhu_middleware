@@ -142,10 +142,14 @@ single-harness green did not survive scrutiny. Honest outcome (NOT a clean green
        one:** the western-vs-eastern dominance convention is an open prompt-design decision (contract:
        "Decide the convention in prompt design — do not invent"), and the located/eastern value needs
        the fusion endpoint. The binding itself is live-verified and faithful.
-- **Lens: honest-caveat liveness — REFUTE.** `interpretFufireResponse` (the day-pillar
-  `anchor_verification` caveat-surfacing half) has **zero production callers** — `executeTestRun` calls
-  only `resolvePromptVariables`. The `"unverified"` caveat IS present in live bazi data but is never
-  surfaced on the live path. Consistent with the existing REQ-F-003 `wired-in-prod = NO`.
+- **Lens: honest-caveat liveness — REFUTE → RESOLVED by FX3 (2026-06-14).** At verification time
+  `interpretFufireResponse` (the day-pillar `anchor_verification` caveat-surfacing half) had **zero
+  production callers** — `executeTestRun` called only `resolvePromptVariables`, so the `"unverified"`
+  caveat (present in live bazi data) was never surfaced. **FX3 wired it**: `executeTestRun` now calls
+  `interpretFufireResponse` per successful op → `result.responseInterpretation`, surfacing the caveat
+  verbatim (code-reviewer SOUND, mutation RED-on-revert, importer grep confirms a prod caller). The
+  REQ-F-003 **render** half (`renderPromptTemplate`) still has zero prod callers → `wired-in-prod = NO`
+  (FX9/north-star).
 
 **APPLIED reclassification (USER-confirmed "recommended honest set", 2026-06-14 — recorded in
 `docs/reality/sizhu-secure-fufire-baseline.evidence.jsonl`, append-only):**
