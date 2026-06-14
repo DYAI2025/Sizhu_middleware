@@ -45,6 +45,8 @@ const READINESS_ENV = [
   "SUPABASE_SERVICE_ROLE_SECRET_REF",
   "FUFIRE_BASE_URL",
   "SUPABASE_URL",
+  "FUFIRE_API_KEY",
+  "APP_MODE",
 ];
 
 beforeAll(() => {
@@ -93,6 +95,26 @@ describe("AC-O-001b — readiness is truthful (503 when required config missing)
     const res = await request(app).get("/api/readiness").set(...bearer(token()));
     // … but real config is missing, so readiness must still be NOT_READY.
     expect(res.body.status).not.toBe("READY");
+  });
+
+  // F-LIVE-2 (live-smoke 2026-06-14): the FuFire key must sit under the SECRET-REF
+  // var name the code resolves (process.env[FUFIRE_API_KEY_SECRET_REF || "SECRET_REF_
+  // FUFIRE_API_KEY"]). A key placed under a bare FUFIRE_API_KEY does NOT satisfy
+  // readiness — this is exactly the local-.env trap that bridged only inside the smoke.
+  it("readiness resolves the FuFire SECRET-REF var, not a bare FUFIRE_API_KEY (F-LIVE-2)", async () => {
+    // Key under the WRONG name → indirection unsatisfied → still NOT_READY.
+    process.env.FUFIRE_API_KEY = "key-under-the-wrong-var-name";
+    let res = await request(app).get("/api/readiness").set(...bearer(token()));
+    expect(res.body.status).toBe("NOT_READY");
+    expect(res.body.missing).toContain("SECRET_REF_FUFIRE_API_KEY");
+
+    // All required vars under their CANONICAL names → READY.
+    process.env.SECRET_REF_FUFIRE_API_KEY = "real-fufire-key";
+    process.env.SECRET_REF_SUPABASE_SERVICE_ROLE = "real-svc-role";
+    process.env.FUFIRE_BASE_URL = "https://api.fufire.space";
+    process.env.SUPABASE_URL = "https://project.supabase.co";
+    res = await request(app).get("/api/readiness").set(...bearer(token()));
+    expect(res.body.status).toBe("READY");
   });
 });
 
