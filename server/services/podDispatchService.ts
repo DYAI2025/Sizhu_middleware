@@ -41,25 +41,25 @@ export class PodDispatchService {
     }
 
     if (!config.enabled) {
-      return this._failure('POD_PROVIDER_DISABLED', 'Fulfillment provider is not enabled.', input);
+      return this._failure('POD_PROVIDER_DISABLED', 'Fulfillment provider is not enabled.', workflowRunId, artifact?.id);
     }
 
     if (config.dispatchMode === 'disabled') {
-      return this._failure('POD_DISPATCH_DISABLED', 'Dispatch mode is currently disabled.', input);
+      return this._failure('POD_DISPATCH_DISABLED', 'Dispatch mode is currently disabled.', workflowRunId, artifact?.id);
     }
 
     if (!artifact) {
-      return this._failure('NO_ACCEPTED_ARTIFACT_FOR_DISPATCH', 'There is no approved final artifact to dispatch.', input);
+      return this._failure('NO_ACCEPTED_ARTIFACT_FOR_DISPATCH', 'There is no approved final artifact to dispatch.', workflowRunId, artifact?.id);
     }
 
     // Usually we would map the product here
     if (config.productMappings.length === 0) {
-      return this._failure('NO_POD_PRODUCT_UID_MAPPING', 'Missing product mapping configuration.', input);
+      return this._failure('NO_POD_PRODUCT_UID_MAPPING', 'Missing product mapping configuration.', workflowRunId, artifact?.id);
     }
 
     const apiKey = process.env[config.secretRef || ''];
     if (!apiKey) {
-      return this._failure('NO_POD_API_KEY_CONFIGURED', `Missing secret for ${config.secretRef}.`, input);
+      return this._failure('NO_POD_API_KEY_CONFIGURED', `Missing secret for ${config.secretRef}.`, workflowRunId, artifact?.id);
     }
 
     // ── Would-dispatch point (AC-O-002c) ─────────────────────────────────────
@@ -122,7 +122,12 @@ export class PodDispatchService {
     };
   }
 
-  private _failure(errorCode: string, message: string, input: any) {
+  // Sanitized failure for the pre-dispatch safety branches. Stores ONLY order
+  // identity (workflowRunId + artifactId) in sanitizedRequestMetadata — never the
+  // raw caller `input`, which can carry customer PII (birth data / name) and was
+  // previously echoed verbatim into the API 400 body. (Review finding: a field
+  // named `sanitizedRequestMetadata` must not contain un-sanitized PII.)
+  private _failure(errorCode: string, message: string, workflowRunId: string, artifactId?: string) {
      const issue: GatewayIssue = {
         id: crypto.randomUUID(),
         providerKind: 'fulfillment',
@@ -134,7 +139,7 @@ export class PodDispatchService {
         retryCount: 0,
         severity: 'critical',
         status: 'open',
-        sanitizedRequestMetadata: { input },
+        sanitizedRequestMetadata: { workflowRunId, artifactId },
         sanitizedResponseMetadata: {},
         createdAt: new Date().toISOString()
      };
