@@ -95,6 +95,26 @@ user-confirmed deferred non-goals. None of these is reported as "done"; each is 
    key; payload key allowlist), mutation RED-on-revert confirmed. The birth instant still appears in
    `result.requests` (the console's debugging purpose — the built outbound bodies) by design.
 
+## FX6 — Stryker expansion to the curated critical set (2026-06-14)
+
+Mutation-hardened the critical pure/security modules beyond the spike's requestBuilders. Scores are the
+Stryker oracle (tautological tests cannot raise them); details in `metrics/mutation-baseline.json`.
+
+| Module | Before | After | Added test |
+|---|---|---|---|
+| server/lib/jwt.ts (security floor — HS256 verify) | 52.75% | **86.8%** | jwt.test.ts (17) |
+| server/services/birthInputNormalizer.ts | 39.3% | **100%** | birthInputNormalizer.mutation.test.ts (16) |
+| server/services/fufireOperations.ts (SSRF/steering) | 51.8% | **98.2%** | fufireOperations.mutation.test.ts |
+| server/services/fufireResponseInterpreter.ts (no-invented-data) | 59.8% | **93.3%** | fufireResponseInterpreter.mutation.test.ts |
+| server/services/podDispatchService.ts (idempotency/sanitization) | 64.4% | **89.7%** | podDispatchService.mutation.test.ts |
+
+Aggregate over the 5 FX6 modules: **92.4%** (449/486). The 4 service test files were authored by a
+parallel agent fan-out and **independently audited HONEST** (code-reviewer reproduced PII/safety
+RED-on-mutation on each; the podDispatch SHA-256 idempotency digests verified as genuine independent
+anchors; no over-mock, no secret/PII leak, no production-code edit). Remaining survivors are documented
+equivalent mutants (base64-decode leniency, MOCK-path Date.now/randomUUID, `length === 0`→`<= 0`,
+exp===now timing boundary). `npm run test:mutation` now covers all 6 hardened modules.
+
 ## Status
 Gates A–E cleared (B/C/D pass-with-notes, E pass; the two Important findings fixed/corrected).
 Next: human USER ACCEPTANCE GATE with the two open items above.

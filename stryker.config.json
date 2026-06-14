@@ -2,8 +2,18 @@
   "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
   "_comment": "SPIKE (P4 follow-up) — not adopted. Targets one pure module to gauge feasibility + a real mutation score.",
   "testRunner": "vitest",
-  "mutate": ["server/services/fufireRequestBuilders.ts"],
-  "reporters": ["clear-text", "json"],
+  "mutate": [
+    "server/lib/jwt.ts",
+    "server/services/fufireRequestBuilders.ts",
+    "server/services/fufireResponseInterpreter.ts",
+    "server/services/podDispatchService.ts",
+    "server/services/fufireOperations.ts",
+    "server/services/birthInputNormalizer.ts"
+  ],
+  "reporters": [
+    "clear-text",
+    "json"
+  ],
   "coverageAnalysis": "off",
   "timeoutMS": 20000,
   "concurrency": 2
