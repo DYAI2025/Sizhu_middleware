@@ -29,6 +29,7 @@ export const ALLOWED_FUFIRE_OPERATIONS = [
   "bazi",
   "baziTrace",
   "wuxing",
+  "fusion",
 ] as const;
 
 export type AllowedFuFireOperation = (typeof ALLOWED_FUFIRE_OPERATIONS)[number];

@@ -17,13 +17,25 @@ import {
  * (`fufire.responseInterpreter.test.ts`) pins the happy-path shape against the
  * captured samples but leaves most branch and exact-value behaviour unpinned, so
  * mutants survived in: resolveString/resolveNumber found-vs-not-found, locale
- * de/en source selection, every missing-source issue string, the wuxing 0,0
+ * de/en source selection, every missing-source issue string, the located
  * coordinate guard (subject undefined / non-finite / exact 1e-6 tolerance /
- * mismatch), describeWuxingLocation, the bazi caveat present-vs-absent branch,
+ * mismatch), describeResponseLocation, the bazi caveat present-vs-absent branch,
  * deferred + unknown ops, the `verified` booleans, and the CALCULATION_NOTE.
  *
  * This file asserts EXACT return values and BOTH sides of every conditional so
  * each surviving mutant goes RED. The objective oracle is the Stryker score.
+ *
+ * FX5 + FX9 contract correction (resolvePromptVariables):
+ *  - `western_dominant` ← wuxing.dominant_element, NO location guard. It is the
+ *    geocentric/western vector, proven LOCATION-INVARIANT live; it binds
+ *    regardless of subject coordinates (the former 0,0 trap is RETIRED here).
+ *  - `eastern_dominant` ← argmax(fusion.wu_xing_vectors.bazi_pillars),
+ *    LOCATION-DEPENDENT → guarded: the fusion response's input coords must match
+ *    the subject (within 1e-6) or eastern_dominant is NOT bound and a
+ *    location-flagged PROMPT_VARIABLE_SOURCE_MISSING issue is recorded. Absent
+ *    fusion ⇒ a PROMPT_VARIABLE_SOURCE_MISSING issue naming eastern_dominant.
+ *  - `dominant_element` is kept as a deprecated alias of `western_dominant`
+ *    (same value, no guard).
  *
  * The literal note string (CALCULATION_NOTE) and the exact missing-source issue
  * strings are reproduced here so a mutant that reworks them is caught verbatim.
@@ -36,13 +48,18 @@ const baziSample = JSON.parse(
 const wuxingSample = JSON.parse(
   readFileSync(join(process.cwd(), `${SAMPLES}/wuxing.response.json`), "utf8"),
 );
+// The fusion sample is wrapped in `{ data: {...} }`; the interpreter is handed `.data`.
+const fusionSample = JSON.parse(
+  readFileSync(join(process.cwd(), `${SAMPLES}/fusion.response.json`), "utf8"),
+).data;
 
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
 
 // The captured wuxing sample's SHAPE-fixture coordinates (0,0).
 const SAMPLE_LAT = 0;
 const SAMPLE_LON = 0;
-// The REAL subject's birth coordinates (Berlin), carried by the bazi sample.
+// The REAL subject's birth coordinates (Berlin), carried by the bazi sample
+// and the (located) fusion sample.
 const REAL_LAT = 52.52;
 const REAL_LON = 13.405;
 
@@ -51,19 +68,16 @@ const EXPECTED_NOTE =
   "chart calculation only; interpretation is not a verified or guaranteed claim";
 
 // ===========================================================================
-// resolvePromptVariables — animal/element/birth_year/dominant_element,
-// present AND absent for each; locale de/en; the 0,0 guard.
+// resolvePromptVariables — animal/element/birth_year/western/eastern/alias,
+// present AND absent for each; locale de/en; the located (eastern) guard.
 // ===========================================================================
 
 describe("resolvePromptVariables — exact resolved values + provenance (present branch)", () => {
-  it("en locale binds animal=Horse, element=Metall, birth_year=1990, dominant=Holz with exact source paths", () => {
-    const realWuxing = clone(wuxingSample);
-    realWuxing.input.lat = REAL_LAT;
-    realWuxing.input.lon = REAL_LON;
-
+  it("en locale binds animal=Horse, element=Metall, birth_year=1990, western=Holz, eastern=Feuer, alias=Holz with exact source paths", () => {
     const result = resolvePromptVariables({
       bazi: baziSample,
-      wuxing: realWuxing,
+      wuxing: wuxingSample, // 0,0 — western is location-invariant, still binds
+      fusion: fusionSample, // Berlin — eastern binds because coords match subject
       locale: "en",
       subject: { lat: REAL_LAT, lon: REAL_LON },
     });
@@ -71,15 +85,22 @@ describe("resolvePromptVariables — exact resolved values + provenance (present
     expect(result.variables.animal).toBe("Horse");
     expect(result.variables.element).toBe("Metall");
     expect(result.variables.birth_year).toBe(1990);
+    expect(result.variables.western_dominant).toBe("Holz");
+    expect(result.variables.eastern_dominant).toBe("Feuer");
+    // Deprecated alias mirrors western_dominant exactly.
     expect(result.variables.dominant_element).toBe("Holz");
 
     // Exact provenance paths (kills source-string mutants).
     expect(result.sources.animal).toBe("chinese.year.animal");
     expect(result.sources.element).toBe("pillars.year.element");
     expect(result.sources.birth_year).toBe("transition.solar_year");
+    expect(result.sources.western_dominant).toBe("wuxing.dominant_element");
+    expect(result.sources.eastern_dominant).toBe(
+      "fusion.wu_xing_vectors.bazi_pillars (argmax)",
+    );
     expect(result.sources.dominant_element).toBe("wuxing.dominant_element");
 
-    // No issues when every source is present and location matches.
+    // No issues when every source is present and the located source matches.
     expect(result.issues).toEqual([]);
 
     // matchedPaths / errors are the SAME object references (no copies).
@@ -91,6 +112,7 @@ describe("resolvePromptVariables — exact resolved values + provenance (present
     const result = resolvePromptVariables({
       bazi: baziSample,
       wuxing: wuxingSample,
+      fusion: fusionSample,
       locale: "de",
       subject: { lat: REAL_LAT, lon: REAL_LON },
     });
@@ -100,18 +122,21 @@ describe("resolvePromptVariables — exact resolved values + provenance (present
   });
 
   it("unknown / missing locale defaults to en ('Horse'), not de", () => {
-    const realWuxing = clone(wuxingSample);
-    realWuxing.input.lat = REAL_LAT;
-    realWuxing.input.lon = REAL_LON;
-
-    const defaulted = resolvePromptVariables({ bazi: baziSample, wuxing: realWuxing });
+    const defaulted = resolvePromptVariables({
+      bazi: baziSample,
+      wuxing: wuxingSample,
+      fusion: fusionSample,
+      subject: { lat: REAL_LAT, lon: REAL_LON },
+    });
     expect(defaulted.variables.animal).toBe("Horse");
     expect(defaulted.sources.animal).toBe("chinese.year.animal");
 
     const garbage = resolvePromptVariables({
       bazi: baziSample,
-      wuxing: realWuxing,
+      wuxing: wuxingSample,
+      fusion: fusionSample,
       locale: "fr",
+      subject: { lat: REAL_LAT, lon: REAL_LON },
     });
     expect(garbage.variables.animal).toBe("Horse");
   });
@@ -124,6 +149,7 @@ describe("resolvePromptVariables — absent branch records exact PROMPT_VARIABLE
     const result = resolvePromptVariables({
       bazi: broken,
       wuxing: wuxingSample,
+      fusion: fusionSample,
       locale: "en",
       subject: { lat: REAL_LAT, lon: REAL_LON },
     });
@@ -140,6 +166,7 @@ describe("resolvePromptVariables — absent branch records exact PROMPT_VARIABLE
     const result = resolvePromptVariables({
       bazi: broken,
       wuxing: wuxingSample,
+      fusion: fusionSample,
       locale: "de",
       subject: { lat: REAL_LAT, lon: REAL_LON },
     });
@@ -155,6 +182,7 @@ describe("resolvePromptVariables — absent branch records exact PROMPT_VARIABLE
     const result = resolvePromptVariables({
       bazi: broken,
       wuxing: wuxingSample,
+      fusion: fusionSample,
       locale: "en",
       subject: { lat: REAL_LAT, lon: REAL_LON },
     });
@@ -170,6 +198,7 @@ describe("resolvePromptVariables — absent branch records exact PROMPT_VARIABLE
     const result = resolvePromptVariables({
       bazi: broken,
       wuxing: wuxingSample,
+      fusion: fusionSample,
       locale: "en",
       subject: { lat: REAL_LAT, lon: REAL_LON },
     });
@@ -179,25 +208,27 @@ describe("resolvePromptVariables — absent branch records exact PROMPT_VARIABLE
     );
   });
 
-  it("missing dominant_element source => no dominant var + exact dominant issue (plain absence, no 'location' word)", () => {
+  it("missing wuxing.dominant_element source => no western/alias var + exact western issue (plain absence, no 'location' word)", () => {
     const brokenWuxing = clone(wuxingSample);
-    brokenWuxing.input.lat = REAL_LAT;
-    brokenWuxing.input.lon = REAL_LON;
     delete brokenWuxing.dominant_element;
     const result = resolvePromptVariables({
       bazi: baziSample,
       wuxing: brokenWuxing,
+      fusion: fusionSample,
       locale: "en",
       subject: { lat: REAL_LAT, lon: REAL_LON },
     });
+    expect(result.variables.western_dominant).toBeUndefined();
     expect(result.variables.dominant_element).toBeUndefined();
+    expect(result.sources.western_dominant).toBeUndefined();
     expect(result.issues).toContain(
-      `${PROMPT_VARIABLE_SOURCE_MISSING}: dominant_element (no source at dominant_element)`,
+      `${PROMPT_VARIABLE_SOURCE_MISSING}: western_dominant (no source at wuxing.dominant_element)`,
     );
-    // The plain-absence issue must NOT use the location-mismatch wording.
-    const dominantIssue = result.issues.find((i) => i.includes("dominant_element"));
-    expect(dominantIssue).toBeDefined();
-    expect(dominantIssue!.toLowerCase()).not.toContain("location mismatch");
+    // The western source has NO location guard — its absence issue must not use
+    // the location-mismatch wording (that wording belongs to the eastern source).
+    const westernIssue = result.issues.find((i) => i.includes("western_dominant"));
+    expect(westernIssue).toBeDefined();
+    expect(westernIssue!.toLowerCase()).not.toContain("location mismatch");
   });
 });
 
@@ -212,6 +243,7 @@ describe("resolveString edge cases — empty/whitespace/non-string source counts
     const result = resolvePromptVariables({
       bazi: broken,
       wuxing: wuxingSample,
+      fusion: fusionSample,
       locale: "en",
       subject: { lat: REAL_LAT, lon: REAL_LON },
     });
@@ -227,6 +259,7 @@ describe("resolveString edge cases — empty/whitespace/non-string source counts
     const result = resolvePromptVariables({
       bazi: broken,
       wuxing: wuxingSample,
+      fusion: fusionSample,
       locale: "en",
       subject: { lat: REAL_LAT, lon: REAL_LON },
     });
@@ -239,6 +272,7 @@ describe("resolveString edge cases — empty/whitespace/non-string source counts
     const result = resolvePromptVariables({
       bazi: broken,
       wuxing: wuxingSample,
+      fusion: fusionSample,
       locale: "en",
       subject: { lat: REAL_LAT, lon: REAL_LON },
     });
@@ -251,6 +285,7 @@ describe("resolveString edge cases — empty/whitespace/non-string source counts
     const result = resolvePromptVariables({
       bazi: ok,
       wuxing: wuxingSample,
+      fusion: fusionSample,
       locale: "en",
       subject: { lat: REAL_LAT, lon: REAL_LON },
     });
@@ -265,6 +300,7 @@ describe("resolveNumber edge cases — non-finite / non-number source counts as 
     const result = resolvePromptVariables({
       bazi: broken,
       wuxing: wuxingSample,
+      fusion: fusionSample,
       locale: "en",
       subject: { lat: REAL_LAT, lon: REAL_LON },
     });
@@ -280,6 +316,7 @@ describe("resolveNumber edge cases — non-finite / non-number source counts as 
     const result = resolvePromptVariables({
       bazi: zero,
       wuxing: wuxingSample,
+      fusion: fusionSample,
       locale: "en",
       subject: { lat: REAL_LAT, lon: REAL_LON },
     });
@@ -291,6 +328,7 @@ describe("resolveNumber edge cases — non-finite / non-number source counts as 
     const result = resolvePromptVariables({
       bazi: baziSample,
       wuxing: wuxingSample,
+      fusion: fusionSample,
       locale: "en",
       subject: { lat: REAL_LAT, lon: REAL_LON },
     });
@@ -299,142 +337,267 @@ describe("resolveNumber edge cases — non-finite / non-number source counts as 
 });
 
 // ===========================================================================
-// The 0,0 trap — wuxingMatchesSubject coordinate guard.
+// FX5 — western_dominant is LOCATION-INVARIANT: it binds regardless of the
+// subject's coordinates (the former 0,0 trap is RETIRED for the western field).
 // ===========================================================================
 
-describe("wuxing 0,0 guard — coordinate match controls whether dominant_element binds", () => {
+describe("western_dominant — LOCATION-INVARIANT, binds regardless of subject coords", () => {
   it("sample is the 0,0 SHAPE fixture (precondition)", () => {
     expect(wuxingSample.input.lat).toBe(SAMPLE_LAT);
     expect(wuxingSample.input.lon).toBe(SAMPLE_LON);
   });
 
-  it("0,0-derived wuxing vs Berlin subject => NOT bound; issue carries token + 'location' + computed coords", () => {
+  it("0,0-derived wuxing vs Berlin subject => western_dominant STILL binds (no guard); alias mirrors it; no location issue", () => {
+    const result = resolvePromptVariables({
+      bazi: baziSample,
+      wuxing: wuxingSample, // 0,0 SHAPE fixture
+      fusion: fusionSample,
+      locale: "en",
+      subject: { lat: REAL_LAT, lon: REAL_LON },
+    });
+    expect(result.variables.western_dominant).toBe("Holz");
+    expect(result.variables.dominant_element).toBe("Holz");
+    expect(result.sources.western_dominant).toBe("wuxing.dominant_element");
+    expect(result.sources.dominant_element).toBe("wuxing.dominant_element");
+
+    // No western/dominant issue exists at all — the western field has no guard.
+    const westernIssue = result.issues.find(
+      (i) => i.includes("western_dominant") || i.includes("dominant_element"),
+    );
+    expect(westernIssue).toBeUndefined();
+  });
+
+  it("subject undefined => western_dominant STILL binds (location is irrelevant to the western vector)", () => {
     const result = resolvePromptVariables({
       bazi: baziSample,
       wuxing: wuxingSample, // 0,0
-      locale: "en",
-      subject: { lat: REAL_LAT, lon: REAL_LON },
-    });
-    expect(result.variables.dominant_element).toBeUndefined();
-    expect(result.sources.dominant_element).toBeUndefined();
-
-    const dominantIssue = result.issues.find((i) => i.includes("dominant_element"));
-    expect(dominantIssue).toBeDefined();
-    expect(dominantIssue).toContain(PROMPT_VARIABLE_SOURCE_MISSING);
-    expect(dominantIssue!.toLowerCase()).toContain("location");
-    // describeWuxingLocation surfaces the real 0,0 coordinates verbatim.
-    expect(dominantIssue).toContain("0,0");
-  });
-
-  it("matching coordinates => dominant_element binds (positive guard branch)", () => {
-    const realWuxing = clone(wuxingSample);
-    realWuxing.input.lat = REAL_LAT;
-    realWuxing.input.lon = REAL_LON;
-    const result = resolvePromptVariables({
-      bazi: baziSample,
-      wuxing: realWuxing,
-      locale: "en",
-      subject: { lat: REAL_LAT, lon: REAL_LON },
-    });
-    expect(result.variables.dominant_element).toBe("Holz");
-    expect(result.sources.dominant_element).toBe("wuxing.dominant_element");
-  });
-
-  it("subject undefined => fail closed, dominant_element NOT bound", () => {
-    const realWuxing = clone(wuxingSample);
-    realWuxing.input.lat = REAL_LAT;
-    realWuxing.input.lon = REAL_LON;
-    const result = resolvePromptVariables({
-      bazi: baziSample,
-      wuxing: realWuxing,
+      fusion: fusionSample,
       locale: "en",
       // no subject
     });
-    expect(result.variables.dominant_element).toBeUndefined();
-    const dominantIssue = result.issues.find((i) => i.includes("dominant_element"));
-    expect(dominantIssue!.toLowerCase()).toContain("location");
-  });
-
-  it("subject with NaN lat => fail closed, NOT bound", () => {
-    const realWuxing = clone(wuxingSample);
-    realWuxing.input.lat = REAL_LAT;
-    realWuxing.input.lon = REAL_LON;
-    const result = resolvePromptVariables({
-      bazi: baziSample,
-      wuxing: realWuxing,
-      locale: "en",
-      subject: { lat: Number.NaN, lon: REAL_LON },
-    });
-    expect(result.variables.dominant_element).toBeUndefined();
-  });
-
-  it("subject with Infinity lon => fail closed, NOT bound", () => {
-    const realWuxing = clone(wuxingSample);
-    realWuxing.input.lat = REAL_LAT;
-    realWuxing.input.lon = REAL_LON;
-    const result = resolvePromptVariables({
-      bazi: baziSample,
-      wuxing: realWuxing,
-      locale: "en",
-      subject: { lat: REAL_LAT, lon: Number.POSITIVE_INFINITY },
-    });
-    expect(result.variables.dominant_element).toBeUndefined();
-  });
-
-  it("wuxing input.lat non-numeric => fail closed, NOT bound", () => {
-    const badWuxing = clone(wuxingSample);
-    badWuxing.input.lat = "52.52"; // string, not number
-    badWuxing.input.lon = REAL_LON;
-    const result = resolvePromptVariables({
-      bazi: baziSample,
-      wuxing: badWuxing,
-      locale: "en",
-      subject: { lat: REAL_LAT, lon: REAL_LON },
-    });
-    expect(result.variables.dominant_element).toBeUndefined();
-  });
-
-  it("coordsEqual tolerance: a delta just under 1e-6 still binds (within tolerance)", () => {
-    const closeWuxing = clone(wuxingSample);
-    closeWuxing.input.lat = REAL_LAT + 5e-7; // |delta| = 5e-7 < 1e-6
-    closeWuxing.input.lon = REAL_LON;
-    const result = resolvePromptVariables({
-      bazi: baziSample,
-      wuxing: closeWuxing,
-      locale: "en",
-      subject: { lat: REAL_LAT, lon: REAL_LON },
-    });
+    expect(result.variables.western_dominant).toBe("Holz");
     expect(result.variables.dominant_element).toBe("Holz");
   });
 
-  it("coordsEqual tolerance: a delta of 1e-5 does NOT bind (outside tolerance)", () => {
-    const farWuxing = clone(wuxingSample);
-    farWuxing.input.lat = REAL_LAT + 1e-5; // |delta| = 1e-5 > 1e-6
-    farWuxing.input.lon = REAL_LON;
+  it("subject with NaN lat => western_dominant STILL binds", () => {
     const result = resolvePromptVariables({
       bazi: baziSample,
-      wuxing: farWuxing,
+      wuxing: wuxingSample, // 0,0
+      fusion: fusionSample,
       locale: "en",
-      subject: { lat: REAL_LAT, lon: REAL_LON },
+      subject: { lat: Number.NaN, lon: REAL_LON },
     });
-    expect(result.variables.dominant_element).toBeUndefined();
-    const dominantIssue = result.issues.find((i) => i.includes("dominant_element"));
-    expect(dominantIssue!.toLowerCase()).toContain("location");
+    expect(result.variables.western_dominant).toBe("Holz");
   });
 
-  it("describeWuxingLocation renders '?' when a coord is non-numeric", () => {
-    const badWuxing = clone(wuxingSample);
-    badWuxing.input.lat = "nope"; // non-number => "?"
-    badWuxing.input.lon = REAL_LON;
+  it("western_dominant binds even when fusion is entirely absent (independent of eastern)", () => {
     const result = resolvePromptVariables({
       bazi: baziSample,
-      wuxing: badWuxing,
+      wuxing: wuxingSample,
+      // no fusion
       locale: "en",
       subject: { lat: REAL_LAT, lon: REAL_LON },
     });
-    const dominantIssue = result.issues.find((i) => i.includes("dominant_element"));
-    expect(dominantIssue).toBeDefined();
-    expect(dominantIssue).toContain(`?,${REAL_LON}`);
+    expect(result.variables.western_dominant).toBe("Holz");
+    expect(result.variables.dominant_element).toBe("Holz");
+  });
+});
+
+// ===========================================================================
+// FX9 — eastern_dominant is LOCATION-DEPENDENT: the located guard against the
+// FUSION source coords is load-bearing (1e-6 tolerance), and fail-closed.
+// ===========================================================================
+
+describe("eastern_dominant — located guard against the fusion source coordinates", () => {
+  it("fusion sample is the Berlin (located) fixture (precondition)", () => {
+    expect(fusionSample.input.lat).toBe(REAL_LAT);
+    expect(fusionSample.input.lon).toBe(REAL_LON);
+  });
+
+  it("matching coordinates => eastern_dominant binds to argmax(bazi_pillars)='Feuer' (positive guard branch)", () => {
+    const result = resolvePromptVariables({
+      bazi: baziSample,
+      wuxing: wuxingSample,
+      fusion: fusionSample, // Berlin
+      locale: "en",
+      subject: { lat: REAL_LAT, lon: REAL_LON },
+    });
+    expect(result.variables.eastern_dominant).toBe("Feuer");
+    expect(result.sources.eastern_dominant).toBe(
+      "fusion.wu_xing_vectors.bazi_pillars (argmax)",
+    );
+  });
+
+  it("fusion present but coords ≠ subject => eastern NOT bound; issue carries token + 'location' + computed coords", () => {
+    const movedFusion = clone(fusionSample);
+    movedFusion.input.lat = 0; // now 0,13.405 — mismatched vs Berlin subject
+    movedFusion.input.lon = 0;
+    const result = resolvePromptVariables({
+      bazi: baziSample,
+      wuxing: wuxingSample,
+      fusion: movedFusion,
+      locale: "en",
+      subject: { lat: REAL_LAT, lon: REAL_LON },
+    });
+    expect(result.variables.eastern_dominant).toBeUndefined();
+    expect(result.sources.eastern_dominant).toBeUndefined();
+
+    const easternIssue = result.issues.find((i) => i.includes("eastern_dominant"));
+    expect(easternIssue).toBeDefined();
+    expect(easternIssue).toContain(PROMPT_VARIABLE_SOURCE_MISSING);
+    expect(easternIssue!.toLowerCase()).toContain("location");
+    // describeResponseLocation surfaces the (mismatched) fusion source coords verbatim.
+    expect(easternIssue).toContain("0,0");
+  });
+
+  it("fusion ABSENT => eastern NOT bound; exact missing-source issue naming eastern_dominant + the path (plain absence, no 'location mismatch')", () => {
+    const result = resolvePromptVariables({
+      bazi: baziSample,
+      wuxing: wuxingSample,
+      // no fusion
+      locale: "en",
+      subject: { lat: REAL_LAT, lon: REAL_LON },
+    });
+    expect(result.variables.eastern_dominant).toBeUndefined();
+    expect(result.sources.eastern_dominant).toBeUndefined();
+    expect(result.issues).toContain(
+      `${PROMPT_VARIABLE_SOURCE_MISSING}: eastern_dominant (no source at fusion.wu_xing_vectors.bazi_pillars)`,
+    );
+    const easternIssue = result.issues.find((i) => i.includes("eastern_dominant"))!;
+    expect(easternIssue.toLowerCase()).not.toContain("location mismatch");
+  });
+
+  it("subject undefined => eastern fails closed, NOT bound (location flagged)", () => {
+    const result = resolvePromptVariables({
+      bazi: baziSample,
+      wuxing: wuxingSample,
+      fusion: fusionSample, // Berlin
+      locale: "en",
+      // no subject
+    });
+    expect(result.variables.eastern_dominant).toBeUndefined();
+    const easternIssue = result.issues.find((i) => i.includes("eastern_dominant"));
+    expect(easternIssue!.toLowerCase()).toContain("location");
+  });
+
+  it("subject with NaN lat => eastern fails closed, NOT bound", () => {
+    const result = resolvePromptVariables({
+      bazi: baziSample,
+      wuxing: wuxingSample,
+      fusion: fusionSample,
+      locale: "en",
+      subject: { lat: Number.NaN, lon: REAL_LON },
+    });
+    expect(result.variables.eastern_dominant).toBeUndefined();
+  });
+
+  it("subject with Infinity lon => eastern fails closed, NOT bound", () => {
+    const result = resolvePromptVariables({
+      bazi: baziSample,
+      wuxing: wuxingSample,
+      fusion: fusionSample,
+      locale: "en",
+      subject: { lat: REAL_LAT, lon: Number.POSITIVE_INFINITY },
+    });
+    expect(result.variables.eastern_dominant).toBeUndefined();
+  });
+
+  it("fusion input.lat non-numeric => eastern fails closed, NOT bound", () => {
+    const badFusion = clone(fusionSample);
+    badFusion.input.lat = "52.52"; // string, not number
+    const result = resolvePromptVariables({
+      bazi: baziSample,
+      wuxing: wuxingSample,
+      fusion: badFusion,
+      locale: "en",
+      subject: { lat: REAL_LAT, lon: REAL_LON },
+    });
+    expect(result.variables.eastern_dominant).toBeUndefined();
+  });
+
+  it("coordsEqual tolerance: a delta just under 1e-6 still binds (within tolerance)", () => {
+    const closeFusion = clone(fusionSample);
+    closeFusion.input.lat = REAL_LAT + 5e-7; // |delta| = 5e-7 < 1e-6
+    const result = resolvePromptVariables({
+      bazi: baziSample,
+      wuxing: wuxingSample,
+      fusion: closeFusion,
+      locale: "en",
+      subject: { lat: REAL_LAT, lon: REAL_LON },
+    });
+    expect(result.variables.eastern_dominant).toBe("Feuer");
+  });
+
+  it("coordsEqual tolerance: a delta of 1e-5 does NOT bind (outside tolerance)", () => {
+    const farFusion = clone(fusionSample);
+    farFusion.input.lat = REAL_LAT + 1e-5; // |delta| = 1e-5 > 1e-6
+    const result = resolvePromptVariables({
+      bazi: baziSample,
+      wuxing: wuxingSample,
+      fusion: farFusion,
+      locale: "en",
+      subject: { lat: REAL_LAT, lon: REAL_LON },
+    });
+    expect(result.variables.eastern_dominant).toBeUndefined();
+    const easternIssue = result.issues.find((i) => i.includes("eastern_dominant"));
+    expect(easternIssue!.toLowerCase()).toContain("location");
+  });
+
+  it("describeResponseLocation renders '?' when a fusion coord is non-numeric", () => {
+    const badFusion = clone(fusionSample);
+    badFusion.input.lat = "nope"; // non-number => "?"
+    const result = resolvePromptVariables({
+      bazi: baziSample,
+      wuxing: wuxingSample,
+      fusion: badFusion,
+      locale: "en",
+      subject: { lat: REAL_LAT, lon: REAL_LON },
+    });
+    const easternIssue = result.issues.find((i) => i.includes("eastern_dominant"));
+    expect(easternIssue).toBeDefined();
+    expect(easternIssue).toContain(`?,${REAL_LON}`);
+  });
+
+  it("argmax tie => eastern NOT bound (ambiguous → never an arbitrary guess)", () => {
+    const tiedFusion = clone(fusionSample);
+    // Make two elements share the strict maximum so argmaxElement returns undefined.
+    tiedFusion.wu_xing_vectors.bazi_pillars = {
+      Holz: 0.9,
+      Feuer: 0.9, // tied top
+      Erde: 0.1,
+      Metall: 0.1,
+      Wasser: 0.1,
+    };
+    const result = resolvePromptVariables({
+      bazi: baziSample,
+      wuxing: wuxingSample,
+      fusion: tiedFusion,
+      locale: "en",
+      subject: { lat: REAL_LAT, lon: REAL_LON },
+    });
+    expect(result.variables.eastern_dominant).toBeUndefined();
+    expect(result.issues).toContain(
+      `${PROMPT_VARIABLE_SOURCE_MISSING}: eastern_dominant (no source at fusion.wu_xing_vectors.bazi_pillars)`,
+    );
+  });
+
+  it("a different argmax winner binds the correct element (kills a hard-coded 'Feuer' mutant)", () => {
+    const wasserFusion = clone(fusionSample);
+    wasserFusion.wu_xing_vectors.bazi_pillars = {
+      Holz: 0.1,
+      Feuer: 0.2,
+      Erde: 0.3,
+      Metall: 0.4,
+      Wasser: 0.99, // strict max
+    };
+    const result = resolvePromptVariables({
+      bazi: baziSample,
+      wuxing: wuxingSample,
+      fusion: wasserFusion,
+      locale: "en",
+      subject: { lat: REAL_LAT, lon: REAL_LON },
+    });
+    expect(result.variables.eastern_dominant).toBe("Wasser");
   });
 });
 
@@ -467,11 +630,11 @@ describe("renderPromptTemplate — fills placeholders with exact values", () => 
 
   it("throws render-block with exact PROMPT_VARIABLE_SOURCE_MISSING message naming the missing var", () => {
     expect(() =>
-      renderPromptTemplate("animal={{animal}} dominant={{dominant_element}}", {
+      renderPromptTemplate("animal={{animal}} eastern={{eastern_dominant}}", {
         animal: "Horse",
       }),
     ).toThrow(
-      `${PROMPT_VARIABLE_SOURCE_MISSING}: render-block — unresolved template variable(s): dominant_element`,
+      `${PROMPT_VARIABLE_SOURCE_MISSING}: render-block — unresolved template variable(s): eastern_dominant`,
     );
   });
 
@@ -499,8 +662,8 @@ describe("renderPromptTemplate — fills placeholders with exact values", () => 
 });
 
 // ===========================================================================
-// interpretFufireResponse — bazi caveat present/absent, wuxing, deferred,
-// unknown op, verified booleans, CALCULATION_NOTE.
+// interpretFufireResponse — bazi caveat present/absent, wuxing, fusion,
+// deferred, unknown op, verified booleans, CALCULATION_NOTE.
 // ===========================================================================
 
 describe("interpretFufireResponse — bazi day-pillar caveat surfaced verbatim", () => {
@@ -561,6 +724,18 @@ describe("interpretFufireResponse — wuxing is a verifiable chart calculation",
   });
 });
 
+describe("interpretFufireResponse — fusion is a verifiable chart calculation (FX9)", () => {
+  it("fusion => verified=true, no caveats, no issues, exact note", () => {
+    const result = interpretFufireResponse({ operation: "fusion", response: fusionSample });
+    expect(result.operation).toBe("fusion");
+    expect(result.verified).toBe(true);
+    expect(result.caveats).toEqual([]);
+    expect(result.dayPillar).toBe(result.caveats);
+    expect(result.issues).toEqual([]);
+    expect(result.note).toBe(EXPECTED_NOTE);
+  });
+});
+
 describe("interpretFufireResponse — deferred ops render-block, never verified", () => {
   for (const op of ["bazi_trace", "chronometry"]) {
     it(`${op} => verified=false, deferred issue (token + op name + 'deferred'), exact note`, () => {
@@ -597,21 +772,25 @@ describe("interpretFufireResponse — unknown operation fails closed", () => {
 });
 
 // ===========================================================================
-// Security: no PII leak in issues/caveats. The 0,0 mismatch issue must carry
-// the WUXING source coords (0,0), never the real subject's Berlin coordinates.
+// Security: no PII leak in issues/caveats. The eastern location-mismatch issue
+// must carry the FUSION source coords, never the real subject's Berlin coords.
 // ===========================================================================
 
-describe("no PII leak — location-mismatch issue describes the wuxing source coords, not the real subject", () => {
+describe("no PII leak — eastern location-mismatch issue describes the fusion source coords, not the real subject", () => {
   it("Berlin subject coords (52.52 / 13.405) do NOT appear in the mismatch issue", () => {
+    const movedFusion = clone(fusionSample);
+    movedFusion.input.lat = 0; // fusion source now reports 0,0
+    movedFusion.input.lon = 0;
     const result = resolvePromptVariables({
       bazi: baziSample,
-      wuxing: wuxingSample, // 0,0
+      wuxing: wuxingSample,
+      fusion: movedFusion,
       locale: "en",
       subject: { lat: REAL_LAT, lon: REAL_LON },
     });
-    const dominantIssue = result.issues.find((i) => i.includes("dominant_element"))!;
-    expect(dominantIssue).toContain("0,0");
-    expect(dominantIssue).not.toContain(String(REAL_LAT));
-    expect(dominantIssue).not.toContain(String(REAL_LON));
+    const easternIssue = result.issues.find((i) => i.includes("eastern_dominant"))!;
+    expect(easternIssue).toContain("0,0");
+    expect(easternIssue).not.toContain(String(REAL_LAT));
+    expect(easternIssue).not.toContain(String(REAL_LON));
   });
 });

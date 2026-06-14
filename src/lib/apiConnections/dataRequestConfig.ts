@@ -19,6 +19,7 @@ export const fufireDataConfig: DataRequestConfig = {
     chronometry_resolve: { key: 'chronometry_resolve', method: 'POST', path: '/v1/chronometry/resolve' },
     bazi: { key: 'bazi', method: 'POST', path: '/v1/calculate/bazi' },
     bazi_trace: { key: 'bazi_trace', method: 'POST', path: '/v1/calculate/bazi/trace' },
-    wuxing: { key: 'wuxing', method: 'POST', path: '/v1/calculate/wuxing' }
+    wuxing: { key: 'wuxing', method: 'POST', path: '/v1/calculate/wuxing' },
+    fusion: { key: 'fusion', method: 'POST', path: '/v1/calculate/fusion' }
   }
 };

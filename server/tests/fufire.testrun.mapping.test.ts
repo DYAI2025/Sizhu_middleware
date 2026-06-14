@@ -233,46 +233,37 @@ describe("T9 (2) — missing source ⇒ block, never guess (no invented data thr
   });
 });
 
-describe("T9 (3) — 0,0-location guard holds THROUGH the live path (True-Line: no value for the wrong subject)", () => {
-  it("wuxing computed at 0,0 ≠ real subject ⇒ dominant_element NOT bound, location-flagged missing-source issue", async () => {
-    // The captured wuxing sample carries input.lat:0 / input.lon:0, while the
-    // subject is real Berlin (52.52, 13.405). The dominant_element ("Holz")
-    // exists in the response but was computed for the WRONG location → invented
-    // data → must NOT be bound to this subject's prompt.
+describe("T9 (3) — dominance through the live path: western location-invariant, eastern needs fusion (corrected AC-F-002f, FX5/FX9)", () => {
+  it("western dominant_element BINDS even from a 0,0 wuxing sample (location-invariant — the 0,0 trap was retired)", async () => {
+    // The captured wuxing sample carries input.lat:0 / input.lon:0. The wuxing
+    // top-level dominant_element is the WESTERN (geocentric) vector, proven
+    // LOCATION-INVARIANT live — so it binds to the Berlin subject regardless of
+    // the 0,0 source coords. (FX5 retired the theater guard for this field.)
     mockFufireFetch();
     const svc = new FuFireDataService();
 
     const result: any = await svc.executeTestRun(FULL_BERLIN_INPUT);
 
-    // dominant_element must be UNBOUND despite being present in the raw response.
-    expect(result.promptVariables?.dominant_element).toBeUndefined();
-
-    // The guard surfaces a missing-source issue that mentions the location
-    // mismatch (so a reviewer can distinguish it from a plain absence).
+    expect(result.promptVariables?.western_dominant).toBe("Holz");
+    expect(result.promptVariables?.dominant_element).toBe("Holz"); // deprecated alias
+    // No location-mismatch issue for the western field anymore.
     const issues: string[] = result.promptVariableIssues ?? [];
-    expect(
-      issues.some(
-        (i) =>
-          i.includes(PROMPT_VARIABLE_SOURCE_MISSING) &&
-          /location|dominant_element/.test(i),
-      ),
-    ).toBe(true);
+    expect(issues.some((i) => /western_dominant/.test(i))).toBe(false);
   });
 
-  it("when the wuxing source coords DO match the subject, dominant_element binds (guard is precise, not blanket)", async () => {
-    // Re-point the wuxing sample's input coords to the real subject so the guard
-    // passes — proving the guard blocks on MISMATCH, not unconditionally (which
-    // would be its own bug: a precise guard, not a blanket refusal).
-    const wuxingMatched = JSON.parse(JSON.stringify(wuxingSample));
-    wuxingMatched.input.lat = REAL_LAT;
-    wuxingMatched.input.lon = REAL_LON;
-
-    mockFufireFetch({ wuxing: wuxingMatched });
+  it("eastern_dominant requires the fusion op: UNBOUND + flagged when fusion is not requested", async () => {
+    // FULL_BERLIN_INPUT requests bazi + wuxing only (no fusion) → the eastern
+    // (located) dominance has no source → not guessed, flagged.
+    mockFufireFetch();
     const svc = new FuFireDataService();
 
     const result: any = await svc.executeTestRun(FULL_BERLIN_INPUT);
 
-    expect(result.promptVariables?.dominant_element).toBe("Holz");
+    expect(result.promptVariables?.eastern_dominant).toBeUndefined();
+    const issues: string[] = result.promptVariableIssues ?? [];
+    expect(
+      issues.some((i) => i.includes(PROMPT_VARIABLE_SOURCE_MISSING) && /eastern_dominant/.test(i)),
+    ).toBe(true);
   });
 });
 
@@ -316,7 +307,14 @@ describe("T9 (5) — no PII/secret leak in the mapped result", () => {
     // coordinates back out under the "mapped variables" label. (The top-level
     // `input` echo is user-accepted and intentionally NOT asserted against here.)
     const mappedKeys = Object.keys(result.promptVariables ?? {});
-    const allowed = new Set(["animal", "element", "birth_year", "dominant_element"]);
+    const allowed = new Set([
+      "animal",
+      "element",
+      "birth_year",
+      "western_dominant",
+      "eastern_dominant",
+      "dominant_element",
+    ]);
     for (const k of mappedKeys) {
       expect(allowed.has(k)).toBe(true);
     }
@@ -341,7 +339,14 @@ describe("T9 (6) — deferred ops (bazi_trace / chronometry) response-mapping re
     // (the safe variable set is bounded; a deferred op cannot add to it).
     expect(result.promptVariables?.element).toBe("Metall");
     const mappedKeys = Object.keys(result.promptVariables ?? {});
-    const allowed = new Set(["animal", "element", "birth_year", "dominant_element"]);
+    const allowed = new Set([
+      "animal",
+      "element",
+      "birth_year",
+      "western_dominant",
+      "eastern_dominant",
+      "dominant_element",
+    ]);
     for (const k of mappedKeys) {
       expect(allowed.has(k)).toBe(true);
     }

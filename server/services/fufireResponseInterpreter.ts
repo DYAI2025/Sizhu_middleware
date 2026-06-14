@@ -17,11 +17,15 @@
  *  - **Provenance, not a guess (AC-F-002a).** Every resolved variable records
  *    the exact source path it was read from (`sources`), so a reviewer can audit
  *    where each value came from.
- *  - **The 0,0 trap (AC-F-002f).** The captured wuxing sample was computed at
- *    `input.lat:0, input.lon:0` — a SHAPE fixture. A `dominant_element` derived
- *    at coordinates that do not match the real subject is a value computed for
- *    the wrong location → invented data → NOT bound; an issue carrying both
- *    {@link PROMPT_VARIABLE_SOURCE_MISSING} and the word "location" is recorded.
+ *  - **Located-source guard (AC-F-002f, corrected FX5/FX9).** The WESTERN dominance
+ *    (`western_dominant` ← wuxing.dominant_element) is geocentric + LOCATION-INVARIANT
+ *    (proven live across Berlin/Sydney/Quito) — bound unguarded; the original 0,0-trap
+ *    premise (that this value was location-specific) was empirically false and is retired
+ *    for it. The EASTERN dominance (`eastern_dominant` ← argmax(fusion.wu_xing_vectors.
+ *    bazi_pillars)) IS location-dependent, so the guard applies THERE: a fusion result
+ *    whose echoed coords do not match the real subject is a value for the wrong location
+ *    → invented data → NOT bound; an issue carrying {@link PROMPT_VARIABLE_SOURCE_MISSING}
+ *    and the word "location" is recorded.
  *  - **Honest caveat, never laundered (AC-F-002e / VCHK-SFB-004).** The
  *    provider-declared day-pillar `anchor_verification` ("unverified") is
  *    surfaced verbatim; nothing relabels the *interpretation* as verified.
@@ -61,7 +65,24 @@ export interface PromptVariables {
   element?: string;
   /** Solar year, e.g. 1990 (← transition.solar_year). */
   birth_year?: number;
-  /** Western-vector dominant element, e.g. "Holz" (← wuxing.dominant_element); 0,0-guarded. */
+  /**
+   * WESTERN (geocentric planet-rulership) dominant element, e.g. "Holz"
+   * (← wuxing.dominant_element). LOCATION-INVARIANT by design — verified live
+   * 2026-06-14 (FX): identical across Berlin/Sydney/Quito at the same instant
+   * (geocentric planet positions do not depend on the observer's lat/lon). The
+   * former 0,0-trap guard (AC-F-002f) was based on a false premise and is RETIRED
+   * for this field (FX5); it is bound regardless of subject coordinates.
+   */
+  western_dominant?: string;
+  /**
+   * EASTERN (located, bazi-pillar) dominant element, e.g. "Feuer"
+   * (← argmax(fusion.wu_xing_vectors.bazi_pillars)). LOCATION-DEPENDENT — bound
+   * only when the fusion response coords match the subject (the located guard is
+   * load-bearing here, unlike the western vector). Requires the fusion operation
+   * (FX9); absent + flagged when fusion was not run or coords mismatch.
+   */
+  eastern_dominant?: string;
+  /** @deprecated alias of {@link western_dominant} (back-compat; same value, no guard). */
   dominant_element?: string;
 }
 
@@ -79,9 +100,15 @@ export interface ResolvePromptVariablesInput {
   bazi?: unknown;
   /** Real wuxing response (the shape of `docs/contracts/fufire-samples/wuxing.response.json`). */
   wuxing?: unknown;
+  /**
+   * Real fusion response (FX9; flat, `wu_xing_vectors.{western_planets,bazi_pillars}`).
+   * Source of the EASTERN (located) dominance. Absent ⇒ eastern_dominant is
+   * unresolved + flagged (never guessed).
+   */
+  fusion?: unknown;
   /** Active render locale; selects the (paired) animal source. Defaults to "en". */
   locale?: PromptLocale | string;
-  /** The real subject's birth coordinates — used to guard the wuxing 0,0 trap. */
+  /** The real subject's birth coordinates — used to guard the LOCATED (eastern/fusion) source. */
   subject?: SubjectCoordinates;
 }
 
@@ -199,7 +226,7 @@ const ANIMAL_SOURCE_BY_LOCALE: Record<PromptLocale, string> = {
 export function resolvePromptVariables(
   input: ResolvePromptVariablesInput,
 ): ResolvePromptVariablesResult {
-  const { bazi, wuxing, subject } = input;
+  const { bazi, wuxing, fusion, subject } = input;
   const locale: PromptLocale = input.locale === "de" ? "de" : "en";
 
   const variables: PromptVariables = {};
@@ -236,25 +263,47 @@ export function resolvePromptVariables(
     issues.push(missingSourceIssue("birth_year", BIRTH_YEAR_PATH));
   }
 
-  // --- dominant_element ← wuxing.dominant_element, GUARDED by the 0,0 trap ---
-  // A wuxing result computed at coordinates that do not match the real subject
-  // is a value computed for the WRONG location → invented data → not bound
-  // (AC-F-002f / VCHK-SFB-001).
-  const DOMINANT_PATH = "dominant_element";
-  const dominant = resolveString(wuxing, DOMINANT_PATH);
-  if (!dominant.found) {
-    issues.push(missingSourceIssue("dominant_element", DOMINANT_PATH));
-  } else if (!wuxingMatchesSubject(wuxing, subject)) {
-    // The source value exists but was computed for a different location (the
-    // captured sample's 0,0). Surface BOTH the missing token and "location" so
-    // downstream code can distinguish a location mismatch from a plain absence.
+  // --- western_dominant ← wuxing.dominant_element (LOCATION-INVARIANT) ----------
+  // FX5 / corrected AC-F-002f: the wuxing top-level dominant_element is the WESTERN
+  // (geocentric planet-rulership) dominance, proven LOCATION-INVARIANT by the live
+  // probe (identical at Berlin/Sydney/Quito, same instant). The former 0,0-trap
+  // guard rested on a false premise (that this value was location-specific) and is
+  // RETIRED for the western field — it is bound regardless of subject coordinates.
+  // `dominant_element` is kept as a deprecated alias of western_dominant.
+  const WESTERN_PATH = "dominant_element";
+  const western = resolveString(wuxing, WESTERN_PATH);
+  if (western.found) {
+    variables.western_dominant = western.value;
+    variables.dominant_element = western.value; // @deprecated alias
+    sources.western_dominant = "wuxing.dominant_element";
+    sources.dominant_element = "wuxing.dominant_element";
+  } else {
+    issues.push(missingSourceIssue("western_dominant", `wuxing.${WESTERN_PATH}`));
+  }
+
+  // --- eastern_dominant ← argmax(fusion.wu_xing_vectors.bazi_pillars) -----------
+  // The EASTERN (located, bazi-pillar) dominance IS location-dependent, so the
+  // located guard is load-bearing here: the fusion response must have been computed
+  // at coordinates matching the real subject, else it is a value for the WRONG
+  // location → invented data → not bound (AC-F-002f, correctly applied to the
+  // located source). Requires the fusion operation; absent ⇒ flagged, never guessed.
+  const EASTERN_PATH = "wu_xing_vectors.bazi_pillars";
+  const baziVector = readPath(fusion, EASTERN_PATH);
+  if (!baziVector.found || !isRecord(baziVector.value)) {
+    issues.push(missingSourceIssue("eastern_dominant", `fusion.${EASTERN_PATH}`));
+  } else if (!responseMatchesSubject(fusion, subject)) {
     issues.push(
-      `${PROMPT_VARIABLE_SOURCE_MISSING}: dominant_element location mismatch ` +
-        `(wuxing computed at ${describeWuxingLocation(wuxing)} ≠ subject)`,
+      `${PROMPT_VARIABLE_SOURCE_MISSING}: eastern_dominant location mismatch ` +
+        `(fusion computed at ${describeResponseLocation(fusion)} ≠ subject)`,
     );
   } else {
-    variables.dominant_element = dominant.value;
-    sources.dominant_element = "wuxing.dominant_element";
+    const dom = argmaxElement(baziVector.value);
+    if (dom !== undefined) {
+      variables.eastern_dominant = dom;
+      sources.eastern_dominant = `fusion.${EASTERN_PATH} (argmax)`;
+    } else {
+      issues.push(missingSourceIssue("eastern_dominant", `fusion.${EASTERN_PATH}`));
+    }
   }
 
   // `matchedPaths`/`errors` are synonyms callers may read; they reference the
@@ -263,19 +312,21 @@ export function resolvePromptVariables(
 }
 
 /**
- * True only when the wuxing response's source coordinates match the subject's
- * birth coordinates. If either side is unknown, we CANNOT prove they match, so
- * we treat it as a mismatch (fail closed — no invented binding).
+ * True only when a (located) response's echoed source coordinates match the
+ * subject's birth coordinates. If either side is unknown, we CANNOT prove they
+ * match, so we treat it as a mismatch (fail closed — no invented binding). Used
+ * for the LOCATED sources (fusion/eastern); the western wuxing vector is
+ * location-invariant and does NOT use this guard (FX5).
  */
-function wuxingMatchesSubject(
-  wuxing: unknown,
+function responseMatchesSubject(
+  response: unknown,
   subject: SubjectCoordinates | undefined,
 ): boolean {
   if (!subject || !Number.isFinite(subject.lat) || !Number.isFinite(subject.lon)) {
     return false;
   }
-  const lat = readPath(wuxing, "input.lat");
-  const lon = readPath(wuxing, "input.lon");
+  const lat = readPath(response, "input.lat");
+  const lon = readPath(response, "input.lon");
   if (
     !lat.found ||
     !lon.found ||
@@ -292,13 +343,36 @@ function coordsEqual(a: number, b: number): boolean {
   return Math.abs(a - b) < 1e-6;
 }
 
-/** A short, secret-free description of where a wuxing result was computed (for the issue). */
-function describeWuxingLocation(wuxing: unknown): string {
-  const lat = readPath(wuxing, "input.lat");
-  const lon = readPath(wuxing, "input.lon");
+/** A short, secret-free description of where a located result was computed (for the issue). */
+function describeResponseLocation(response: unknown): string {
+  const lat = readPath(response, "input.lat");
+  const lon = readPath(response, "input.lon");
   const latStr = typeof lat.value === "number" ? String(lat.value) : "?";
   const lonStr = typeof lon.value === "number" ? String(lon.value) : "?";
   return `${latStr},${lonStr}`;
+}
+
+/**
+ * Deterministic argmax over an element→weight vector (e.g. the fusion
+ * bazi_pillars vector): returns the element key with the strictly-largest finite
+ * numeric weight. Returns undefined if the vector has no usable numeric entry, or
+ * if the top weight is tied (ambiguous → not bound, never an arbitrary guess).
+ */
+function argmaxElement(vector: Record<string, unknown>): string | undefined {
+  let best: string | undefined;
+  let bestVal = -Infinity;
+  let tied = false;
+  for (const [key, raw] of Object.entries(vector)) {
+    if (typeof raw !== "number" || !Number.isFinite(raw)) continue;
+    if (raw > bestVal) {
+      bestVal = raw;
+      best = key;
+      tied = false;
+    } else if (raw === bestVal) {
+      tied = true;
+    }
+  }
+  return tied ? undefined : best;
 }
 
 // ---------------------------------------------------------------------------
@@ -410,7 +484,9 @@ export function interpretFufireResponse(
     };
   }
 
-  if (operation === "wuxing") {
+  if (operation === "wuxing" || operation === "fusion") {
+    // Both are treatable chart *calculations* (wuxing = western vector; fusion =
+    // western + eastern/bazi vectors). The note keeps the claim honest.
     return {
       operation,
       verified: true,

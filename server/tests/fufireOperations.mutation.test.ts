@@ -34,12 +34,13 @@ import {
 
 // ── 0. allowlist constant: the four server-owned operations, exact set ─────────
 describe("FX6 ALLOWED_FUFIRE_OPERATIONS — exact server-owned set", () => {
-  it("is exactly chronometry / bazi / baziTrace / wuxing in order", () => {
+  it("is exactly chronometry / bazi / baziTrace / wuxing / fusion in order", () => {
     expect([...ALLOWED_FUFIRE_OPERATIONS]).toEqual([
       "chronometry",
       "bazi",
       "baziTrace",
       "wuxing",
+      "fusion",
     ]);
   });
 });
