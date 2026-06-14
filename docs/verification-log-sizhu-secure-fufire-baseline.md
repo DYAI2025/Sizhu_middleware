@@ -51,8 +51,8 @@ Reality Ledger below keeps that distinction explicit.
 | REQ-S-001 (default-deny) | real-boundary-smoke | yes | green |
 | REQ-S-002 (role+MFA) | real-boundary-smoke | yes | green |
 | REQ-F-001 (request builders) | unit-only | yes | green |
-| REQ-F-002 (bazi+wuxing interpret) | integration-fake | **NO** (Gate C/D: interpreter built+sample-verified but ZERO prod importers — not on any live path; wiring deferred) | **RED** (not wired-in-prod + integration-fake, no live FuFire call) |
-| REQ-F-003 (prompt mapping) | integration-fake | **NO** (same — renderPromptTemplate not invoked on any live path) | **RED** (not wired-in-prod + integration-fake) |
+| REQ-F-002 (bazi+wuxing interpret/map) | integration-fake | **yes** (T9: resolvePromptVariables wired into executeTestRun — real prod path, mutation-proven; NO→yes earned) | RED-for-confidence (wired, but integration-fake — no live FuFire call) |
+| REQ-F-003 (prompt-template render) | integration-fake | **NO** (T9 wired the F-002 map half; renderPromptTemplate still has zero prod importers — live consumer is the north-star pipeline; render-wiring deferred) | **RED** (render half not wired-in-prod; built primitive) |
 | REQ-A-002 (OpenRouter gateway) | integration-fake | yes | RED-for-confidence (model slugs unconfirmed vs live catalog; no live call) |
 | REQ-D-001 (persistence boundary) | integration | yes | green (block-not-fake by design) |
 | REQ-O-002 (Gelato safety+idempotency) | integration | yes | green (no live Gelato by design — deferred non-goal) |

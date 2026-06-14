@@ -23,6 +23,10 @@ import {
   type FufireNonexistentTime,
 } from '../contracts/fufireContract';
 import { normalizeBirthInputWithWarnings } from './birthInputNormalizer';
+import {
+  resolvePromptVariables,
+  type PromptVariables,
+} from './fufireResponseInterpreter';
 
 /** L2 cap: the maximum upstream error-body length surfaced in a gateway issue. */
 const MAX_UPSTREAM_ERROR_CHARS = 500;
@@ -46,6 +50,13 @@ export interface FuFireTestRunInput {
   ambiguousTime?: FufireAmbiguousTime | string;
   nonexistentTime?: FufireNonexistentTime | string;
   calendarPolicy?: string;
+  /**
+   * Active render locale; selects the (paired) animal source in the response
+   * interpreter (`de` → pillars.year.tier, `en` → chinese.year.animal). Defaults
+   * to 'en' when absent (matching the interpreter's own default — any non-'de'
+   * selects the en source). Never mixes sources within a render.
+   */
+  locale?: string;
   /** Operations may arrive as an array OR a single `operation` field (L4). */
   requestedOperations?: unknown;
   operation?: unknown;
@@ -61,6 +72,23 @@ export interface FuFireTestRunResult {
   warnings: string[];
   gatewayIssues: GatewayIssue[];
   readinessStatus: 'READY' | 'NOT_READY';
+  /**
+   * REQ-F-002 / REQ-F-003 (Task T9) — prompt variables MAPPED from the real
+   * FuFire bazi + wuxing responses by {@link resolvePromptVariables} (the
+   * trust-boundary "no invented data" interpreter). ADDITIVE: the raw
+   * {@link FuFireTestRunResult.responses} array is untouched. A variable whose
+   * declared source is absent (or, for `dominant_element`, computed for the wrong
+   * location) is left UNDEFINED — never guessed — and the block is recorded in
+   * {@link promptVariableIssues}. Absent on early returns that never reach the
+   * fetch loop (NO_GEOCODER / disabled / no-key).
+   */
+  promptVariables?: PromptVariables;
+  /**
+   * Greppable issues from the response interpreter; each absent/blocked
+   * prompt-variable source pushes one entry carrying the literal
+   * `PROMPT_VARIABLE_SOURCE_MISSING` token (REQ-F-002 / AC-F-002b/f).
+   */
+  promptVariableIssues?: string[];
 }
 
 /**
@@ -300,10 +328,9 @@ export class FuFireDataService {
 
       // Body is shaped ONLY by the T3 builders from normalized birth input.
       // No URL / path / header / secret is taken from the request body (T1).
-      // F2 (T4): the captured FuFire RESPONSE is currently echoed raw below.
-      // server/services/fufireResponseInterpreter.ts is the trust-boundary
-      // primitive that maps a real response → prompt variables (no invented
-      // data); it is NOT yet wired here (Sprint-4 deferred, integration-fake).
+      // The raw FuFire RESPONSE collected below is mapped into prompt variables
+      // AFTER the loop by resolvePromptVariables (T9 — the trust-boundary "no
+      // invented data" interpreter is now wired into this live execute path).
       const reqBody = dispatch.build(normalizedBirthInput);
 
       requests.push({ operation: op, body: reqBody });
@@ -361,10 +388,9 @@ export class FuFireDataService {
            });
            responses.push({ operation: op, error: errorCode });
         } else {
-           // F2 (T4): this raw response is the input the response interpreter
-           // (server/services/fufireResponseInterpreter.ts) is designed to map
-           // into prompt variables under the "no invented data" trust boundary.
-           // It is NOT yet wired in (Sprint-4 deferred) — see the breadcrumb above.
+           // This raw response is retained as-is in `responses` (additive) AND
+           // is the input the response interpreter maps into prompt variables
+           // after the loop (T9 — resolvePromptVariables, "no invented data").
            const data = await response.json();
            responses.push({ operation: op, data });
         }
@@ -390,6 +416,39 @@ export class FuFireDataService {
       }
     }
 
+    // T9 (REQ-F-002 / REQ-F-003): WIRE the response interpreter into the live
+    // execute path. After the fetch loop, map the REAL bazi + wuxing response
+    // bodies into the small, source-traced prompt-variable set via
+    // resolvePromptVariables — the trust-boundary "no invented data" primitive.
+    // This is ADDITIVE: `responses` (the raw payloads) is left exactly as-is.
+    //
+    //  - bazi/wuxing data = the SUCCESSFUL op's `data` (undefined if the op was
+    //    not requested, or failed — in which case the resolver surfaces a
+    //    PROMPT_VARIABLE_SOURCE_MISSING issue rather than inventing a value).
+    //  - locale picks the (paired) animal source; default 'en' when unspecified
+    //    (the resolver itself treats any non-'de' value as 'en').
+    //  - subject = the REAL caller coordinates (validated finite above): the
+    //    resolver guards `dominant_element` against the wuxing 0,0 trap by
+    //    comparing the response's source coords to THESE subject coords.
+    //  - deferred ops (baziTrace / chronometry) are deliberately NOT mapped:
+    //    resolvePromptVariables only reads bazi + wuxing, so a deferred op can
+    //    never contribute a (verified) prompt variable.
+    const findOpData = (operation: string): unknown =>
+      responses.find((r) => r.operation === operation && 'data' in r)?.data;
+
+    const resolved = resolvePromptVariables({
+      bazi: findOpData('bazi'),
+      wuxing: findOpData('wuxing'),
+      // Default to 'en' when no locale is supplied — this matches the
+      // interpreter's own default (any non-'de' selects the en animal source),
+      // so an unspecified-locale render is deterministic and never a guess.
+      locale: typeof input.locale === 'string' ? input.locale : 'en',
+      // Both coords are guaranteed finite numbers here by the latReady/lonReady
+      // guard above (which returns early otherwise); the resolver re-checks with
+      // Number.isFinite, so this is safe even if the guard ever changes.
+      subject: { lat: input.manualLat as number, lon: input.manualLon as number },
+    });
+
     return {
        input,
        normalizedBirthPayload,
@@ -397,7 +456,9 @@ export class FuFireDataService {
        responses,
        warnings,
        gatewayIssues: issues,
-       readinessStatus: 'READY'
+       readinessStatus: 'READY',
+       promptVariables: resolved.variables,
+       promptVariableIssues: resolved.issues,
     };
   }
 }
