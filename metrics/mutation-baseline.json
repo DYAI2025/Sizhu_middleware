@@ -34,6 +34,42 @@
           "independentReview": "code-reviewer verdict HONEST — reproduced RED-on-mutation for every test class; confirmed the 4 survivors are mathematically equivalent (unkillable), not mislabeled"
         }
       ]
+    },
+    {
+      "module": "server/lib/jwt.ts",
+      "history": [
+        { "date": "2026-06-14", "pass": "FX6-baseline", "mutationScoreTotal": 52.75, "mutationScoreCovered": 63.16, "killed": 48, "survived": 28, "noCoverage": 15, "note": "security floor (HS256 verify) — alg/exp/nbf/signature/structural branches unpinned by the HTTP auth tests" },
+        { "date": "2026-06-14", "pass": "FX6-hardening", "mutationScoreTotal": 86.8, "killed": 79, "survived": 12, "noCoverage": 0, "addedTest": "server/tests/jwt.test.ts (17 tests)", "remainingSurvivorsAreEquivalent": true, "note": "all security-critical branches killed (alg-confusion/none, signature, expired, structural); survivors are base64-decode-leniency arithmetic + typeof-input-vs-Buffer same-output + exp===now timing boundary (unhittable with real clock)" }
+      ]
+    },
+    {
+      "module": "server/services/fufireResponseInterpreter.ts",
+      "history": [
+        { "date": "2026-06-14", "pass": "FX6-baseline", "mutationScoreTotal": 59.8, "killed": 134, "survived": 73, "noCoverage": 17 },
+        { "date": "2026-06-14", "pass": "FX6-hardening", "mutationScoreTotal": 93.3, "killed": 209, "survived": 14, "noCoverage": 1, "addedTest": "server/tests/fufireResponseInterpreter.mutation.test.ts", "note": "no-invented-data boundary; both branches per var, locale de/en, 0,0 trap + 1e-6 tolerance, deferred ops" }
+      ]
+    },
+    {
+      "module": "server/services/podDispatchService.ts",
+      "history": [
+        { "date": "2026-06-14", "pass": "FX6-baseline", "mutationScoreTotal": 64.4, "killed": 56, "survived": 29, "noCoverage": 2 },
+        { "date": "2026-06-14", "pass": "FX6-hardening", "mutationScoreTotal": 89.7, "killed": 78, "survived": 8, "noCoverage": 1, "addedTest": "server/tests/podDispatchService.mutation.test.ts", "note": "idempotency SHA-256 independent-anchor digests + exact error codes/messages + sanitization no-PII; survivors are MOCK-path Date.now/randomUUID (non-deterministic by design)" }
+      ]
+    },
+    {
+      "module": "server/services/fufireOperations.ts",
+      "history": [
+        { "date": "2026-06-14", "pass": "FX6-baseline", "mutationScoreTotal": 51.8, "killed": 29, "survived": 26, "noCoverage": 1 },
+        { "date": "2026-06-14", "pass": "FX6-hardening", "mutationScoreTotal": 98.2, "killed": 55, "survived": 1, "noCoverage": 0, "addedTest": "server/tests/fufireOperations.mutation.test.ts", "note": "SSRF/secret-steering boundary; exact retained/stripped key sets, no-echo; 1 survivor `length === 0`->`<= 0` equivalent" }
+      ]
+    },
+    {
+      "module": "server/services/birthInputNormalizer.ts",
+      "history": [
+        { "date": "2026-06-14", "pass": "FX6-baseline", "mutationScoreTotal": 39.3, "killed": 11, "survived": 17, "noCoverage": 0 },
+        { "date": "2026-06-14", "pass": "FX6-hardening", "mutationScoreTotal": 100.0, "killed": 28, "survived": 0, "noCoverage": 0, "addedTest": "server/tests/birthInputNormalizer.mutation.test.ts (16 tests)", "note": "default-noon rule full truth-table" }
+      ]
     }
-  ]
+  ],
+  "_fx6": "FX6 (2026-06-14): expanded Stryker to the curated critical set. Aggregate over the 5 FX6 modules 92.4% (449/486). Independent code-reviewer HONEST on all 4 agent-authored files (reproduced PII/safety RED-on-mutation; SHA-256 digests are genuine independent anchors; no over-mock/leak/prod-edit). npm run test:mutation now covers all 6 hardened modules."
 }
