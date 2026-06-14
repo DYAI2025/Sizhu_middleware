@@ -346,6 +346,7 @@ Allowed change scope:
 - `docs/contracts/**`
 - `docs/plans/**`
 - `docs/traceability.md`
+- `docs/verification*.md`
 - `docs/context/**`
 - `docs/reality/**`
 - `docs/architecture/**`
