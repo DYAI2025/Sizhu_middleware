@@ -233,14 +233,17 @@ export function resolvePromptVariables(
   const sources: PromptVariableSources = {};
   const issues: string[] = [];
 
+  // Provenance paths are recorded with their RESPONSE prefix (`bazi.` / `wuxing.`
+  // / `fusion.`) so the audit trail is uniform + says WHICH response each value
+  // came from (review consistency fix).
   // --- animal (locale-driven; sources kept paired, selected by locale) ------
   const animalPath = ANIMAL_SOURCE_BY_LOCALE[locale];
   const animal = resolveString(bazi, animalPath);
   if (animal.found) {
     variables.animal = animal.value;
-    sources.animal = animalPath;
+    sources.animal = `bazi.${animalPath}`;
   } else {
-    issues.push(missingSourceIssue("animal", animalPath));
+    issues.push(missingSourceIssue("animal", `bazi.${animalPath}`));
   }
 
   // --- element ← pillars.year.element ---------------------------------------
@@ -248,9 +251,9 @@ export function resolvePromptVariables(
   const element = resolveString(bazi, ELEMENT_PATH);
   if (element.found) {
     variables.element = element.value;
-    sources.element = ELEMENT_PATH;
+    sources.element = `bazi.${ELEMENT_PATH}`;
   } else {
-    issues.push(missingSourceIssue("element", ELEMENT_PATH));
+    issues.push(missingSourceIssue("element", `bazi.${ELEMENT_PATH}`));
   }
 
   // --- birth_year ← transition.solar_year (a number) ------------------------
@@ -258,9 +261,9 @@ export function resolvePromptVariables(
   const birthYear = resolveNumber(bazi, BIRTH_YEAR_PATH);
   if (birthYear.found) {
     variables.birth_year = birthYear.value;
-    sources.birth_year = BIRTH_YEAR_PATH;
+    sources.birth_year = `bazi.${BIRTH_YEAR_PATH}`;
   } else {
-    issues.push(missingSourceIssue("birth_year", BIRTH_YEAR_PATH));
+    issues.push(missingSourceIssue("birth_year", `bazi.${BIRTH_YEAR_PATH}`));
   }
 
   // --- western_dominant ← wuxing.dominant_element (LOCATION-INVARIANT) ----------

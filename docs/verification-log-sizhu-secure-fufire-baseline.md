@@ -57,11 +57,20 @@ Reality Ledger below keeps that distinction explicit.
 | REQ-D-001 (persistence boundary) | integration | yes | green (block-not-fake by design) |
 | REQ-O-002 (Gelato safety+idempotency) | integration | yes | green (no live Gelato by design — deferred non-goal) |
 
-**Honest confidence statement:** REQ-F-002/F-003 + the OpenRouter call path are verified only against
-real captured samples / config, NOT a live FuFire/OpenRouter network call — they are
-RED-for-confidence until a live-boundary smoke exists. bazi_trace + chronometry response-mapping are
-deferred/render-blocked (no samples). Real Gelato dispatch + real Supabase persistence are
-user-confirmed deferred non-goals. None of these is reported as "done"; each is surfaced verbatim.
+**Honest confidence statement (as written 2026-06-14T01:58Z, Gate A — PRE-live-smoke; SUPERSEDED, see
+below):** REQ-F-002/F-003 + the OpenRouter call path are verified only against real captured samples /
+config, NOT a live FuFire/OpenRouter network call — they are RED-for-confidence until a live-boundary
+smoke exists. bazi_trace + chronometry response-mapping are deferred/render-blocked (no samples). Real
+Gelato dispatch + real Supabase persistence are user-confirmed deferred non-goals.
+
+**UPDATED confidence statement (2026-06-14, POST live smoke — FX2/FX4/FX5/FX9; this supersedes the
+above and matches the Reality Ledger table):** the RED-for-confidence items were CLEARED by real
+network calls — REQ-F-001 (builders accepted live, HTTP 200), REQ-F-002 (animal/element/birth_year +
+western_dominant + eastern_dominant bound from real api.fufire.space), REQ-A-002 (OpenRouter catalog +
+completion live; stale image slug fixed), REQ-F-003 (renderPromptTemplate wired on the live path).
+Remaining honest carve-outs: dominant_element naming/convention is product-semantic (western alias vs
+eastern); bazi_trace + chronometry response-mapping stay deferred/render-blocked (no samples); real
+Gelato dispatch + real Supabase persistence stay user-confirmed deferred non-goals. None overstated.
 
 ## PRIL gate evidence (executable)
 - `plumbline-context-check` → PASS (Canvas/PRD/Vision/Traceability all confirmed).

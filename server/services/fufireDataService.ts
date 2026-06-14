@@ -425,6 +425,7 @@ export class FuFireDataService {
            else if (op === 'chronometry') errorCode = 'FUFIRE_CHRONOMETRY_FAILED';
            else if (op === 'bazi' || op === 'baziTrace') errorCode = 'FUFIRE_BAZI_FAILED';
            else if (op === 'wuxing') errorCode = 'FUFIRE_WUXING_FAILED';
+           else if (op === 'fusion') errorCode = 'FUFIRE_FUSION_FAILED';
 
            // L2: bound the raw upstream error body so an arbitrarily large /
            // attacker-influenced response cannot bloat the gateway issue. The

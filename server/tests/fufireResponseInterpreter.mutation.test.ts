@@ -91,9 +91,9 @@ describe("resolvePromptVariables — exact resolved values + provenance (present
     expect(result.variables.dominant_element).toBe("Holz");
 
     // Exact provenance paths (kills source-string mutants).
-    expect(result.sources.animal).toBe("chinese.year.animal");
-    expect(result.sources.element).toBe("pillars.year.element");
-    expect(result.sources.birth_year).toBe("transition.solar_year");
+    expect(result.sources.animal).toBe("bazi.chinese.year.animal");
+    expect(result.sources.element).toBe("bazi.pillars.year.element");
+    expect(result.sources.birth_year).toBe("bazi.transition.solar_year");
     expect(result.sources.western_dominant).toBe("wuxing.dominant_element");
     expect(result.sources.eastern_dominant).toBe(
       "fusion.wu_xing_vectors.bazi_pillars (argmax)",
@@ -118,7 +118,7 @@ describe("resolvePromptVariables — exact resolved values + provenance (present
     });
     expect(result.variables.animal).toBe("Pferd");
     expect(result.variables.animal).not.toBe("Horse");
-    expect(result.sources.animal).toBe("pillars.year.tier");
+    expect(result.sources.animal).toBe("bazi.pillars.year.tier");
   });
 
   it("unknown / missing locale defaults to en ('Horse'), not de", () => {
@@ -129,7 +129,7 @@ describe("resolvePromptVariables — exact resolved values + provenance (present
       subject: { lat: REAL_LAT, lon: REAL_LON },
     });
     expect(defaulted.variables.animal).toBe("Horse");
-    expect(defaulted.sources.animal).toBe("chinese.year.animal");
+    expect(defaulted.sources.animal).toBe("bazi.chinese.year.animal");
 
     const garbage = resolvePromptVariables({
       bazi: baziSample,
@@ -156,7 +156,7 @@ describe("resolvePromptVariables — absent branch records exact PROMPT_VARIABLE
     expect(result.variables.animal).toBeUndefined();
     expect(result.sources.animal).toBeUndefined();
     expect(result.issues).toContain(
-      `${PROMPT_VARIABLE_SOURCE_MISSING}: animal (no source at chinese.year.animal)`,
+      `${PROMPT_VARIABLE_SOURCE_MISSING}: animal (no source at bazi.chinese.year.animal)`,
     );
   });
 
@@ -172,7 +172,7 @@ describe("resolvePromptVariables — absent branch records exact PROMPT_VARIABLE
     });
     expect(result.variables.animal).toBeUndefined();
     expect(result.issues).toContain(
-      `${PROMPT_VARIABLE_SOURCE_MISSING}: animal (no source at pillars.year.tier)`,
+      `${PROMPT_VARIABLE_SOURCE_MISSING}: animal (no source at bazi.pillars.year.tier)`,
     );
   });
 
@@ -188,7 +188,7 @@ describe("resolvePromptVariables — absent branch records exact PROMPT_VARIABLE
     });
     expect(result.variables.element).toBeUndefined();
     expect(result.issues).toContain(
-      `${PROMPT_VARIABLE_SOURCE_MISSING}: element (no source at pillars.year.element)`,
+      `${PROMPT_VARIABLE_SOURCE_MISSING}: element (no source at bazi.pillars.year.element)`,
     );
   });
 
@@ -204,7 +204,7 @@ describe("resolvePromptVariables — absent branch records exact PROMPT_VARIABLE
     });
     expect(result.variables.birth_year).toBeUndefined();
     expect(result.issues).toContain(
-      `${PROMPT_VARIABLE_SOURCE_MISSING}: birth_year (no source at transition.solar_year)`,
+      `${PROMPT_VARIABLE_SOURCE_MISSING}: birth_year (no source at bazi.transition.solar_year)`,
     );
   });
 
@@ -249,7 +249,7 @@ describe("resolveString edge cases — empty/whitespace/non-string source counts
     });
     expect(result.variables.element).toBeUndefined();
     expect(result.issues).toContain(
-      `${PROMPT_VARIABLE_SOURCE_MISSING}: element (no source at pillars.year.element)`,
+      `${PROMPT_VARIABLE_SOURCE_MISSING}: element (no source at bazi.pillars.year.element)`,
     );
   });
 
@@ -306,7 +306,7 @@ describe("resolveNumber edge cases — non-finite / non-number source counts as 
     });
     expect(result.variables.birth_year).toBeUndefined();
     expect(result.issues).toContain(
-      `${PROMPT_VARIABLE_SOURCE_MISSING}: birth_year (no source at transition.solar_year)`,
+      `${PROMPT_VARIABLE_SOURCE_MISSING}: birth_year (no source at bazi.transition.solar_year)`,
     );
   });
 
@@ -321,7 +321,7 @@ describe("resolveNumber edge cases — non-finite / non-number source counts as 
       subject: { lat: REAL_LAT, lon: REAL_LON },
     });
     expect(result.variables.birth_year).toBe(0);
-    expect(result.sources.birth_year).toBe("transition.solar_year");
+    expect(result.sources.birth_year).toBe("bazi.transition.solar_year");
   });
 
   it("a present finite number IS bound (positive resolveNumber branch)", () => {
