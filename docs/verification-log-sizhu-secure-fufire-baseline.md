@@ -51,8 +51,8 @@ Reality Ledger below keeps that distinction explicit.
 | REQ-S-001 (default-deny) | real-boundary-smoke | yes | green |
 | REQ-S-002 (role+MFA) | real-boundary-smoke | yes | green |
 | REQ-F-001 (request builders) | **real-boundary-smoke** (2026-06-14 live: built bodies → api.fufire.space HTTP 200; was unit-only) | yes | green |
-| REQ-F-002 (bazi+wuxing interpret/map) | **production-verified (bazi-half: animal/element/birth_year, live call)** · dominant_element RED-for-confidence · caveat/render half wired-in-prod NO | yes (map half) | bazi-half green (live, provenance-confirmed); dominant_element RED (western-dominance / prompt-convention open); caveat half NO |
-| REQ-F-003 (prompt-template render) | integration-fake | **NO** (T9 wired the F-002 map half; renderPromptTemplate still has zero prod importers — live consumer is the north-star pipeline; render-wiring deferred) | **RED** (render half not wired-in-prod; built primitive) |
+| REQ-F-002 (bazi+wuxing+fusion interpret/map) | **production-verified** (FX4/5/9: animal/element/birth_year + western_dominant + eastern_dominant all bound LIVE) | yes | green — western_dominant (location-invariant, 0,0 guard retired) + eastern_dominant (fusion, location-guarded) both bound from live api.fufire.space; fails closed, never guessed |
+| REQ-F-003 (prompt-template render) | integration | **YES** (FX9: renderPromptTemplate wired into executeTestRun — optional promptTemplate → renderedPrompt; render-block captured; importer grep confirms prod caller) | green (render-block on unresolved var, never an unfilled/guessed placeholder; guard test fufire.testrun.render.test.ts) |
 | REQ-A-002 (OpenRouter gateway) | **production-verified** (FX2 2026-06-14: live openrouter.ai call; slugs confirmed in catalog + real completion; stale image slug caught & fixed) | yes | green |
 | REQ-D-001 (persistence boundary) | integration | yes | green (block-not-fake by design) |
 | REQ-O-002 (Gelato safety+idempotency) | integration | yes | green (no live Gelato by design — deferred non-goal) |

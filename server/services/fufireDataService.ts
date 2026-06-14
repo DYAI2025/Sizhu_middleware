@@ -10,6 +10,7 @@ import {
   buildBaziRequest,
   buildBaziTraceRequest,
   buildWuxingRequest,
+  buildFusionRequest,
   type NormalizedBirthInput,
 } from './fufireRequestBuilders';
 import {
@@ -26,6 +27,7 @@ import { normalizeBirthInputWithWarnings } from './birthInputNormalizer';
 import {
   resolvePromptVariables,
   interpretFufireResponse,
+  renderPromptTemplate,
   type PromptVariables,
 } from './fufireResponseInterpreter';
 
@@ -61,6 +63,14 @@ export interface FuFireTestRunInput {
   /** Operations may arrive as an array OR a single `operation` field (L4). */
   requestedOperations?: unknown;
   operation?: unknown;
+  /**
+   * Optional prompt template (FX9). When supplied, the resolved promptVariables
+   * are rendered into it via renderPromptTemplate (single-pass `{{var}}`
+   * substitution). A template referencing an UNRESOLVED variable render-blocks
+   * (the block is surfaced in {@link FuFireTestRunResult.promptRenderIssue}, never
+   * an unfilled/guessed placeholder). Absent ⇒ no render is attempted.
+   */
+  promptTemplate?: unknown;
   [key: string]: unknown;
 }
 
@@ -81,14 +91,16 @@ export interface FuFireTestRunResult {
   gatewayIssues: GatewayIssue[];
   readinessStatus: 'READY' | 'NOT_READY';
   /**
-   * REQ-F-002 / REQ-F-003 (Task T9) — prompt variables MAPPED from the real
-   * FuFire bazi + wuxing responses by {@link resolvePromptVariables} (the
+   * REQ-F-002 / REQ-F-003 — prompt variables MAPPED from the real FuFire
+   * bazi + wuxing + fusion responses by {@link resolvePromptVariables} (the
    * trust-boundary "no invented data" interpreter). ADDITIVE: the raw
    * {@link FuFireTestRunResult.responses} array is untouched. A variable whose
-   * declared source is absent (or, for `dominant_element`, computed for the wrong
-   * location) is left UNDEFINED — never guessed — and the block is recorded in
-   * {@link promptVariableIssues}. Absent on early returns that never reach the
-   * fetch loop (NO_GEOCODER / disabled / no-key).
+   * declared source is absent is left UNDEFINED — never guessed — and the block is
+   * recorded in {@link promptVariableIssues}. Note (FX5/FX9): `western_dominant`
+   * (wuxing) is LOCATION-INVARIANT and unguarded; `eastern_dominant` (fusion) is
+   * the LOCATION-guarded source (bound only when the fusion response coords match
+   * `subject`); `dominant_element` is the deprecated alias of western_dominant.
+   * Absent on early returns that never reach the fetch loop (NO_GEOCODER / disabled / no-key).
    */
   promptVariables?: PromptVariables;
   /**
@@ -113,6 +125,19 @@ export interface FuFireTestRunResult {
     issues: string[];
     note: string;
   }>;
+  /**
+   * REQ-F-003 (Task FX9) — the prompt rendered from {@link promptVariables} via
+   * renderPromptTemplate, present ONLY when the caller supplied a `promptTemplate`
+   * AND every referenced variable resolved. This gives renderPromptTemplate its
+   * first production caller (closing the F-003 render-half wired-in-prod = NO gap).
+   */
+  renderedPrompt?: string;
+  /**
+   * Set instead of {@link renderedPrompt} when a supplied template referenced an
+   * UNRESOLVED variable — the render is BLOCKED (carries the literal
+   * `PROMPT_VARIABLE_SOURCE_MISSING` token), never an unfilled/guessed placeholder.
+   */
+  promptRenderIssue?: string;
 }
 
 /**
@@ -145,6 +170,7 @@ const FUFIRE_OPERATION_DISPATCH: Record<
   bazi: { configKey: 'bazi', build: buildBaziRequest },
   baziTrace: { configKey: 'bazi_trace', build: buildBaziTraceRequest },
   wuxing: { configKey: 'wuxing', build: buildWuxingRequest },
+  fusion: { configKey: 'fusion', build: buildFusionRequest },
 };
 
 /** Coerce an untrusted value to a contract enum, else undefined (no invented value). */
@@ -468,10 +494,13 @@ export class FuFireDataService {
     //  - locale picks the (paired) animal source; default 'en' when unspecified
     //    (the resolver itself treats any non-'de' value as 'en').
     //  - subject = the REAL caller coordinates (validated finite above): the
-    //    resolver guards `dominant_element` against the wuxing 0,0 trap by
-    //    comparing the response's source coords to THESE subject coords.
+    //    resolver uses them to guard the LOCATION-dependent EASTERN source
+    //    (fusion) — eastern_dominant binds only when the fusion response coords
+    //    match the subject. The WESTERN source (wuxing → western_dominant /
+    //    dominant_element alias) is location-invariant and unguarded (FX5).
+    //  - fusion data feeds eastern_dominant (FX9); absent ⇒ eastern flagged, not guessed.
     //  - deferred ops (baziTrace / chronometry) are deliberately NOT mapped:
-    //    resolvePromptVariables only reads bazi + wuxing, so a deferred op can
+    //    resolvePromptVariables reads bazi + wuxing + fusion, so a deferred op can
     //    never contribute a (verified) prompt variable.
     const findOpData = (operation: string): unknown =>
       responses.find((r) => r.operation === operation && 'data' in r)?.data;
@@ -479,6 +508,9 @@ export class FuFireDataService {
     const resolved = resolvePromptVariables({
       bazi: findOpData('bazi'),
       wuxing: findOpData('wuxing'),
+      // FX9: the EASTERN (located) dominance source. undefined when fusion was not
+      // requested → eastern_dominant stays unresolved + flagged (never guessed).
+      fusion: findOpData('fusion'),
       // Default to 'en' when no locale is supplied — this matches the
       // interpreter's own default (any non-'de' selects the en animal source),
       // so an unspecified-locale render is deterministic and never a guess.
@@ -509,6 +541,22 @@ export class FuFireDataService {
         };
       });
 
+    // FX9 (REQ-F-003): render the prompt on the LIVE path when a template is
+    // supplied. renderPromptTemplate does single-pass {{var}} substitution and
+    // THROWS (carrying PROMPT_VARIABLE_SOURCE_MISSING) if the template references
+    // an unresolved variable — we capture that as a render-block issue rather than
+    // failing the whole run, and never emit an unfilled/guessed placeholder. This
+    // gives renderPromptTemplate its first production caller (F-003 render half).
+    let renderedPrompt: string | undefined;
+    let promptRenderIssue: string | undefined;
+    if (typeof input.promptTemplate === 'string' && input.promptTemplate.length > 0) {
+      try {
+        renderedPrompt = renderPromptTemplate(input.promptTemplate, { ...resolved.variables });
+      } catch (err: any) {
+        promptRenderIssue = typeof err?.message === 'string' ? err.message : String(err);
+      }
+    }
+
     return {
        normalizedBirthPayload,
        requests,
@@ -519,6 +567,8 @@ export class FuFireDataService {
        promptVariables: resolved.variables,
        promptVariableIssues: resolved.issues,
        responseInterpretation,
+       ...(renderedPrompt !== undefined ? { renderedPrompt } : {}),
+       ...(promptRenderIssue !== undefined ? { promptRenderIssue } : {}),
     };
   }
 }

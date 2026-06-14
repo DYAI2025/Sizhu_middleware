@@ -94,7 +94,7 @@ const SUBJECT = {
   boundary: "midnight",
   ambiguousTime: "earlier",
   nonexistentTime: "error",
-  requestedOperations: ["bazi", "wuxing"],
+  requestedOperations: ["bazi", "wuxing", "fusion"],
   locale: "en",
 };
 
@@ -217,7 +217,10 @@ async function main(): Promise<void> {
     coreVars.animal !== undefined &&
     coreVars.element !== undefined &&
     coreVars.birth_year !== undefined;
-  const dominantBound = coreVars.dominant_element !== undefined;
+  const dominantBound = coreVars.western_dominant !== undefined;
+  // FX9: with the fusion op requested + coords matching, eastern (located) dominance binds too.
+  console.log(`western_dominant : ${coreVars.western_dominant ?? "(unbound)"}`);
+  console.log(`eastern_dominant : ${coreVars.eastern_dominant ?? "(unbound)"}  ← needs fusion + coord match`);
 
   const fail =
     result.readinessStatus !== "READY" ||
