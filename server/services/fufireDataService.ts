@@ -156,7 +156,11 @@ export class FuFireDataService {
           retryCount: 0,
           severity: 'minor',
           status: 'open',
-          sanitizedRequestMetadata: { input },
+          // A field NAMED sanitizedRequestMetadata must not carry raw `input` (which
+          // holds birth PII: birthDate/time, manual lat/lon). Mirror the POD _failure
+          // fix (commit a113746) + the other issues here ({}). Which coord was missing
+          // is the only non-PII diagnostic worth keeping.
+          sanitizedRequestMetadata: { latProvided: latReady, lonProvided: lonReady },
           sanitizedResponseMetadata: {},
           createdAt: new Date().toISOString()
         } as GatewayIssue],

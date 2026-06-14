@@ -51,8 +51,8 @@ Reality Ledger below keeps that distinction explicit.
 | REQ-S-001 (default-deny) | real-boundary-smoke | yes | green |
 | REQ-S-002 (role+MFA) | real-boundary-smoke | yes | green |
 | REQ-F-001 (request builders) | unit-only | yes | green |
-| REQ-F-002 (bazi+wuxing interpret) | integration-fake | yes | **RED-for-confidence** (real samples, NOT a live FuFire call) |
-| REQ-F-003 (prompt mapping) | integration-fake | yes | **RED-for-confidence** (same) |
+| REQ-F-002 (bazi+wuxing interpret) | integration-fake | **NO** (Gate C/D: interpreter built+sample-verified but ZERO prod importers — not on any live path; wiring deferred) | **RED** (not wired-in-prod + integration-fake, no live FuFire call) |
+| REQ-F-003 (prompt mapping) | integration-fake | **NO** (same — renderPromptTemplate not invoked on any live path) | **RED** (not wired-in-prod + integration-fake) |
 | REQ-A-002 (OpenRouter gateway) | integration-fake | yes | RED-for-confidence (model slugs unconfirmed vs live catalog; no live call) |
 | REQ-D-001 (persistence boundary) | integration | yes | green (block-not-fake by design) |
 | REQ-O-002 (Gelato safety+idempotency) | integration | yes | green (no live Gelato by design — deferred non-goal) |
@@ -70,6 +70,28 @@ user-confirmed deferred non-goals. None of these is reported as "done"; each is 
 - `plumbline-redact --mode check` on the evidence ledger → PASS.
 - Full Stop-hook simulation (scope+context+reality) → no block.
 
+## Phase-3 gate outcomes (2026-06-14)
+- **Gate A** (hermetic): CLEARED — see battery above.
+- **Gate B** (security): pass-with-notes. No High/Critical. Important: FuFire test-run echoed raw
+  birth PII in `sanitizedRequestMetadata` (fufireDataService.ts:159) — **FIXED** (now non-PII
+  diagnostic; guard test `fufire.testrun.sanitization.test.ts`, mutation-verified RED on revert).
+- **Gate C** (production-validator): pass-with-notes. All 10 in-scope REQ verified; REQ-F-002/F-003/
+  A-002 = pass-red-confidence (integration-fake, no live call). Important: **REQ-F-002/F-003
+  wired-in-prod over-stated yes→corrected to NO** (interpreter has zero production importers).
+- **Gate D** (product-owner judgment): pass-with-notes — "builds the right thing"; same wired-in-prod
+  over-statement surfaced (now corrected); RED-for-confidence items honestly carried, none laundered.
+- **Gate E** (True-Line): PASS — line intact end-to-end; all 6 Canvas fields on all rows; no non-goal
+  violated; RED ceilings surfaced verbatim.
+
+## Open items routed to the USER ACCEPTANCE GATE
+1. **REQ-F-002/F-003 wired-in-prod = NO** (corrected). The bazi+wuxing interpreter is built +
+   sample-verified but not composed into a live path (executeTestRun returns the raw FuFire response
+   unmapped). SCOPE DECISION for the user: wire it into executeTestRun now, or accept it as a
+   built-but-unwired primitive with wiring deferred (REQ-F-002/F-003 then NOT fully done).
+2. **FuFire test-run top-level `input` echo** (result.input returned to the admin): debatable —
+   admin's own data, synchronous, not logged, not in a "sanitized"-named field. User decision: leave
+   (test-console shows submitted input) or PII-strip the echo too.
+
 ## Status
-Gate A: **CLEARED**. Proceed to Gate B (security), Gate C (production-validator + Reality Ledger),
-Gate D (product-owner judgment), Gate E (True-Line), then the human USER ACCEPTANCE GATE.
+Gates A–E cleared (B/C/D pass-with-notes, E pass; the two Important findings fixed/corrected).
+Next: human USER ACCEPTANCE GATE with the two open items above.
