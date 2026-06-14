@@ -65,3 +65,27 @@ refine the number, but the directional finding — weak value/branch pinning —
 ## Do NOT (yet)
 - Do not make Stryker a blocking per-commit CI gate (runtime).
 - Do not merge this spike branch as-is without the user's adopt decision (dep weight + the 2 moderate).
+
+---
+
+## Adoption + survivor-hardening (2026-06-14, post-spike)
+
+User decision: **adopt** (option a). Stryker merged to main (`npm run test:mutation`,
+config, metrics seed). Then the survivor backlog was raised into tests as its own slice.
+
+- New test file `server/tests/fufire.requestBuilders.mutation.test.ts` (+32 tests) targeting
+  the survivor classes: throw paths (requireCoord/requireString — previously zero coverage),
+  the tautological `if (x !== undefined)` optional-field gap (now presence AND absence both
+  pinned), and exact toIsoDatetime / calendar_policy values.
+- **Mutation score `fufireRequestBuilders.ts`: 38.95% → 94.74% total (95.74% covered)** —
+  90 killed / 4 survived / 1 no-cov.
+- The remaining 4 survivors + 1 no-cov are **equivalent mutants** (mathematically unkillable),
+  documented in `metrics/mutation-baseline.json`, NOT papered over with fake tests:
+  - `parts[i] ?? "00"` → `?? ""`: `padStart(2,"0")` re-fills `""`→`"00"`; no input distinguishes them.
+  - requireCoord left operand `typeof value !== "number"`→false: `Number.isFinite` alone (no
+    coercion) already catches undefined/NaN/string identically — the typeof clause is redundant.
+- Independent code-reviewer verdict: **HONEST** — reproduced ≥1 RED-on-mutation per test class,
+  confirmed the survivors are genuine equivalents (not work-dodging). Full suite 205 green, lint 0.
+
+This validates recommendation #2 (raise survivors → tests) end-to-end and demonstrates the
+metrics-baseline before/after the discipline actually moves the number.
