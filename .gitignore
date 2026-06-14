@@ -12,3 +12,7 @@ config/claude/
 
 # Local Claude Code agent state (homunculus observer etc.) — never product content
 .claude/
+
+# Stryker mutation report output (transient)
+reports/mutation/
+.stryker-tmp/

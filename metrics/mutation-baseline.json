@@ -1,0 +1,22 @@
+{
+  "_note": "Spike seed (P4) — first mutation-score baseline data point. NOT the agileteam metrics-emitter runs.jsonl schema; that stays for the governance layer to define.",
+  "tool": "@stryker-mutator/core 9.6.1 (vitest-runner)",
+  "feature": "sizhu-secure-fufire-baseline",
+  "date": "2026-06-14",
+  "coverageAnalysis": "off",
+  "modules": [
+    {
+      "module": "server/services/fufireRequestBuilders.ts",
+      "mutationScoreTotal": 38.95,
+      "mutationScoreCovered": 42.53,
+      "killed": 37,
+      "survived": 50,
+      "noCoverage": 8,
+      "timeout": 0,
+      "errors": 0,
+      "runtimeSec": 18,
+      "testsPerMutant": 8.58,
+      "finding": "green output-asserted tests + manual RED-on-revert proofs still score 38.95% — tests pin shape/presence, not most field values/branches"
+    }
+  ]
+}
