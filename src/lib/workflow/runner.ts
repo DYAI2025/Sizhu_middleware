@@ -33,6 +33,11 @@ import { ArtifactService } from './artifactService';
 import { EscalationService } from './escalationService';
 import { selectModelForOperation } from '../modelGateway';
 import type { ModelGatewayOperation } from '../modelGateway';
+// FP2 / REQ-F-001: single-source the default-noon display value. The canonical
+// CLIENT-SIDE constant lives in domain/defaultBirthTime.ts; the FuFire ISO form
+// (`DEFAULT_NOON_TIME` "12:00:00") lives in server/contracts/fufireContract.ts and
+// is kept in sync there. The runner is client-safe, so it imports the display form.
+import { DEFAULT_BIRTH_TIME, DEFAULT_BIRTH_TIME_SOURCE } from '../domain/defaultBirthTime';
 
 export { getPropertyByPath, renderPrompt } from './promptRenderer';
 
@@ -128,7 +133,7 @@ export class WorkflowRunner {
       productId,
       customerName,
       birthDate,
-      birthTime: birthTimeKnown ? birthTime : '12:00',
+      birthTime: birthTimeKnown ? birthTime : DEFAULT_BIRTH_TIME,
       birthTimeKnown,
       birthPlace,
       status: 'running',
@@ -173,9 +178,9 @@ export class WorkflowRunner {
 
     // 1. ASTRO / PERSONALIZATION RESOLUTION
     const birthTimeFallback = {
-      birth_time: '12:00',
+      birth_time: DEFAULT_BIRTH_TIME,
       birth_time_known: false,
-      birth_time_source: 'default_noon'
+      birth_time_source: DEFAULT_BIRTH_TIME_SOURCE
     };
 
     await saveAndFireLog(`Invoking Personalization Engine adapter on fufire...`, 'PERSONALIZATION_LOOKUP', 'info');
@@ -190,8 +195,8 @@ export class WorkflowRunner {
 
     // Strict unknown fallback validation rule assertions
     if (!birthTimeKnown) {
-      personalizationVars.resolvedTime = '12:00';
-      personalizationVars.resolvedTimeSource = 'default_noon';
+      personalizationVars.resolvedTime = DEFAULT_BIRTH_TIME;
+      personalizationVars.resolvedTimeSource = DEFAULT_BIRTH_TIME_SOURCE;
     }
 
     await saveAndFireLog(`Resolved Personalization parameters: animal=${personalizationVars.animal}, element=${personalizationVars.element}. Time Source: ${personalizationVars.resolvedTimeSource}`, 'PERSONALIZATION_LOOKUP', 'success');

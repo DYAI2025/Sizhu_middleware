@@ -67,6 +67,11 @@ export class SupabaseProviderRepository implements ProviderRepository {
     return notConfigured();
   }
   async performHealthCheck(): Promise<ApiProvider['status']> {
+    // AC-D-001a carve-out (DELIBERATE, not an oversight): a health-check is a
+    // UX-mirror READ, not a persistence side effect. It must fail SAFE to a
+    // non-LIVE/non-success status rather than throw — so the console never paints
+    // a provider as LIVE when Supabase is offline. The real authz/persistence
+    // boundary still throws notConfigured() for every write/read of state.
     return 'LIVE_DISABLED';
   }
 }
@@ -124,6 +129,13 @@ export class SupabaseRoleRepository implements RoleRepository {
     return notConfigured();
   }
   async getActiveRole(): Promise<AppRoleName> {
+    // AC-D-001a carve-out (DELIBERATE, not an oversight): the active role is a
+    // UX-mirror READ used to render the client shell. It fails SAFE to the
+    // LOWEST-privilege role ('Observer', view-only) instead of throwing — so a
+    // misread can never escalate. Real authorization is enforced SERVER-SIDE
+    // (apiGuard + role/MFA checks), not by this client-side mirror; every
+    // role-MUTATING op (setActiveRole, saveRolePermissions, …) still throws
+    // notConfigured().
     return 'Observer';
   }
   async setActiveRole(): Promise<void> {

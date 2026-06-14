@@ -355,6 +355,7 @@ Allowed change scope:
 - `package-lock.json`
 - `.gitignore`
 - `CLAUDE.md`
+- `vite.config.ts`
 
 > ENTSCHIEDEN (User 2026-06-13): UI-Pfade für Login/Account-Security und FuFire-Test-Console sind
 > Teil dieses Runs. Out-of-scope bleiben UI-Pfade zu deferred Sprints (Gelato/QG2,

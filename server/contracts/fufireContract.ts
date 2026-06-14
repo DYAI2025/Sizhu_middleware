@@ -32,7 +32,13 @@ export const DEFAULT_CALENDAR_POLICY = "gregorian" as const;
 
 /** Marker recorded when birth time is unknown and defaulted to noon. */
 export const DEFAULT_NOON_SOURCE = "default_noon" as const;
-/** ISO time component used when birth time is unknown. */
+/**
+ * ISO time component (`HH:MM:SS`) used in OUTBOUND FuFire request bodies when
+ * birth time is unknown. Server-only canonical form. Its client-side display
+ * counterpart is `DEFAULT_BIRTH_TIME` ("12:00") in
+ * `src/lib/domain/defaultBirthTime.ts`; both are the same 12:00 local wall-clock
+ * noon and MUST be kept in sync (FP2 / REQ-F-001).
+ */
 export const DEFAULT_NOON_TIME = "12:00:00" as const;
 /** Warning surfaced when the default-noon rule fires. */
 export const BIRTH_TIME_UNKNOWN_WARNING = "BIRTH_TIME_UNKNOWN_DEFAULT_NOON" as const;
