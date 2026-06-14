@@ -1,22 +1,39 @@
 {
-  "_note": "Spike seed (P4) — first mutation-score baseline data point. NOT the agileteam metrics-emitter runs.jsonl schema; that stays for the governance layer to define.",
+  "_note": "Mutation-score baseline (P4). NOT the agileteam metrics-emitter runs.jsonl schema; that stays for the governance layer to define. Each module records the spike baseline and any subsequent hardening pass.",
   "tool": "@stryker-mutator/core 9.6.1 (vitest-runner)",
   "feature": "sizhu-secure-fufire-baseline",
-  "date": "2026-06-14",
   "coverageAnalysis": "off",
   "modules": [
     {
       "module": "server/services/fufireRequestBuilders.ts",
-      "mutationScoreTotal": 38.95,
-      "mutationScoreCovered": 42.53,
-      "killed": 37,
-      "survived": 50,
-      "noCoverage": 8,
-      "timeout": 0,
-      "errors": 0,
-      "runtimeSec": 18,
-      "testsPerMutant": 8.58,
-      "finding": "green output-asserted tests + manual RED-on-revert proofs still score 38.95% — tests pin shape/presence, not most field values/branches"
+      "history": [
+        {
+          "date": "2026-06-14",
+          "pass": "spike-baseline",
+          "mutationScoreTotal": 38.95,
+          "mutationScoreCovered": 42.53,
+          "killed": 37,
+          "survived": 50,
+          "noCoverage": 8,
+          "finding": "green output-asserted tests + manual RED-on-revert proofs still score 38.95% — tests pin shape/presence, not most field values/branches"
+        },
+        {
+          "date": "2026-06-14",
+          "pass": "survivor-hardening",
+          "mutationScoreTotal": 94.74,
+          "mutationScoreCovered": 95.74,
+          "killed": 90,
+          "survived": 4,
+          "noCoverage": 1,
+          "addedTest": "server/tests/fufire.requestBuilders.mutation.test.ts (32 tests)",
+          "remainingSurvivorsAreEquivalent": true,
+          "equivalentMutants": [
+            "L113/L114/L115 `parts[i] ?? \"00\"` -> `?? \"\"` (padStart(2,\"0\") re-fills to \"00\" either way; no distinguishing input)",
+            "L74 requireCoord left operand `typeof value !== \"number\"` ->false (Number.isFinite alone catches undefined/NaN/string identically; typeof clause is redundant)"
+          ],
+          "independentReview": "code-reviewer verdict HONEST — reproduced RED-on-mutation for every test class; confirmed the 4 survivors are mathematically equivalent (unkillable), not mislabeled"
+        }
+      ]
     }
   ]
 }
