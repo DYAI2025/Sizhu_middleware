@@ -84,6 +84,30 @@ async function main(): Promise<void> {
     );
   }
 
+  // Time-sensitivity control: same Berlin location, a DIFFERENT instant. A real
+  // computing engine must produce a different western vector for a different date;
+  // identical output here would mean hardcoded/cached data (rules out that fork).
+  const altDates = ["1990-06-15", "1975-11-23"];
+  const tstByDate: string[] = [];
+  const vecByDate: string[] = [];
+  for (const d of altDates) {
+    const res = await svc.executeTestRun({
+      birthDate: d,
+      birthTime: "14:30",
+      birthTimeKnown: true,
+      manualLat: 52.52,
+      manualLon: 13.405,
+      manualTimezone: "Europe/Berlin",
+      requestedOperations: ["wuxing"],
+    } as any);
+    const w = res.responses.find((r) => r.operation === "wuxing" && "data" in r)?.data as any;
+    tstByDate.push(String(w?.true_solar_time));
+    vecByDate.push(JSON.stringify(w?.wu_xing_vector));
+    console.log(`date ${d}: dominant=${w?.dominant_element} Holz=${w?.wu_xing_vector?.Holz} tst=${w?.true_solar_time}`);
+  }
+  const timeSensitive = new Set(vecByDate).size > 1;
+  console.log(`time-sensitive (vector changes with date): ${timeSensitive}`);
+
   const vectors = new Set(rows.map((r) => r.vectorHash));
   const tsts = new Set(rows.map((r) => String(r.true_solar_time)));
   const allEchoedCorrectly = rows.every(
