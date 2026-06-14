@@ -313,7 +313,7 @@ wird **deferred** (statt als Schema-Stub gebaut). Für diesen Run sind die Evide
 
 List the only repo-relative files, directories, or glob patterns that implementation agents may edit for this feature. Keep this narrow and user-confirmed with the canvas. Examples: `src/<feature>/**`, `docs/<feature>.md`, `tests/<feature>/**`.
 
-Status: CONFIRMED (User 2026-06-13 — UI eingeschlossen; 2026-06-13 erweitert um Workflow-/Governance-Artefakte nach Scope-Guard-Eskalation)
+Status: CONFIRMED (User 2026-06-13 — UI eingeschlossen; 2026-06-13 erweitert um Workflow-/Governance-Artefakte nach Scope-Guard-Eskalation; 2026-06-14 erweitert um `scripts/**` für den Live-FuFire-Boundary-Smoke, North-Star-Slice #1, nachdem der User die Secrets bereitgestellt hat)
 
 Allowed change scope:
 
@@ -357,6 +357,7 @@ Allowed change scope:
 - `.gitignore`
 - `CLAUDE.md`
 - `vite.config.ts`
+- `scripts/**`
 
 > ENTSCHIEDEN (User 2026-06-13): UI-Pfade für Login/Account-Security und FuFire-Test-Console sind
 > Teil dieses Runs. Out-of-scope bleiben UI-Pfade zu deferred Sprints (Gelato/QG2,
@@ -368,6 +369,9 @@ Allowed change scope:
 >   Laufzeit-Provider-Dependency.
 > - `docs/**`-Pfade sind Governance-/Workflow-Artefakte (Canvas, PRD, Vision, Traceability,
 >   Plan, Contract-Referenz/Fixtures, Kontext/Marker, ADRs) — keine Produkt-Codepfade.
+> - `scripts/**`: NUR der opt-in Live-Boundary-Smoke-Harness (kein Produkt-/Laufzeit-Codepfad,
+>   nicht Teil von `npm test`, kein CI-Gate). Ruft den bestehenden FuFire-Call-Pfad gegen die
+>   echte API; ändert KEINEN Produkt-Code (der `fetch` existiert bereits in `fufireDataService.ts`).
 >
 > ERWEITERUNG 2026-06-13 (Scope-Guard-Eskalation, vom User genehmigt): ergänzt um
 > `docs/traceability.md`, `docs/plans/**`, `docs/contracts/**` (statt nur api-reference.md, deckt

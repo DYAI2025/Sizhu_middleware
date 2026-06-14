@@ -95,3 +95,62 @@ user-confirmed deferred non-goals. None of these is reported as "done"; each is 
 ## Status
 Gates A–E cleared (B/C/D pass-with-notes, E pass; the two Important findings fixed/corrected).
 Next: human USER ACCEPTANCE GATE with the two open items above.
+
+---
+
+## Live FuFire boundary smoke (2026-06-14, north-star slice #1)
+
+Real authenticated calls to `api.fufire.space` via the already-wired path
+(`buildBaziRequest`/`buildWuxingRequest` → `fufireDataService` live `fetch` → `resolvePromptVariables`).
+Harness: `scripts/smoke/fufire-live-smoke.ts` (`npm run smoke:fufire`); evidence captured to
+`docs/contracts/fufire-samples/{bazi,wuxing}.live-2026-06-14.response.json` +
+`docs/reality/fufire-live-smoke-live-2026-06-14.report.json`. Subject synthetic (no PII).
+
+**Harness result:** `✓ PASS` — readiness READY, bazi+wuxing HTTP 200, prompt variables bound
+(animal=Horse, element=Metall, birth_year=1990, dominant_element=Holz), contract drift none,
+secret-hygiene clean. LF3 drift guard proven (`--inject-drift` → RED).
+
+**BUT the harness PASS was adversarially verified (4 independent lenses) and 2 REFUTED it** — the
+single-harness green did not survive scrutiny. Honest outcome (NOT a clean green flip):
+
+- **Lens: provenance — CONFIRM.** animal←chinese.year.animal, element←pillars.year.element,
+  birth_year←transition.solar_year, dominant_element←wuxing.dominant_element. Each traces to a real
+  live field; no defaults/guesses.
+- **Lens: secret/PII — CONFIRM.** No key in any captured file or harness output; only the synthetic subject.
+- **Lens: freshness — REFUTE.** The live Berlin wuxing was byte-identical to the captured 0,0 sample
+  (same `wu_xing_vector`, `true_solar_time=14.4995`, `equation_of_time=-0.027`); only echoed
+  `input.lat/lon` differed. A location-sensitivity probe (`npm run probe:fufire-location`, Berlin/
+  Sydney/Quito, same instant) returned **identical output for all three** including `true_solar_time`.
+  → **FINDING F-LIVE-1:** FuFire `wuxing` does not vary with lat/lon **or tz** (constant true_solar_time
+  across 3 timezones ⇒ it consumes only the wall-clock `date`). Two consequences:
+    1. **AC-F-002f's premise is empirically false** — a `dominant_element` computed at 0,0 is NOT
+       "wrong-location data"; it is identical everywhere. The 0,0-trap guard
+       (`fufireResponseInterpreter.ts:247`) is harmless but not load-bearing (it gates on echoed coords,
+       not on the computation being location-sensitive).
+    2. **Upstream concern (not ours to fix):** wuxing ignoring tz/lon is a FuFire-engine correctness
+       question. Our middleware faithfully maps what FuFire returns; whether that value is
+       astrologically right for a located subject needs a FuFire-side answer before `dominant_element`
+       is trusted for personalization. Until then `dominant_element` stays RED-for-confidence.
+- **Lens: honest-caveat liveness — REFUTE.** `interpretFufireResponse` (the day-pillar
+  `anchor_verification` caveat-surfacing half) has **zero production callers** — `executeTestRun` calls
+  only `resolvePromptVariables`. The `"unverified"` caveat IS present in live bazi data but is never
+  surfaced on the live path. Consistent with the existing REQ-F-003 `wired-in-prod = NO`.
+
+**Earned upgrade (evidence-backed, recommended):**
+- **REQ-F-001 (request builders): `unit-only → real-boundary-smoke`.** The live API accepted the
+  built bazi + wuxing bodies (HTTP 200) — the bodies are contract-correct against the REAL endpoint,
+  not just unit assertions. (Pairs with the 94.74% mutation hardening of the same module.)
+
+**NOT upgraded (honest — needs USER reclassification, no agent self-promote):**
+- **REQ-F-002 (bazi-derived mapping: animal/element/birth_year):** mapped from REAL live bazi with
+  confirmed provenance. Candidate `integration-fake → production-verified` for the bazi half — USER decides.
+- **REQ-F-002 `dominant_element` / AC-F-002f:** stays RED-for-confidence (F-LIVE-1 above).
+- **REQ-F-002/F-003 caveat + render half (`interpretFufireResponse`/`renderPromptTemplate`):** stays
+  `wired-in-prod = NO` (lens-4 confirmed zero prod callers).
+
+**Config findings for prod/Railway (F-LIVE-2):** the service reads the FuFire key from
+`process.env[SECRET_REF_FUFIRE_API_KEY]` and the base URL from `FUFIRE_BASE_URL`. The local `.env`
+held the key under `FUFIRE_API_KEY` (bridged for the smoke + flagged). **On Railway the readiness
+endpoint will report 503 NOT_READY unless the key is set under the secret-ref name
+`SECRET_REF_FUFIRE_API_KEY`** (or `FUFIRE_API_KEY_SECRET_REF` points at the actual var). `FUFIRE_BASE_URL`
+must be set (now present locally).
