@@ -1,0 +1,53 @@
+<!--
+  Evaluation set for sizhu-mcp-server (MCP-builder Phase 4).
+  Read-only, independent, verifiable. Two classes:
+   (A) tool-contract questions — answers are STABLE (from the server's own behavior/config),
+       verifiable now without a live deploy.
+   (B) live-state questions — answers depend on the target Sizhu deployment + a valid admin+MFA
+       token; the <answer> must be filled by the operator against THEIR deploy before scoring
+       (left as the deterministic expected token where the deploy state is known/fixed).
+  All questions are read-only (no money/dispatch). sizhu_pod_dispatch is never exercised.
+-->
+<evaluation>
+  <qa_pair>
+    <question>Using the sizhu-mcp-server, how many tools does it expose, and how many of them are annotated as destructive (money/real-fulfillment)?</question>
+    <answer>11 tools, 1 destructive (sizhu_pod_dispatch)</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Which single sizhu-mcp-server tool is the only one whose annotations mark it destructiveHint=true?</question>
+    <answer>sizhu_pod_dispatch</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Is there an MCP tool exposed by sizhu-mcp-server that lets an agent approve a final artifact for live dispatch (i.e. an approve-final-artifact tool)? Answer yes or no.</question>
+    <answer>no</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Send a request to the sizhu-mcp-server /mcp endpoint with NO Authorization bearer. What HTTP status is returned?</question>
+    <answer>401</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Call sizhu_get_secret_references_status. Does any field in the response contain an actual secret value, or only presence booleans? Answer: 'only presence' or 'contains secret'.</question>
+    <answer>only presence</answer>
+  </qa_pair>
+  <!-- (B) live-state questions — fill <answer> against your deployment before scoring -->
+  <qa_pair>
+    <question>Call sizhu_get_readiness against the target deployment. Is the status READY or NOT_READY?</question>
+    <answer><!-- TO FILL against live deploy: READY | NOT_READY --></answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Call sizhu_get_config. What appMode is the deployment running?</question>
+    <answer><!-- TO FILL: DEMO_LOCAL | CONFIG_REQUIRED | SUPABASE_READY | PRODUCTION --></answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Call sizhu_check_secret_reference with ref=SECRET_REF_FUFIRE_API_KEY. Is it present? true or false.</question>
+    <answer><!-- TO FILL against live deploy: true | false --></answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Call sizhu_get_fulfillment_readiness. Is POD dispatch READY or NOT_READY, and if NOT_READY what is the reason?</question>
+    <answer><!-- TO FILL against live deploy --></answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Run sizhu_run_fufire_test for birthDate 1990-06-15, birthTime 14:30, manualLat 52.52, manualLon 13.405, manualTimezone Europe/Berlin, requestedOperations [bazi], locale en. What is promptVariables.animal?</question>
+    <answer><!-- TO FILL against live deploy with a valid token: expected 'Horse' (en, year-pillar) --></answer>
+  </qa_pair>
+</evaluation>
