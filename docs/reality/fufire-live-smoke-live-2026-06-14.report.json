@@ -1,0 +1,20 @@
+{
+  "date": "live-2026-06-14",
+  "baseUrlHost": "api.fufire.space",
+  "authHeaderName": "X-API-Key",
+  "readinessStatus": "READY",
+  "promptVariables": {
+    "animal": "Horse",
+    "element": "Metall",
+    "birth_year": 1990,
+    "dominant_element": "Holz"
+  },
+  "promptVariableIssues": [],
+  "gatewayIssues": [],
+  "contractDrift": [],
+  "secretHygiene": "clean",
+  "configWarnings": [
+    "CONFIG MISMATCH: service resolves the key from \"SECRET_REF_FUFIRE_API_KEY\" but .env has it under FUFIRE_API_KEY. Bridged for this run — set the secret under the secret-ref name in prod/Railway (or set FUFIRE_API_KEY_SECRET_REF=FUFIRE_API_KEY)."
+  ],
+  "verdict": "PASS"
+}

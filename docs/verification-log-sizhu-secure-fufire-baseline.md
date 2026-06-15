@@ -50,18 +50,27 @@ Reality Ledger below keeps that distinction explicit.
 | REQ-O-001 (health/readiness) | real-boundary-smoke | yes | green |
 | REQ-S-001 (default-deny) | real-boundary-smoke | yes | green |
 | REQ-S-002 (role+MFA) | real-boundary-smoke | yes | green |
-| REQ-F-001 (request builders) | unit-only | yes | green |
-| REQ-F-002 (bazi+wuxing interpret/map) | integration-fake | **yes** (T9: resolvePromptVariables wired into executeTestRun — real prod path, mutation-proven; NO→yes earned) | RED-for-confidence (wired, but integration-fake — no live FuFire call) |
-| REQ-F-003 (prompt-template render) | integration-fake | **NO** (T9 wired the F-002 map half; renderPromptTemplate still has zero prod importers — live consumer is the north-star pipeline; render-wiring deferred) | **RED** (render half not wired-in-prod; built primitive) |
-| REQ-A-002 (OpenRouter gateway) | integration-fake | yes | RED-for-confidence (model slugs unconfirmed vs live catalog; no live call) |
+| REQ-F-001 (request builders) | **real-boundary-smoke** (2026-06-14 live: built bodies → api.fufire.space HTTP 200; was unit-only) | yes | green |
+| REQ-F-002 (bazi+wuxing+fusion interpret/map) | **production-verified** (FX4/5/9: animal/element/birth_year + western_dominant + eastern_dominant all bound LIVE) | yes | green — western_dominant (location-invariant, 0,0 guard retired) + eastern_dominant (fusion, location-guarded) both bound from live api.fufire.space; fails closed, never guessed |
+| REQ-F-003 (prompt-template render) | integration | **YES** (FX9: renderPromptTemplate wired into executeTestRun — optional promptTemplate → renderedPrompt; render-block captured; importer grep confirms prod caller) | green (render-block on unresolved var, never an unfilled/guessed placeholder; guard test fufire.testrun.render.test.ts) |
+| REQ-A-002 (OpenRouter gateway) | **production-verified** (FX2 2026-06-14: live openrouter.ai call; slugs confirmed in catalog + real completion; stale image slug caught & fixed) | yes | green |
 | REQ-D-001 (persistence boundary) | integration | yes | green (block-not-fake by design) |
 | REQ-O-002 (Gelato safety+idempotency) | integration | yes | green (no live Gelato by design — deferred non-goal) |
 
-**Honest confidence statement:** REQ-F-002/F-003 + the OpenRouter call path are verified only against
-real captured samples / config, NOT a live FuFire/OpenRouter network call — they are
-RED-for-confidence until a live-boundary smoke exists. bazi_trace + chronometry response-mapping are
-deferred/render-blocked (no samples). Real Gelato dispatch + real Supabase persistence are
-user-confirmed deferred non-goals. None of these is reported as "done"; each is surfaced verbatim.
+**Honest confidence statement (as written 2026-06-14T01:58Z, Gate A — PRE-live-smoke; SUPERSEDED, see
+below):** REQ-F-002/F-003 + the OpenRouter call path are verified only against real captured samples /
+config, NOT a live FuFire/OpenRouter network call — they are RED-for-confidence until a live-boundary
+smoke exists. bazi_trace + chronometry response-mapping are deferred/render-blocked (no samples). Real
+Gelato dispatch + real Supabase persistence are user-confirmed deferred non-goals.
+
+**UPDATED confidence statement (2026-06-14, POST live smoke — FX2/FX4/FX5/FX9; this supersedes the
+above and matches the Reality Ledger table):** the RED-for-confidence items were CLEARED by real
+network calls — REQ-F-001 (builders accepted live, HTTP 200), REQ-F-002 (animal/element/birth_year +
+western_dominant + eastern_dominant bound from real api.fufire.space), REQ-A-002 (OpenRouter catalog +
+completion live; stale image slug fixed), REQ-F-003 (renderPromptTemplate wired on the live path).
+Remaining honest carve-outs: dominant_element naming/convention is product-semantic (western alias vs
+eastern); bazi_trace + chronometry response-mapping stay deferred/render-blocked (no samples); real
+Gelato dispatch + real Supabase persistence stay user-confirmed deferred non-goals. None overstated.
 
 ## PRIL gate evidence (executable)
 - `plumbline-context-check` → PASS (Canvas/PRD/Vision/Traceability all confirmed).
@@ -88,10 +97,109 @@ user-confirmed deferred non-goals. None of these is reported as "done"; each is 
    sample-verified but not composed into a live path (executeTestRun returns the raw FuFire response
    unmapped). SCOPE DECISION for the user: wire it into executeTestRun now, or accept it as a
    built-but-unwired primitive with wiring deferred (REQ-F-002/F-003 then NOT fully done).
-2. **FuFire test-run top-level `input` echo** (result.input returned to the admin): debatable —
-   admin's own data, synchronous, not logged, not in a "sanitized"-named field. User decision: leave
-   (test-console shows submitted input) or PII-strip the echo too.
+2. **FuFire test-run top-level `input` echo** — **RESOLVED by FX8 (2026-06-14, user "strip the echo").**
+   Removed the redundant top-level `result.input`, and replaced `normalizedBirthPayload = { ...input }`
+   (which spread customerName + arbitrary passthrough keys) with the explicit normalized birth fields
+   only. Guard test `server/tests/fufire.testrun.inputecho.test.ts` (sentinel name absent; no `input`
+   key; payload key allowlist), mutation RED-on-revert confirmed. The birth instant still appears in
+   `result.requests` (the console's debugging purpose — the built outbound bodies) by design.
+
+## FX6 — Stryker expansion to the curated critical set (2026-06-14)
+
+Mutation-hardened the critical pure/security modules beyond the spike's requestBuilders. Scores are the
+Stryker oracle (tautological tests cannot raise them); details in `metrics/mutation-baseline.json`.
+
+| Module | Before | After | Added test |
+|---|---|---|---|
+| server/lib/jwt.ts (security floor — HS256 verify) | 52.75% | **86.8%** | jwt.test.ts (17) |
+| server/services/birthInputNormalizer.ts | 39.3% | **100%** | birthInputNormalizer.mutation.test.ts (16) |
+| server/services/fufireOperations.ts (SSRF/steering) | 51.8% | **98.2%** | fufireOperations.mutation.test.ts |
+| server/services/fufireResponseInterpreter.ts (no-invented-data) | 59.8% | **93.3%** | fufireResponseInterpreter.mutation.test.ts |
+| server/services/podDispatchService.ts (idempotency/sanitization) | 64.4% | **89.7%** | podDispatchService.mutation.test.ts |
+
+Aggregate over the 5 FX6 modules: **92.4%** (449/486). The 4 service test files were authored by a
+parallel agent fan-out and **independently audited HONEST** (code-reviewer reproduced PII/safety
+RED-on-mutation on each; the podDispatch SHA-256 idempotency digests verified as genuine independent
+anchors; no over-mock, no secret/PII leak, no production-code edit). Remaining survivors are documented
+equivalent mutants (base64-decode leniency, MOCK-path Date.now/randomUUID, `length === 0`→`<= 0`,
+exp===now timing boundary). `npm run test:mutation` now covers all 6 hardened modules.
 
 ## Status
 Gates A–E cleared (B/C/D pass-with-notes, E pass; the two Important findings fixed/corrected).
 Next: human USER ACCEPTANCE GATE with the two open items above.
+
+---
+
+## Live FuFire boundary smoke (2026-06-14, north-star slice #1)
+
+Real authenticated calls to `api.fufire.space` via the already-wired path
+(`buildBaziRequest`/`buildWuxingRequest` → `fufireDataService` live `fetch` → `resolvePromptVariables`).
+Harness: `scripts/smoke/fufire-live-smoke.ts` (`npm run smoke:fufire`); evidence captured to
+`docs/contracts/fufire-samples/{bazi,wuxing}.live-2026-06-14.response.json` +
+`docs/reality/fufire-live-smoke-live-2026-06-14.report.json`. Subject synthetic (no PII).
+
+**Harness result:** `✓ PASS` — readiness READY, bazi+wuxing HTTP 200, prompt variables bound
+(animal=Horse, element=Metall, birth_year=1990, dominant_element=Holz), contract drift none,
+secret-hygiene clean. LF3 drift guard proven (`--inject-drift` → RED).
+
+**BUT the harness PASS was adversarially verified (4 independent lenses) and 2 REFUTED it** — the
+single-harness green did not survive scrutiny. Honest outcome (NOT a clean green flip):
+
+- **Lens: provenance — CONFIRM.** animal←chinese.year.animal, element←pillars.year.element,
+  birth_year←transition.solar_year, dominant_element←wuxing.dominant_element. Each traces to a real
+  live field; no defaults/guesses.
+- **Lens: secret/PII — CONFIRM.** No key in any captured file or harness output; only the synthetic subject.
+- **Lens: freshness — REFUTE.** The live Berlin wuxing was byte-identical to the captured 0,0 sample
+  (same `wu_xing_vector`, `true_solar_time=14.4995`, `equation_of_time=-0.027`); only echoed
+  `input.lat/lon` differed. A location-sensitivity probe (`npm run probe:fufire-location`, Berlin/
+  Sydney/Quito, same instant) returned **identical output for all three** including `true_solar_time`.
+  → **FINDING F-LIVE-1 — INVESTIGATED & RESOLVED (user chose "investigate deeper", 2026-06-14):**
+  Live `wuxing` does not vary with lat/lon **or tz** (constant `true_solar_time` across 3 timezones).
+  **This is NOT a bug — it is documented by-design behaviour.** The deeper probe + contract resolve it:
+    - `npm run probe:fufire-location` (Berlin/Sydney/Quito, same instant): identical `wu_xing_vector`
+      ⇒ location-invariant. Date probe (1990-06-15 vs 1975-11-23): vector + true_solar_time **change**
+      ⇒ genuinely time-sensitive, a real engine, NOT hardcoded/cached.
+    - The contract (`docs/contracts/fufire-api-reference.md`) + the fusion reference
+      (`fufire-samples/fusion-and-vectormap.reference.json`) state the wuxing top-level
+      `dominant_element` is the **WESTERN-vector** (geocentric, planet-rulership) dominance — which is
+      location-invariant by construction. The fusion reference's `western_planets.Holz=0.6101955…`
+      equals our live wuxing value exactly; its `bazi_pillars` (eastern/located) vector differs
+      (dominant=Feuer). The **located/eastern** dominance is a separate **fusion** endpoint (north-star).
+    Consequences:
+    1. **AC-F-002f's premise was a misunderstanding** — a 0,0 `dominant_element` is NOT "wrong-location
+       data" for the western vector; it is correct everywhere. The 0,0-trap guard
+       (`fufireResponseInterpreter.ts:247`) is harmless but **not load-bearing** for this field
+       (a candidate to simplify in a future reviewed slice; left as-is for now).
+    2. **`dominant_element` stays RED-for-confidence — for a PRODUCT-SEMANTIC reason, not a technical
+       one:** the western-vs-eastern dominance convention is an open prompt-design decision (contract:
+       "Decide the convention in prompt design — do not invent"), and the located/eastern value needs
+       the fusion endpoint. The binding itself is live-verified and faithful.
+- **Lens: honest-caveat liveness — REFUTE → RESOLVED by FX3 (2026-06-14).** At verification time
+  `interpretFufireResponse` (the day-pillar `anchor_verification` caveat-surfacing half) had **zero
+  production callers** — `executeTestRun` called only `resolvePromptVariables`, so the `"unverified"`
+  caveat (present in live bazi data) was never surfaced. **FX3 wired it**: `executeTestRun` now calls
+  `interpretFufireResponse` per successful op → `result.responseInterpretation`, surfacing the caveat
+  verbatim (code-reviewer SOUND, mutation RED-on-revert, importer grep confirms a prod caller). The
+  REQ-F-003 **render** half (`renderPromptTemplate`) still has zero prod callers → `wired-in-prod = NO`
+  (FX9/north-star).
+
+**APPLIED reclassification (USER-confirmed "recommended honest set", 2026-06-14 — recorded in
+`docs/reality/sizhu-secure-fufire-baseline.evidence.jsonl`, append-only):**
+- **REQ-F-001 (request builders): `unit-only → real-boundary-smoke`** ✅. The live API accepted the
+  built bazi + wuxing bodies (HTTP 200) — contract-correct against the REAL endpoint, not just unit
+  assertions. (Pairs with the 94.74% mutation hardening of the same module.)
+- **REQ-F-002 bazi-derived mapping (animal/element/birth_year): `integration-fake → production-verified`** ✅
+  (SCOPED — see the jsonl carve-outs). Mapped from REAL live bazi with adversarially-confirmed provenance.
+
+**Deliberately NOT upgraded (honest, carved out in the same jsonl entry):**
+- **REQ-F-002 `dominant_element` / AC-F-002f:** stays RED-for-confidence — product-semantic
+  (western-vs-eastern convention undecided; located dominance needs fusion), per F-LIVE-1 resolution.
+- **REQ-F-002/F-003 caveat + render half (`interpretFufireResponse`/`renderPromptTemplate`):** stays
+  `wired-in-prod = NO` (lens-4 confirmed zero prod callers).
+
+**Config findings for prod/Railway (F-LIVE-2):** the service reads the FuFire key from
+`process.env[SECRET_REF_FUFIRE_API_KEY]` and the base URL from `FUFIRE_BASE_URL`. The local `.env`
+held the key under `FUFIRE_API_KEY` (bridged for the smoke + flagged). **On Railway the readiness
+endpoint will report 503 NOT_READY unless the key is set under the secret-ref name
+`SECRET_REF_FUFIRE_API_KEY`** (or `FUFIRE_API_KEY_SECRET_REF` points at the actual var). `FUFIRE_BASE_URL`
+must be set (now present locally).

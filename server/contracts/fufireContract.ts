@@ -122,3 +122,22 @@ export interface WuxingRequest {
   ambiguousTime?: FufireAmbiguousTime;
   nonexistentTime?: FufireNonexistentTime;
 }
+
+/**
+ * POST /v1/calculate/fusion — flat, SAME request shape as wuxing (`lat`/`lon`
+ * REQUIRED). Verified live 2026-06-14 (FX9): HTTP 200, flat response with
+ * `wu_xing_vectors.{western_planets, bazi_pillars}`. The EASTERN (located, bazi)
+ * dominance = argmax(wu_xing_vectors.bazi_pillars); unlike the western wuxing
+ * vector it IS location-dependent, so the response coords must match the subject.
+ */
+export interface FusionRequest {
+  /** ISO datetime (REQUIRED). */
+  date: string;
+  /** REQUIRED by the contract. */
+  lat: number;
+  /** REQUIRED by the contract. */
+  lon: number;
+  tz?: string;
+  ambiguousTime?: FufireAmbiguousTime;
+  nonexistentTime?: FufireNonexistentTime;
+}

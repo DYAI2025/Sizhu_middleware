@@ -108,10 +108,10 @@ export default function ProductsView() {
       imageQuality: 'standard',
       // REQ-A-002: OpenRouter is the single default model gateway.
       primaryProvider: 'OpenRouter',
-      primaryModel: 'google/gemini-2.5-flash-image-preview',
+      primaryModel: 'google/gemini-2.5-flash-image',
       primarySecretRef: 'SECRET_REF_OPENROUTER_API_KEY',
       fallbackProvider: 'OpenRouter',
-      fallbackModel: 'google/gemini-2.5-flash-image-preview',
+      fallbackModel: 'google/gemini-2.5-flash-image',
       fallbackLLM: 'google/gemini-2.5-flash',
       fallbackSecretRef: 'SECRET_REF_OPENROUTER_API_KEY'
     };
@@ -489,7 +489,7 @@ export default function ProductsView() {
                         type="text"
                         value={primaryModel}
                         onChange={(e) => setPrimaryModel(e.target.value)}
-                        placeholder="google/gemini-2.5-flash-image-preview"
+                        placeholder="google/gemini-2.5-flash-image"
                         className="mt-1 w-full text-xs border border-nt bg-b1 rounded-sm p-1.5 font-mono"
                       />
                     </div>

@@ -46,19 +46,22 @@ export const OPERATION_REQUIRED_CAPABILITIES: Record<
 /**
  * Built-in OpenRouter default model per operation (used when no env override).
  *
- * UNVERIFIED (user decision 2026-06-13): these model slugs are NOT confirmed against
- * the live OpenRouter catalog (cannot be verified offline). They are overridable via
- * the OPERATION_MODEL_ENV vars and MUST be confirmed against the live catalog before
- * production. Do not treat them as a verified working premise — a wrong slug surfaces
- * only at the first real OpenRouter call. Tracked `unverified` in the Reality Ledger.
+ * VERIFIED against the live OpenRouter catalog 2026-06-14 (FX2 live smoke,
+ * `npm run smoke:openrouter`, 337 models):
+ *  - quality_gate `google/gemini-2.5-flash` — present; a real completion succeeded.
+ *  - image_generation `google/gemini-2.5-flash-image` — present. (The prior default
+ *    `google/gemini-2.5-flash-image-preview` was STALE — NOT in the live catalog;
+ *    the FX2 smoke caught it. The GA slug dropped the `-preview` suffix.)
+ * Still overridable via the OPERATION_MODEL_ENV vars. The smoke remains the guard:
+ * a future catalog change surfaces as a slug-drift FAIL on the next run.
  */
 const DEFAULT_OPERATION_MODELS: Record<ModelGatewayOperation, ModelDescriptor> = {
   image_generation: {
-    id: 'google/gemini-2.5-flash-image-preview', // unverified — confirm vs live OpenRouter catalog
+    id: 'google/gemini-2.5-flash-image', // verified present in live catalog (FX2, 2026-06-14)
     capabilities: ['image_generation', 'vision'],
   },
   quality_gate: {
-    id: 'google/gemini-2.5-flash', // unverified — confirm vs live OpenRouter catalog
+    id: 'google/gemini-2.5-flash', // verified present + completion ok (FX2, 2026-06-14)
     capabilities: ['vision', 'text'],
   },
 };

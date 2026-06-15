@@ -130,32 +130,45 @@ describe("AC-F-002e / VCHK-SFB-004 — day-pillar 'unverified' caveat surfaced, 
   });
 });
 
-describe("AC-F-002f — wuxing dominant_element from a 0,0 location is NEVER bound to a real person", () => {
-  it("a 0,0-derived wuxing sample must not be snapshotted as the Berlin subject's dominant_element", () => {
-    // The captured wuxing sample was computed at lat:0, lon:0 (a SHAPE fixture only).
+describe("AC-F-002f (corrected, FX5/FX9) — western dominance is location-invariant; the located guard moved to eastern (fusion)", () => {
+  it("a 0,0-derived wuxing western dominant_element BINDS (location-invariant — the 0,0 trap premise was empirically false)", () => {
+    // The captured wuxing sample was computed at lat:0, lon:0 (a SHAPE fixture).
     expect(wuxingSample.input.lat).toBe(0);
     expect(wuxingSample.input.lon).toBe(0);
 
-    // The interpreter must guard: binding a wuxing result whose source coordinates
-    // (0,0) do not match the real subject's coordinates is invented data → blocked.
+    // FX live finding (2026-06-14): the wuxing top-level dominant_element is the
+    // WESTERN (geocentric) vector — identical at Berlin/Sydney/Quito for the same
+    // instant. So a 0,0 source is NOT "wrong-location data" for this field; it is
+    // location-invariant and binds to any subject. The old "never bound" guard was
+    // theater and is retired (FX5). dominant_element is the deprecated alias.
     const result = resolvePromptVariables({
       bazi: baziSample,
-      wuxing: wuxingSample, // 0,0-derived
+      wuxing: wuxingSample, // 0,0-derived, but western is location-invariant
       locale: "en",
-      subject: { lat: REAL_LAT, lon: REAL_LON }, // real Berlin coordinates
+      subject: { lat: REAL_LAT, lon: REAL_LON },
     });
 
-    const issues = JSON.stringify(result.issues ?? result.errors ?? result);
-    // dominant_element must NOT be silently bound to the real person from a 0,0 computation.
-    // Acceptable outcomes: render-block (PROMPT_VARIABLE_SOURCE_MISSING / location-mismatch),
-    // never a confident "your dominant element is Holz" derived from the null point.
-    const boundToRealPerson =
-      result.variables?.dominant_element === "Holz" && !issues.includes(PROMPT_VARIABLE_SOURCE_MISSING) &&
-      !issues.toLowerCase().includes("location");
+    expect(result.variables.western_dominant).toBe("Holz");
+    expect(result.variables.dominant_element).toBe("Holz"); // alias
+    // No location-mismatch issue for the western field.
+    const issues = JSON.stringify(result.issues);
+    expect(issues.toLowerCase()).not.toContain("western_dominant");
+  });
+
+  it("the LOCATED guard now applies to eastern_dominant (fusion): no fusion ⇒ unbound + flagged, never guessed", () => {
+    const result = resolvePromptVariables({
+      bazi: baziSample,
+      wuxing: wuxingSample,
+      // no fusion supplied
+      locale: "en",
+      subject: { lat: REAL_LAT, lon: REAL_LON },
+    });
+    expect(result.variables.eastern_dominant).toBeUndefined();
     expect(
-      boundToRealPerson,
-      "a 0,0-derived dominant_element must not be bound to a real subject's prompt (True-Line: no invented data)",
-    ).toBe(false);
+      result.issues.some(
+        (i) => i.includes(PROMPT_VARIABLE_SOURCE_MISSING) && i.includes("eastern_dominant"),
+      ),
+    ).toBe(true);
   });
 
   it("when wuxing IS called with the real subject lat/lon, dominant_element may bind (positive path)", () => {

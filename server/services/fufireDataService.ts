@@ -10,6 +10,7 @@ import {
   buildBaziRequest,
   buildBaziTraceRequest,
   buildWuxingRequest,
+  buildFusionRequest,
   type NormalizedBirthInput,
 } from './fufireRequestBuilders';
 import {
@@ -25,6 +26,8 @@ import {
 import { normalizeBirthInputWithWarnings } from './birthInputNormalizer';
 import {
   resolvePromptVariables,
+  interpretFufireResponse,
+  renderPromptTemplate,
   type PromptVariables,
 } from './fufireResponseInterpreter';
 
@@ -60,12 +63,27 @@ export interface FuFireTestRunInput {
   /** Operations may arrive as an array OR a single `operation` field (L4). */
   requestedOperations?: unknown;
   operation?: unknown;
+  /**
+   * Optional prompt template (FX9). When supplied, the resolved promptVariables
+   * are rendered into it via renderPromptTemplate (single-pass `{{var}}`
+   * substitution). A template referencing an UNRESOLVED variable render-blocks
+   * (the block is surfaced in {@link FuFireTestRunResult.promptRenderIssue}, never
+   * an unfilled/guessed placeholder). Absent ⇒ no render is attempted.
+   */
+  promptTemplate?: unknown;
   [key: string]: unknown;
 }
 
 /** L3 — typed boundary result. */
 export interface FuFireTestRunResult {
-  input: FuFireTestRunInput;
+  /**
+   * FX8 (2026-06-14, user "strip the echo"): the raw caller `input` is NO LONGER
+   * echoed at the top level — it was a redundant copy of the admin's own submission
+   * carrying birth PII (date/name/coords). The birth instant that is genuinely part
+   * of the console's debugging purpose remains visible in {@link requests}
+   * (the built outbound bodies) and {@link normalizedBirthPayload} (the normalized
+   * birth fields ONLY — no customerName / arbitrary passthrough).
+   */
   normalizedBirthPayload: Record<string, unknown>;
   requests: Array<{ operation: string; body: unknown }>;
   responses: Array<{ operation: string; data?: unknown; error?: string }>;
@@ -73,14 +91,16 @@ export interface FuFireTestRunResult {
   gatewayIssues: GatewayIssue[];
   readinessStatus: 'READY' | 'NOT_READY';
   /**
-   * REQ-F-002 / REQ-F-003 (Task T9) — prompt variables MAPPED from the real
-   * FuFire bazi + wuxing responses by {@link resolvePromptVariables} (the
+   * REQ-F-002 / REQ-F-003 — prompt variables MAPPED from the real FuFire
+   * bazi + wuxing + fusion responses by {@link resolvePromptVariables} (the
    * trust-boundary "no invented data" interpreter). ADDITIVE: the raw
    * {@link FuFireTestRunResult.responses} array is untouched. A variable whose
-   * declared source is absent (or, for `dominant_element`, computed for the wrong
-   * location) is left UNDEFINED — never guessed — and the block is recorded in
-   * {@link promptVariableIssues}. Absent on early returns that never reach the
-   * fetch loop (NO_GEOCODER / disabled / no-key).
+   * declared source is absent is left UNDEFINED — never guessed — and the block is
+   * recorded in {@link promptVariableIssues}. Note (FX5/FX9): `western_dominant`
+   * (wuxing) is LOCATION-INVARIANT and unguarded; `eastern_dominant` (fusion) is
+   * the LOCATION-guarded source (bound only when the fusion response coords match
+   * `subject`); `dominant_element` is the deprecated alias of western_dominant.
+   * Absent on early returns that never reach the fetch loop (NO_GEOCODER / disabled / no-key).
    */
   promptVariables?: PromptVariables;
   /**
@@ -89,7 +109,46 @@ export interface FuFireTestRunResult {
    * `PROMPT_VARIABLE_SOURCE_MISSING` token (REQ-F-002 / AC-F-002b/f).
    */
   promptVariableIssues?: string[];
+  /**
+   * REQ-F-002 (Task FX3) — provider-declared caveats surfaced VERBATIM from each
+   * successful response by {@link interpretFufireResponse}, the trust-boundary
+   * caveat reader (AC-F-002e / AC-F-003c). The day-pillar `anchor_verification`
+   * status (bazi) is carried through here without ever being relabeled; deferred
+   * ops (bazi_trace / chronometry) carry their render-block issue. ADDITIVE — the
+   * raw {@link FuFireTestRunResult.responses} array is untouched. Absent on early
+   * returns that never reach the fetch loop.
+   */
+  responseInterpretation?: Array<{
+    operation: string;
+    verified: boolean;
+    caveats: string[];
+    issues: string[];
+    note: string;
+  }>;
+  /**
+   * REQ-F-003 (Task FX9) — the prompt rendered from {@link promptVariables} via
+   * renderPromptTemplate, present ONLY when the caller supplied a `promptTemplate`
+   * AND every referenced variable resolved. This gives renderPromptTemplate its
+   * first production caller (closing the F-003 render-half wired-in-prod = NO gap).
+   */
+  renderedPrompt?: string;
+  /**
+   * Set instead of {@link renderedPrompt} when a supplied template referenced an
+   * UNRESOLVED variable — the render is BLOCKED (carries the literal
+   * `PROMPT_VARIABLE_SOURCE_MISSING` token), never an unfilled/guessed placeholder.
+   */
+  promptRenderIssue?: string;
 }
+
+/**
+ * Internal op-name → authoritative contract op-name for the interpreter. The
+ * service uses camelCase internal names (`baziTrace`); interpretFufireResponse's
+ * deferred set + branches key on the contract names (`bazi_trace`). Mapping here
+ * keeps the interpreter's deferred-op render-block correct on the live path.
+ */
+const INTERPRETER_OP_NAME: Record<string, string> = {
+  baziTrace: 'bazi_trace',
+};
 
 /**
  * Single source of truth for the op-name → outbound config key + body builder.
@@ -111,6 +170,7 @@ const FUFIRE_OPERATION_DISPATCH: Record<
   bazi: { configKey: 'bazi', build: buildBaziRequest },
   baziTrace: { configKey: 'bazi_trace', build: buildBaziTraceRequest },
   wuxing: { configKey: 'wuxing', build: buildWuxingRequest },
+  fusion: { configKey: 'fusion', build: buildFusionRequest },
 };
 
 /** Coerce an untrusted value to a contract enum, else undefined (no invented value). */
@@ -145,11 +205,18 @@ export class FuFireDataService {
     };
     const { normalized: normalizedBirthInput, warnings } = normalizeBirthInputWithWarnings(rawNormalized);
 
-    // Echo a normalized payload for the run output (back-compat with prior shape).
+    // FX8: the normalized payload reports ONLY the explicit normalized BIRTH fields
+    // — NOT `...input`, which previously spread the raw caller object (leaking
+    // customerName + any arbitrary passthrough keys into a field returned to the
+    // client). The birth instant here is the legitimate "what we normalized + sent"
+    // view (also present in `requests`); customerName and unknown keys are excluded.
     const normalizedBirthPayload = {
-      ...input,
+      birthDate: normalizedBirthInput.birthDate,
       birthTime: normalizedBirthInput.birthTime,
       birthTimeKnown: normalizedBirthInput.birthTimeKnown,
+      lat: normalizedBirthInput.lat,
+      lon: normalizedBirthInput.lon,
+      timezone: normalizedBirthInput.timezone,
       ...(normalizedBirthInput.birthTimeSource
         ? { birthTimeSource: normalizedBirthInput.birthTimeSource }
         : {}),
@@ -168,7 +235,6 @@ export class FuFireDataService {
     if (!latReady || !lonReady) {
       // In this iteration we do not have a real geocoder configured
       return {
-        input,
         normalizedBirthPayload,
         requests: [],
         responses: [],
@@ -221,7 +287,7 @@ export class FuFireDataService {
           sanitizedResponseMetadata: {},
           createdAt: new Date().toISOString()
         } as GatewayIssue);
-        return { input, normalizedBirthPayload, requests, responses, warnings, gatewayIssues: issues, readinessStatus: 'NOT_READY' };
+        return { normalizedBirthPayload, requests, responses, warnings, gatewayIssues: issues, readinessStatus: 'NOT_READY' };
     }
 
     // L1: read the key SOLELY from the configured secret reference — no bare
@@ -246,7 +312,7 @@ export class FuFireDataService {
         sanitizedResponseMetadata: {},
         createdAt: new Date().toISOString()
       });
-      return { input, normalizedBirthPayload, requests, responses, warnings, gatewayIssues: issues, readinessStatus: 'NOT_READY' };
+      return { normalizedBirthPayload, requests, responses, warnings, gatewayIssues: issues, readinessStatus: 'NOT_READY' };
     }
 
     if (!config.baseUrl) {
@@ -265,7 +331,7 @@ export class FuFireDataService {
         sanitizedResponseMetadata: {},
         createdAt: new Date().toISOString()
       });
-      return { input, normalizedBirthPayload, requests, responses, warnings, gatewayIssues: issues, readinessStatus: 'NOT_READY' };
+      return { normalizedBirthPayload, requests, responses, warnings, gatewayIssues: issues, readinessStatus: 'NOT_READY' };
     }
 
     for (const op of requestedOps) {
@@ -359,6 +425,7 @@ export class FuFireDataService {
            else if (op === 'chronometry') errorCode = 'FUFIRE_CHRONOMETRY_FAILED';
            else if (op === 'bazi' || op === 'baziTrace') errorCode = 'FUFIRE_BAZI_FAILED';
            else if (op === 'wuxing') errorCode = 'FUFIRE_WUXING_FAILED';
+           else if (op === 'fusion') errorCode = 'FUFIRE_FUSION_FAILED';
 
            // L2: bound the raw upstream error body so an arbitrarily large /
            // attacker-influenced response cannot bloat the gateway issue. The
@@ -428,10 +495,13 @@ export class FuFireDataService {
     //  - locale picks the (paired) animal source; default 'en' when unspecified
     //    (the resolver itself treats any non-'de' value as 'en').
     //  - subject = the REAL caller coordinates (validated finite above): the
-    //    resolver guards `dominant_element` against the wuxing 0,0 trap by
-    //    comparing the response's source coords to THESE subject coords.
+    //    resolver uses them to guard the LOCATION-dependent EASTERN source
+    //    (fusion) — eastern_dominant binds only when the fusion response coords
+    //    match the subject. The WESTERN source (wuxing → western_dominant /
+    //    dominant_element alias) is location-invariant and unguarded (FX5).
+    //  - fusion data feeds eastern_dominant (FX9); absent ⇒ eastern flagged, not guessed.
     //  - deferred ops (baziTrace / chronometry) are deliberately NOT mapped:
-    //    resolvePromptVariables only reads bazi + wuxing, so a deferred op can
+    //    resolvePromptVariables reads bazi + wuxing + fusion, so a deferred op can
     //    never contribute a (verified) prompt variable.
     const findOpData = (operation: string): unknown =>
       responses.find((r) => r.operation === operation && 'data' in r)?.data;
@@ -439,6 +509,9 @@ export class FuFireDataService {
     const resolved = resolvePromptVariables({
       bazi: findOpData('bazi'),
       wuxing: findOpData('wuxing'),
+      // FX9: the EASTERN (located) dominance source. undefined when fusion was not
+      // requested → eastern_dominant stays unresolved + flagged (never guessed).
+      fusion: findOpData('fusion'),
       // Default to 'en' when no locale is supplied — this matches the
       // interpreter's own default (any non-'de' selects the en animal source),
       // so an unspecified-locale render is deterministic and never a guess.
@@ -449,8 +522,43 @@ export class FuFireDataService {
       subject: { lat: input.manualLat as number, lon: input.manualLon as number },
     });
 
+    // FX3 (REQ-F-002 / AC-F-002e): surface the provider-declared caveats on the
+    // LIVE path. interpretFufireResponse reads each SUCCESSFUL op's response and
+    // carries the day-pillar `anchor_verification` caveat (bazi) verbatim — never
+    // relabeling "unverified" as verified. ADDITIVE: `responses` is untouched. This
+    // gives interpretFufireResponse its first production caller (closing the
+    // lens-4 finding that the caveat half had zero prod importers).
+    const responseInterpretation = responses
+      .filter((r) => 'data' in r && r.data !== undefined)
+      .map((r) => {
+        const opName = INTERPRETER_OP_NAME[r.operation] ?? r.operation;
+        const i = interpretFufireResponse({ operation: opName, response: r.data });
+        return {
+          operation: r.operation,
+          verified: i.verified,
+          caveats: i.caveats,
+          issues: i.issues,
+          note: i.note,
+        };
+      });
+
+    // FX9 (REQ-F-003): render the prompt on the LIVE path when a template is
+    // supplied. renderPromptTemplate does single-pass {{var}} substitution and
+    // THROWS (carrying PROMPT_VARIABLE_SOURCE_MISSING) if the template references
+    // an unresolved variable — we capture that as a render-block issue rather than
+    // failing the whole run, and never emit an unfilled/guessed placeholder. This
+    // gives renderPromptTemplate its first production caller (F-003 render half).
+    let renderedPrompt: string | undefined;
+    let promptRenderIssue: string | undefined;
+    if (typeof input.promptTemplate === 'string' && input.promptTemplate.length > 0) {
+      try {
+        renderedPrompt = renderPromptTemplate(input.promptTemplate, { ...resolved.variables });
+      } catch (err: any) {
+        promptRenderIssue = typeof err?.message === 'string' ? err.message : String(err);
+      }
+    }
+
     return {
-       input,
        normalizedBirthPayload,
        requests,
        responses,
@@ -459,6 +567,9 @@ export class FuFireDataService {
        readinessStatus: 'READY',
        promptVariables: resolved.variables,
        promptVariableIssues: resolved.issues,
+       responseInterpretation,
+       ...(renderedPrompt !== undefined ? { renderedPrompt } : {}),
+       ...(promptRenderIssue !== undefined ? { promptRenderIssue } : {}),
     };
   }
 }

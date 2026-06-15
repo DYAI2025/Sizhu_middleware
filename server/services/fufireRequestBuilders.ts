@@ -27,6 +27,7 @@ import {
   type BaziRequest,
   type BaziTraceRequest,
   type WuxingRequest,
+  type FusionRequest,
   DEFAULT_CALENDAR_POLICY,
   DEFAULT_NOON_TIME,
 } from "../contracts/fufireContract";
@@ -183,6 +184,24 @@ export function buildBaziTraceRequest(
 export function buildWuxingRequest(input: NormalizedBirthInput): RequestBody<WuxingRequest> {
   // `lat`/`lon` are REQUIRED by the contract; validated here (no `as` cast).
   const body: RequestBody<WuxingRequest> = {
+    date: toIsoDatetime(input),
+    lat: requireCoord(input.lat, "lat"),
+    lon: requireCoord(input.lon, "lon"),
+  };
+
+  if (input.timezone !== undefined) body.tz = input.timezone;
+  if (input.ambiguousTime !== undefined) body.ambiguousTime = input.ambiguousTime;
+  if (input.nonexistentTime !== undefined) body.nonexistentTime = input.nonexistentTime;
+
+  return body;
+}
+
+/**
+ * POST /v1/calculate/fusion — FLAT, SAME shape as wuxing. `lat`/`lon` REQUIRED
+ * (the eastern/located dominance depends on them). Carries NO `elements`.
+ */
+export function buildFusionRequest(input: NormalizedBirthInput): RequestBody<FusionRequest> {
+  const body: RequestBody<FusionRequest> = {
     date: toIsoDatetime(input),
     lat: requireCoord(input.lat, "lat"),
     lon: requireCoord(input.lon, "lon"),
