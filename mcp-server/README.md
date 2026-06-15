@@ -15,12 +15,21 @@ human-approval-before-live-dispatch invariant `assertDispatchAllowed`) is enforc
   stores no admin secret; a stolen MCP endpoint yields no standing access. Tokens are
   short-lived (Supabase aal2) — re-authenticate when they expire.
 - **No bearer → 401.** Requests without a forwarded token are rejected before any tool runs.
-- **Payment is gated, not autonomous.** `sizhu_pod_dispatch` is the only money/real-fulfillment
-  tool. It is exposed but the server enforces `assertDispatchAllowed` (the artifact must be
-  QA-accepted or human-approved). **There is no `approve-final-artifact` tool here**, so an
-  agent **cannot self-approve a real charge** — a human approves out-of-band. Today the real
-  Gelato adapter is a safe boundary (`MISSING_POD_CONTRACT`, no real charge yet); when the
-  live adapter lands, this tool can spend real money — `validate_dispatch` first, always.
+- **Payment path — KNOWN GAP (security review C1), `pod_dispatch` WITHHELD by default.** The
+  backend `/api/fulfillment/pod/dispatch` route does **NOT** currently enforce
+  `assertDispatchAllowed` server-side — that guard lives only in the client-side runner, so the
+  route trusts the caller-supplied artifact (a fabricated `{ artifact:{ status:'accepted' } }` is
+  not rejected by server state). **There is therefore no real server-side approval gate yet.** The
+  only present backstops are the unbuilt Gelato adapter (`MISSING_POD_CONTRACT`, no real charge) and
+  `mock_success` in DEMO_LOCAL. Consequences:
+  - `sizhu_pod_dispatch` is registered **only when `MCP_ENABLE_DISPATCH=true`** (default OFF). Do not
+    enable it for autonomous use against a money-live deployment until the server-side approval gate exists.
+  - `sizhu_validate_dispatch` is a request-**shape** check only — it does NOT verify approval and will
+    green-light a fabricated artifact. Do not treat `READY_FOR_DISPATCH` as a safety go-signal yet.
+  - There is no `approve-final-artifact` tool here (an agent can't self-approve), but the real fix is a
+    **server-side approval gate on the dispatch route** (load the authoritative run + `assertDispatchAllowed`,
+    or require a signed approval token). That is a REQUIRED follow-up before any real-payment autonomy.
+    It needs server-side run persistence (REQ-D-001, currently a deferred stub) or a signed-token mechanism.
 - **No secrets/PII echoed.** Status tools report only `present: boolean` for secret-refs;
   the FuFire test-run’s birth PII is redacted from any outbound provider request by the server.
 - Treat the deployed MCP endpoint as privileged plumbing: front it with TLS, restrict who can
@@ -38,8 +47,8 @@ human-approval-before-live-dispatch invariant `assertDispatchAllowed`) is enforc
 | `sizhu_list_workflows` | GET /workflows/* | read |
 | `sizhu_get_fulfillment_readiness` | GET /fulfillment/readiness | read |
 | `sizhu_run_fufire_test` | POST /data-requests/fufire/test-run | action (sensitive; personalization, no money) |
-| `sizhu_validate_dispatch` | POST /fulfillment/pod/validate-dispatch | action (safe dry-run, non-charging) |
-| `sizhu_pod_dispatch` | POST /fulfillment/pod/dispatch | **DESTRUCTIVE (money)** — gated |
+| `sizhu_validate_dispatch` | POST /fulfillment/pod/validate-dispatch | action — request-**shape** check only (NOT an approval gate, see C1) |
+| `sizhu_pod_dispatch` | POST /fulfillment/pod/dispatch | **DESTRUCTIVE (money)** — OFF by default (`MCP_ENABLE_DISPATCH=true`); NO server-side approval gate yet (C1) |
 | `sizhu_check_secret_reference` | POST /secret-references/check | action (presence only) |
 
 **Coverage note (honest):** the MCP server can only expose what `/api` actually serves today.

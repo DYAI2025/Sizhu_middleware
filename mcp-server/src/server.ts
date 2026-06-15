@@ -11,11 +11,16 @@
  * yet wired server-side (they run client-side / are the paused live-loop slice),
  * so they are intentionally absent — the MCP server can only expose what /api serves.
  *
- * Payment safety: `sizhu_pod_dispatch` is the only money-affecting tool. It is
- * exposed but NOT autonomous-by-fiat — the downstream /api enforces
- * `assertDispatchAllowed` (the artifact must be QA-accepted or human-approved), and
- * there is no `approve-final-artifact` tool here, so an agent cannot self-approve a
- * real charge. (When an approval endpoint is added server-side, it stays human-only.)
+ * Payment safety (security review C1, corrected): `sizhu_pod_dispatch` is the only
+ * money-affecting tool and is WITHHELD by default (registered only when
+ * MCP_ENABLE_DISPATCH=true). IMPORTANT — the backend /api/fulfillment/pod/dispatch
+ * route does NOT currently enforce `assertDispatchAllowed` server-side (that guard
+ * lives only in the client-side runner; the route trusts the caller-supplied
+ * artifact). So there is NO real server-side approval gate yet. The only present
+ * backstops are the unbuilt Gelato adapter (`MISSING_POD_CONTRACT`) + DEMO_LOCAL
+ * mock. There is also no `approve-final-artifact` tool here (an agent can't
+ * self-approve), but the real fix is a server-side approval gate on the dispatch
+ * route — a tracked follow-up that MUST land before any money-live autonomous use.
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -111,10 +116,10 @@ Returns: { readinessStatus, requests[], responses[], promptVariables (animal/ele
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, (args) => runTool(() => client.post("/data-requests/fufire/test-run", args)));
 
-  // ---- Fulfillment: validate (safe) ----------------------------------------
+  // ---- Fulfillment: validate (shape check only — NOT an approval gate) ------
   server.registerTool("sizhu_validate_dispatch", {
-    title: "Validate a POD dispatch (safe dry-run)",
-    description: "POST /api/fulfillment/pod/validate-dispatch — a NON-charging readiness/safety check for a would-be dispatch. Returns { ok, status:'READY_FOR_DISPATCH' } or a 400 INVALID_REQUEST. Does NOT place an order or charge money. Use this before sizhu_pod_dispatch. Sensitive (admin+MFA). Args: workflowRunId, artifact.",
+    title: "Validate a POD dispatch request shape (NOT an approval check)",
+    description: "POST /api/fulfillment/pod/validate-dispatch — a NON-charging request-SHAPE check. Returns { ok, status:'READY_FOR_DISPATCH' } if the body has a workflowRunId + artifact, else 400 INVALID_REQUEST. WARNING: today this is a shape check ONLY — it does NOT verify QA-acceptance or human-approval and will green-light a fabricated artifact. Do NOT treat READY_FOR_DISPATCH as a safety go-signal until the server-side approval gate exists. Sensitive (admin+MFA). Args: workflowRunId, artifact.",
     inputSchema: {
       workflowRunId: z.string().min(1).describe("The workflow run id"),
       artifact: z.record(z.unknown()).describe("The candidate artifact object ({ id, url, ... })"),
@@ -122,22 +127,32 @@ Returns: { readinessStatus, requests[], responses[], promptVariables (animal/ele
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, (args) => runTool(() => client.post("/fulfillment/pod/validate-dispatch", args)));
 
-  // ---- Fulfillment: dispatch (MONEY — destructive, gated downstream) --------
-  server.registerTool("sizhu_pod_dispatch", {
-    title: "Dispatch a POD order (REAL fulfillment — money)",
-    description: `POST /api/fulfillment/pod/dispatch — submit an accepted artifact to the POD provider (Gelato). THIS IS THE MONEY / REAL-FULFILLMENT PATH and is DESTRUCTIVE + NOT idempotent at the business level (a duplicate logical order is de-duplicated only by the server's deterministic idempotency key).
+  // ---- Fulfillment: dispatch (MONEY — DESTRUCTIVE) -------------------------
+  // SAFETY (security review C1): the dispatch tool is WITHHELD by default. The
+  // backend /api/fulfillment/pod/dispatch route does NOT currently enforce
+  // assertDispatchAllowed server-side (that guard lives only in the client-side
+  // runner; the route trusts the caller-supplied artifact). So there is no real
+  // server-side approval gate yet — exposing an autonomous money tool would ship a
+  // fictional guardrail. It is registered ONLY when the operator explicitly opts in
+  // via MCP_ENABLE_DISPATCH=true, AND the description states the true (un-gated) state.
+  if (process.env.MCP_ENABLE_DISPATCH === "true") {
+    server.registerTool("sizhu_pod_dispatch", {
+      title: "Dispatch a POD order (REAL fulfillment — money; UN-GATED today)",
+      description: `POST /api/fulfillment/pod/dispatch — submit an artifact to the POD provider (Gelato). DESTRUCTIVE money/real-fulfillment path, not business-idempotent.
 
-GUARDRAILS (enforced by the server, not bypassable from here):
-- The server applies assertDispatchAllowed: the artifact MUST be QA-accepted or human-approved, else the dispatch is refused. An agent CANNOT self-approve — there is no approval tool exposed here.
-- Today the real Gelato adapter is a safe boundary: a well-formed call returns ok:false error_code 'MISSING_POD_CONTRACT' (no real charge yet). When the live adapter lands, this tool would place a real order — treat every call as potentially money-spending.
-ALWAYS call sizhu_validate_dispatch first and confirm READY_FOR_DISPATCH. Args: workflowRunId, input, artifact. Returns { ok, error_code?, message?, idempotencyKey?, gatewayIssue? }.`,
-    inputSchema: {
-      workflowRunId: z.string().min(1).describe("The workflow run id"),
-      input: z.record(z.unknown()).describe("The run input (order context)"),
-      artifact: z.record(z.unknown()).describe("The QA-accepted / human-approved artifact to dispatch"),
-    },
-    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
-  }, (args) => runTool(() => client.post("/fulfillment/pod/dispatch", args)));
+⚠️ TRUTHFUL SAFETY STATE (do not rely on a gate that does not exist):
+- The backend route does NOT currently verify QA-acceptance or human-approval — it trusts the artifact you pass. assertDispatchAllowed is NOT enforced on this route (only in the client-side runner). A fabricated { artifact: { status:'accepted' } } is NOT rejected by server state.
+- The ONLY current backstops are: the unbuilt Gelato adapter returning ok:false 'MISSING_POD_CONTRACT' (no real charge yet), and 'mock_success' in DEMO_LOCAL. When the live Gelato adapter lands WITHOUT a server-side approval gate, this tool WILL place real orders with no approval check.
+- This tool is OFF unless MCP_ENABLE_DISPATCH=true. Do NOT enable for autonomous use against a money-live deployment until the server-side approval gate is built. A human should perform/authorize real charges out-of-band.
+Args: workflowRunId, input, artifact. Returns { ok, error_code?, message?, idempotencyKey?, gatewayIssue? }.`,
+      inputSchema: {
+        workflowRunId: z.string().min(1).describe("The workflow run id"),
+        input: z.record(z.unknown()).describe("The run input (order context)"),
+        artifact: z.record(z.unknown()).describe("The artifact to dispatch (NOTE: not server-verified for approval today)"),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+    }, (args) => runTool(() => client.post("/fulfillment/pod/dispatch", args)));
+  }
 
   // ---- Secret-reference presence check -------------------------------------
   server.registerTool("sizhu_check_secret_reference", {

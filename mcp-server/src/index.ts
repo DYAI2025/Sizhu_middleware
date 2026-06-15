@@ -37,9 +37,10 @@ function bearerFrom(req: Request): string | undefined {
 }
 
 function originAllowed(req: Request): boolean {
-  if (ALLOWED_ORIGINS.length === 0) return true; // not configured → no Origin restriction
+  if (ALLOWED_ORIGINS.length === 0) return true; // not configured → no Origin restriction (set it for remote deploys)
   const origin = req.headers.origin;
-  return typeof origin !== "string" || ALLOWED_ORIGINS.includes(origin);
+  // When an allowlist IS configured, fail closed: a missing Origin is NOT auto-allowed.
+  return typeof origin === "string" && ALLOWED_ORIGINS.includes(origin);
 }
 
 const app = express();
