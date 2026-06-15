@@ -99,3 +99,97 @@ Branch: feat/sizhu-secure-fufire-baseline
 - MISSING (deployment, non-blocking for code): Railway env values, Supabase first-owner
   user ID, final auth-key setup.
 - No open BLOCKER for this run (deferral resolved the samples blocker, not weakening).
+
+---
+---
+
+# Traceability Matrix: sizhu-live-generate-qa-loop (Slice A)
+
+Status: user-confirmed (User, 2026-06-15 — at the USER GATE after Phase 0.7 remediation; Council + spec-auditor + watcher gate-fixes applied)
+Confirmed by user: yes
+Owner: requirements-analyst
+PRD: docs/prd/sizhu-live-generate-qa-loop.prd.md
+Canvas: docs/canvas/sizhu-live-generate-qa-loop.canvas.md (Status: user-confirmed, re-confirmed after Council 2026-06-15)
+Branch: feat/sizhu-live-generate-qa-loop
+Date: 2026-06-15
+
+> One row per top-level REQ. `wired-in-prod?` = is the capability reachable through the
+> **production composition root** (`createApp()` in `server/index.ts`) via the new
+> `POST /api/workflows/:id/run`, proven by a non-test importer (P1)? (yes/no/planned).
+> `evidence-class` (Reality Ledger) ∈ {unit-fake, integration-fake, real-boundary-smoke,
+> production-verified}. For to-build REQs the cell shows the **TARGET** class (most target
+> `real-boundary-smoke` via the P7 live-loop smoke, REQ-LGQ-008); `evidence` = "TO BUILD"
+> until the build writes actuals. `canvas-risk-status` ∈ {aligned, value-risk,
+> non-goal-violation, risk-introduced, blocked}.
+> All `canvas-link` = docs/canvas/sizhu-live-generate-qa-loop.canvas.md.
+
+## Legend / shared canvas values
+
+- **canvas-problem (P-loop)**: the generate→QA→escalate loop has never produced a REAL
+  generated image scored by a REAL vision model — only mocks (offline SVG + mock scores);
+  no real `ImageGenerationProvider`/`QualityGateProvider` exists (canvas §1).
+- **canvas-target-user (U-op)**: POD shop operator/admin of the Bazzi console; configures
+  quality gates, runs/observes workflows (canvas §2). End Etsy buyer is OUT of scope this
+  slice (no real customer data/order/money).
+- **canvas-value (V-real)**: the loop runs against REAL OpenRouter models so accept/escalate
+  reflects real model behavior — first real link of the north-star pipeline (canvas §4).
+- **canvas-value (V-nofake)**: no fake-success; a divergent real response FAILS LOUD, never
+  fakes an accepted candidate (canvas §4 #2).
+- **canvas-value (V-approval)**: human-approval-before-live-dispatch invariant PRESERVED —
+  this slice adds NO dispatch leg; run stops at `pod_ready` (canvas §4 #3).
+- **canvas-value (V-nopii)**: no birth-data PII crosses the OpenRouter boundary or any
+  log/error/metadata surface (canvas §4 #4, A4 hard constraint).
+- **canvas-value (V-cap)**: HARD per-run cost/quantity cap (both max-images AND $ ceiling),
+  server-enforced, derived from config worst-case (canvas §4 #5, R3+A3).
+- **canvas-value (V-prov)**: artifact provenance (model + prompt-vars + QA-score) + per-run
+  cost/rejection telemetry recorded (canvas §4 #6, C2).
+- **canvas-success (S-smoke)**: a flag-gated real-boundary smoke goes green — real image,
+  real score, deterministic terminal state, cap bites, real cost, no PII/key leak
+  (canvas §5, RESOLVED — this IS the success signal; NOT a console UI).
+
+## Matrix
+
+| REQ-ID | requirement | acceptance-test(s) | task(s) | evidence | wired-in-prod? | evidence-class (TARGET) | canvas-link | canvas-problem | canvas-target-user | canvas-value-claim | canvas-success-signal | canvas-risk-status |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| REQ-LGQ-001 | Real `ImageGenerationProvider` (OpenRouter image call; ephemeral base64; seam-compatible; mock preserved) | AC-LGQ-001a (real POST /v1/chat/completions, base64 data URI), AC-LGQ-001b (seam-compatible drop-in), AC-LGQ-001c (mock still used in DEMO_LOCAL), AC-LGQ-001d (ephemeral, no Supabase) | T-LGQ-2, T-LGQ-3 | TO BUILD (unit/contract = unit-fake mocked HTTP; promoted only by the REQ-LGQ-008 live smoke) | planned (via T-LGQ-7 endpoint) | real-boundary-smoke | canvas | P-loop | U-op | V-real | S-smoke | aligned |
+| REQ-LGQ-002 | Real `QualityGateProvider` (OpenRouter vision scoring; no silent vanish; image→score proven) | AC-LGQ-002a (real vision call, status from minScore), AC-LGQ-002b (seam-compatible), AC-LGQ-002c (no vanish/no fake accept), AC-LGQ-002d (image→score path proven, retires R9 ungeprüft) | T-LGQ-2, T-LGQ-4 | TO BUILD | planned (via T-LGQ-7 endpoint) | real-boundary-smoke | canvas | P-loop | U-op | V-real, V-nofake | S-smoke | aligned (R9 image→score = ungeprüft until smoke proves it; NOT a premise) |
+| REQ-LGQ-003 | Server-side run endpoint `POST /api/workflows/:id/run` (sensitive; runs runner server-side; no dispatch leg) | AC-LGQ-003a (server-side run, client never sees key), AC-LGQ-003b (classified sensitive, pattern added), AC-LGQ-003c (401/403 default-deny matrix), AC-LGQ-003d (stops at pod_ready, no dispatch) | T-LGQ-6, T-LGQ-7, T-LGQ-8 | TO BUILD (auth matrix via supertest vs createApp = real-boundary-smoke; run via live smoke) | planned → yes (T-LGQ-8 importer check) | real-boundary-smoke | canvas | P-loop | U-op | V-real, V-approval | S-smoke | aligned (R1/R2 RESOLVED; dispatch invariant preserved by adding no dispatch leg) |
+| REQ-LGQ-004 | Hard cost cap — max-image-calls AND $ ceiling, server-enforced, derived (12/$1.00 = per-product worst-case 6/$0.23 + headroom; F1-corrected, was 9/$0.35) | AC-LGQ-004a (image-count cap bites), AC-LGQ-004b ($ ceiling bites), AC-LGQ-004c (derivation justified from config), AC-LGQ-004d (RED-on-removal guard, P2/P4) | T-LGQ-1, T-LGQ-6 | TO BUILD (unit guard RED-on-revert + cap-bites in live smoke) | planned (enforced in server runner, T-LGQ-6) | real-boundary-smoke | canvas | P-loop | U-op | V-cap | S-smoke | aligned (R3+A3 RESOLVED; cap DERIVED not guessed; load-bearing money guard) |
+| REQ-LGQ-005 | PII redaction at provider boundary (only rendered prompt + score criteria leave; never raw birth data) | AC-LGQ-005a (sentinel birth data absent from outbound body/header/system prompt), AC-LGQ-005b (absent from logs/errors/metadata/qaResultJson), AC-LGQ-005c (paired guard RED-on-leak, P2) | T-LGQ-3, T-LGQ-4 | TO BUILD (paired P2 guard test; outbound-body assertion in live smoke) | planned (in both real providers) | real-boundary-smoke | canvas | P-loop | U-op | V-nopii | S-smoke | aligned (A4 hard constraint; baseline P2 origin = sanitizedRequestMetadata birth-data echo) |
+| REQ-LGQ-006 | Per-candidate provenance (model+prompt-vars+QA-score) + per-run cost & rejection telemetry | AC-LGQ-006a (artifact carries modelUsed + prompt-var provenance + qaScore), AC-LGQ-006b (run records summed usage.cost + rejection-rate), AC-LGQ-006c (provenance PII-safe) | T-LGQ-5 | TO BUILD (live smoke asserts non-zero real cost + provenance present) | planned (threaded via ArtifactService + run result) | real-boundary-smoke | canvas | P-loop | U-op | V-prov | S-smoke | aligned (C2; folds into value-promise #6; PII-safe per OQ-3) |
+| REQ-LGQ-007 | No-fake-success / contract-drift guard (divergent/HTTP-error response FAILS LOUD) | AC-LGQ-007a (missing image/score field → controlled drift error, no synth), AC-LGQ-007b (non-2xx incl. 402 fails loud), AC-LGQ-007c (slug-drift guard reused, --inject-drift) | T-LGQ-2, T-LGQ-9 | TO BUILD (drift unit tests = integration-fake crafted responses; slug-drift + 402 in smoke) | planned (in real providers) | integration-fake → real-boundary-smoke | canvas | P-loop | U-op | V-nofake | S-smoke | aligned (R5; no-fake-success value-promise #2) |
+| REQ-LGQ-008 | Wired-in-prod + flag-gated real-boundary live smoke (success signal) | AC-LGQ-008a (≥1 production importer from createApp, P1), AC-LGQ-008b (live smoke green = success signal; real image→score→terminal, cap bites, real cost, no PII/key), AC-LGQ-008c (opt-in, not CI; --dry-run), AC-LGQ-008d (readiness reflects OpenRouter key, never echoed) | T-LGQ-7, T-LGQ-8, T-LGQ-9 | TO BUILD (the smoke itself = real-boundary-smoke; importer check = unit/integration) | planned → yes (the whole point of the slice) | real-boundary-smoke | canvas | P-loop | U-op | V-real | S-smoke | aligned (P1/P7; this green smoke IS the canvas §5 success signal) |
+
+## Reality-Ledger notes (must not be laundered)
+
+- **All REQ-LGQ rows are TO BUILD at draft time.** `evidence-class` cells show the TARGET
+  class. A row may not claim a higher class than its evidence proves; an I/O/remote feature
+  whose only evidence is mocked HTTP stays `unit-fake`/`integration-fake` (RED for live
+  confidence) until the REQ-LGQ-008 live smoke promotes it to `real-boundary-smoke`.
+- **R9 image→score path = `ungeprüft` until proven (AC-LGQ-002d).** The real image
+  generation contract is `belegt` (verified live 2026-06-15: base64 PNG data URI,
+  $0.0387/image, modest max_tokens required). The vision model scoring a real image input
+  is NOT yet proven end-to-end; it stays `ungeprüft` and is retired only by the live smoke —
+  it may NOT be downgraded to a "documented risk" premise.
+- **wired-in-prod (P1).** No REQ-LGQ row may flip `wired-in-prod=yes` until a NON-TEST
+  importer reachable from `createApp()` (via `POST /api/workflows/:id/run`) is proven by grep
+  (AC-LGQ-008a). Passing unit tests with zero production callers = built-but-dead = `no`.
+- **Cost cap is load-bearing (P2/P4).** AC-LGQ-004d requires the cap guard to go RED when the
+  cap is reverted; real money ($0.0387/image) makes this a money guard, not decoration.
+- **No-PII paired guard (P2).** REQ-LGQ-005's claim ships with its sentinel-birth-data guard
+  in the same commit; no guard ⇒ do not record the claim.
+- **Value-promise #3 preserved structurally.** This slice adds NO dispatch leg;
+  `assertDispatchAllowed` (runner.ts:352,409) is untouched; run stops at `pod_ready`.
+
+## Open items feeding this matrix (see PRD §10)
+
+- OQ-1: server-run input source (request-body birth data vs repo-read run/order) — touches
+  REQ-LGQ-003 contract + REQ-LGQ-005 PII surface. ASK before Vision confirmation.
+- OQ-2: cap-bite terminal state — reuse `escalated` vs new `cap_stopped` (NFR-4 + REQ-LGQ-004).
+- OQ-3: provenance form for prompt variables — verbatim vs non-PII hash; never store
+  name/date/place (REQ-LGQ-006a vs REQ-LGQ-005). ASK (touches PII acceptance criterion).
+- OQ-4: cost-cap config home — env vs GenerationConfig vs new settings field (REQ-LGQ-004).
+- ASSUMPTION (unconfirmed): existing `run_simulation` permission + new `sensitive` route
+  classification suffice; no new `run_live` RBAC permission this slice.
+- NFR-5 latency = `ungeprüft` — benchmark in build; do not assert a number.
+- No open BLOCKER (canvas decisions R1/R2/R3/R8/A3/A4/C2/§5/§7 all RESOLVED).
