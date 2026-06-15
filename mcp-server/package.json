@@ -1,0 +1,26 @@
+{
+  "name": "sizhu-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server exposing the Sizhu middleware (Bazzi console) operations to an agent — a thin, auth-forwarding proxy over the Sizhu /api. Inherits the server-side default-deny + sensitive role+MFA guards; adds no privilege and holds no admin secret. NOTE: the money path (pod_dispatch) is OFF by default and the backend dispatch route does not yet enforce a server-side approval gate (see README C1) — required follow-up before real-payment autonomy.",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "lint": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.6.1",
+    "express": "^4.21.2",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
