@@ -11,6 +11,7 @@ import {
 } from "./services/fufireOperations";
 import { apiGuard } from "./middleware/auth";
 import { getAppMode } from "../src/lib/app/appMode";
+import { runWorkflow, RunWorkflowInput } from "./services/workflowRunService";
 
 dotenv.config();
 
@@ -126,6 +127,37 @@ export function createApp(): Express {
 
   app.get("/api/workflows/*", (_req, res) => {
     res.json({ status: "OK", workflows: [] });
+  });
+
+  // POST /api/workflows/:id/run — run the full generate→QA pipeline
+  app.post("/api/workflows/:id/run", async (req, res) => {
+    try {
+      const { orderNumber, productId, customerName, birthDate, birthTime, birthTimeKnown, birthPlace } = req.body;
+
+      if (!orderNumber || !productId || !customerName || !birthDate || !birthPlace) {
+        return res.status(400).json({ ok: false, error_code: "INVALID_REQUEST", message: "Missing required fields: orderNumber, productId, customerName, birthDate, birthPlace" });
+      }
+
+      const input: RunWorkflowInput = {
+        orderNumber,
+        productId,
+        customerName,
+        birthDate,
+        birthTime: birthTime || "12:00",
+        birthTimeKnown: birthTimeKnown === true,
+        birthPlace,
+      };
+
+      const result = await runWorkflow(input);
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({
+        ok: false,
+        error_code: "INTERNAL_SERVER_ERROR",
+        message: err.message,
+        retryable: false,
+      });
+    }
   });
 
   // --- Sensitive routes (session + admin role + MFA) -------------------------

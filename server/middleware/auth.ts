@@ -149,6 +149,7 @@ const SENSITIVE_API_ROUTES: Array<{ method: string; pattern: RegExp }> = [
   { method: "POST", pattern: /^\/workflows\/[^/]+\/quality-gate-1\/?$/ },
   { method: "POST", pattern: /^\/workflows\/[^/]+\/quality-gate-2\/?$/ },
   { method: "POST", pattern: /^\/workflows\/[^/]+\/approve-final-artifact\/?$/ },
+  { method: "POST", pattern: /^\/workflows\/[^/]+\/run\/?$/ },
   { method: "POST", pattern: /^\/fulfillment\/pod\/validate-dispatch\/?$/ },
   { method: "POST", pattern: /^\/fulfillment\/pod\/dispatch\/?$/ },
   { method: "POST", pattern: /^\/config(\/.*)?$/ },
