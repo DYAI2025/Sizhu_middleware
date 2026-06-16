@@ -29,14 +29,17 @@ export default function AuthCallbackView() {
 
         // 1. PKCE code from Supabase magic-link redirect
         const code = params.get("code");
+        let exchangeErrorMessage: string | null = null;
         if (code) {
           setMessage("Exchanging sign-in code…");
           const { error: exchangeError } =
             await client.auth.exchangeCodeForSession(code);
           if (exchangeError) {
             // The code may already have been consumed by the GoTrue client's
-            // internal _initialize() — that is not an error.  Fall through to
-            // getSession().
+            // internal _initialize(). In that case this is *not* a real error
+            // — we still fall through to getSession().  If that also fails we
+            // surface the exchange error as the actionable diagnostic.
+            exchangeErrorMessage = exchangeError.message;
           }
         }
 
@@ -46,7 +49,12 @@ export default function AuthCallbackView() {
         const session = data?.session;
 
         if (!session) {
-          setError("NO_AUTH_SESSION_AFTER_CALLBACK");
+          const errorCode = exchangeErrorMessage
+            ? `EXCHANGE_FAILED: ${exchangeErrorMessage}`
+            : "NO_AUTH_SESSION_AFTER_CALLBACK";
+          const redirectUrl = new URL(window.location.origin);
+          redirectUrl.searchParams.set("authError", errorCode);
+          window.location.replace(redirectUrl.toString());
           return;
         }
 

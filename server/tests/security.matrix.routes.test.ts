@@ -71,6 +71,7 @@ const SENSITIVE_POST_ROUTES = [
   "/api/fulfillment/pod/dispatch",
   "/api/fulfillment/pod/validate-dispatch", // §6 RESOLVED: must be sensitive
   "/api/secret-references/check",
+  "/api/workflows/run-123/run",
 ];
 
 describe("AC-S-001a — public health stays open", () => {

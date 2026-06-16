@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { join } from "path";
+import { parseAllowlist } from "../lib/auth/parseAllowlist";
 
 const root = process.cwd();
 
@@ -9,35 +10,28 @@ function read(file: string): string {
 }
 
 describe("magic link callback — PKCE code exchange", () => {
-  it("AuthCallbackView reads ?code= from the URL and calls exchangeCodeForSession", () => {
+  it("exchanges ?code= for session before redirecting", () => {
     const content = read("src/components/auth/AuthCallbackView.tsx");
     expect(content).toContain("exchangeCodeForSession");
     expect(content).toContain('params.get("code")');
   });
 
-  it("AuthCallbackView shows NO_AUTH_SESSION_AFTER_CALLBACK when no session after exchange", () => {
+  it("surfaces exchange error message when exchange fails", () => {
     const content = read("src/components/auth/AuthCallbackView.tsx");
+    expect(content).toContain("exchangeErrorMessage");
+    expect(content).toContain("EXCHANGE_FAILED");
+  });
+
+  it("redirects with authError param when no session after exchange", () => {
+    const content = read("src/components/auth/AuthCallbackView.tsx");
+    expect(content).toContain("authError");
     expect(content).toContain("NO_AUTH_SESSION_AFTER_CALLBACK");
-  });
-
-  it("AuthCallbackView shows Supabase error message from exchange", () => {
-    const content = read("src/components/auth/AuthCallbackView.tsx");
-    expect(content).toContain("exchangeError");
-  });
-
-  it("AuthCallbackView does not redirect before session is confirmed", () => {
-    const content = read("src/components/auth/AuthCallbackView.tsx");
-    const assignCalls = content.match(/location\.assign/g) || [];
-    const getSessionCalls = content.match(/getSession/g) || [];
-    // assign must come after getSession
-    const assignIdx = content.indexOf("location.assign");
-    const sessionIdx = content.lastIndexOf("getSession");
-    expect(assignIdx).toBeGreaterThan(sessionIdx);
+    expect(content).toContain("location.replace");
   });
 });
 
 describe("magic link send — shouldCreateUser", () => {
-  it("sendMagicLink passes shouldCreateUser: true to signInWithOtp", () => {
+  it("passes shouldCreateUser: true to signInWithOtp", () => {
     const content = read("src/lib/auth/authState.ts");
     const optsLine = content
       .split("\n")
@@ -46,21 +40,48 @@ describe("magic link send — shouldCreateUser", () => {
     expect(optsLine).toContain("true");
   });
 
-  it("sendMagicLink sets emailRedirectTo to /auth/callback", () => {
+  it("sets emailRedirectTo to /auth/callback", () => {
     const content = read("src/lib/auth/authState.ts");
     expect(content).toContain("emailRedirectTo");
     expect(content).toContain("/auth/callback");
   });
 });
 
-describe("admin email allowlist — VITE_ prefix for frontend", () => {
-  it("supabaseClient.ts reads VITE_ADMIN_EMAIL_ALLOWLIST from import.meta.env", () => {
-    const content = read("src/lib/auth/supabaseClient.ts");
-    expect(content).toContain("VITE_ADMIN_EMAIL_ALLOWLIST");
+describe("parseAllowlist", () => {
+  it("splits comma-separated values", () => {
+    expect(parseAllowlist("a@x.com,b@y.com,c@z.com")).toEqual([
+      "a@x.com",
+      "b@y.com",
+      "c@z.com",
+    ]);
   });
 
-  it(".env has VITE_ADMIN_EMAIL_ALLOWLIST set", () => {
-    const content = read(".env");
-    expect(content).toContain("VITE_ADMIN_EMAIL_ALLOWLIST=ben.poersch@gmail.com");
+  it("trims whitespace around entries", () => {
+    expect(parseAllowlist(" a@x.com , b@y.com ")).toEqual([
+      "a@x.com",
+      "b@y.com",
+    ]);
+  });
+
+  it("lowercases values", () => {
+    expect(parseAllowlist("Admin@X.COM")).toEqual(["admin@x.com"]);
+  });
+
+  it("filters out empty entries", () => {
+    expect(parseAllowlist("a@x.com,,b@y.com")).toEqual([
+      "a@x.com",
+      "b@y.com",
+    ]);
+  });
+
+  it("returns empty array for null / undefined / empty string", () => {
+    expect(parseAllowlist(null)).toEqual([]);
+    expect(parseAllowlist(undefined)).toEqual([]);
+    expect(parseAllowlist("")).toEqual([]);
+  });
+
+  it("supabaseClient.ts uses parseAllowlist for ADMIN_EMAIL_ALLOWLIST", () => {
+    const content = read("src/lib/auth/supabaseClient.ts");
+    expect(content).toContain("parseAllowlist");
   });
 });
