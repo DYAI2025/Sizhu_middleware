@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { parseAllowlist } from "./parseAllowlist";
 
 /**
  * Browser Supabase client.
@@ -31,10 +32,7 @@ export const SUPABASE_ANON_KEY = env.VITE_SUPABASE_ANON_KEY || "";
 
 /** Display-only allowlist used to render the expected role in the UI. The real
  * authorization decision is always made server-side. */
-export const ADMIN_EMAIL_ALLOWLIST = (env.VITE_ADMIN_EMAIL_ALLOWLIST || "")
-  .split(",")
-  .map((e) => e.trim().toLowerCase())
-  .filter(Boolean);
+export const ADMIN_EMAIL_ALLOWLIST = parseAllowlist(env.VITE_ADMIN_EMAIL_ALLOWLIST);
 
 export function isSupabaseConfigured(): boolean {
   return Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
