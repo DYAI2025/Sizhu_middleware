@@ -143,7 +143,7 @@ export function createApp(): Express {
         productId,
         customerName,
         birthDate,
-        birthTime: birthTime || "12:00",
+        birthTime: birthTimeKnown ? birthTime || "12:00" : "",
         birthTimeKnown: birthTimeKnown === true,
         birthPlace,
       };

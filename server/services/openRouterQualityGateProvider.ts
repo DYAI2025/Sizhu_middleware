@@ -36,80 +36,77 @@ export class OpenRouterQualityGateProvider implements QualityGateProvider {
   > {
     const apiKey = this.resolveApiKey(secretRef);
 
-    const evaluations: {
-      candidateIndex: number;
-      score: number;
-      status: "accepted" | "rejected" | "not_selected";
-      reason: string;
-      detailedJson: string;
-    }[] = [];
-
-    for (const candidate of candidates) {
-      const messages = [
-        {
-          role: "user" as const,
-          content: [
-            { type: "text" as const, text: qaPrompt },
-            { type: "image_url" as const, image_url: { url: candidate.storagePath } },
-          ],
-        },
-      ];
-
-      const body = { model, messages };
-
-      const response = await fetch(`${this.baseUrl}/chat/completions`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
-      });
-
-      if (!response.ok) {
-        const errText = await response.text().catch(() => "unknown error");
-        throw new Error(
-          `OpenRouter quality gate failed for candidate ${candidate.candidateIndex} (${response.status}): ${errText}`,
-        );
-      }
-
-      const data = await response.json();
-      const text = data?.choices?.[0]?.message?.content ?? "";
-      const score = this.extractScore(text, minScore);
-      const passed = score >= minScore;
-
-      evaluations.push({
-        candidateIndex: candidate.candidateIndex,
-        score,
-        status: passed ? "accepted" : "rejected",
-        reason: text.substring(0, 500),
-        detailedJson: JSON.stringify(
+    const results = await Promise.all(
+      candidates.map(async (candidate) => {
+        const messages = [
           {
-            evaluation_timestamp: new Date().toISOString(),
-            llm_model: model,
-            raw_response: text.substring(0, 2000),
+            role: "user" as const,
+            content: [
+              { type: "text" as const, text: qaPrompt },
+              { type: "image_url" as const, image_url: { url: candidate.storagePath } },
+            ],
           },
-          null,
-          2,
-        ),
-      });
-    }
+        ];
+
+        const body = { model, messages };
+
+        const response = await fetch(`${this.baseUrl}/chat/completions`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(30_000),
+        });
+
+        if (!response.ok) {
+          const errText = await response.text().catch(() => "unknown error");
+          throw new Error(
+            `OpenRouter quality gate failed for candidate ${candidate.candidateIndex} (${response.status}): ${errText}`,
+          );
+        }
+
+        const data = await response.json();
+        const text = data?.choices?.[0]?.message?.content ?? "";
+        const score = this.extractScore(text, minScore);
+        const passed = score >= minScore;
+
+        return {
+          candidateIndex: candidate.candidateIndex,
+          score,
+          status: passed ? "accepted" as const : "rejected" as const,
+          reason: text.substring(0, 500),
+          detailedJson: JSON.stringify(
+            {
+              evaluation_timestamp: new Date().toISOString(),
+              llm_model: model,
+              raw_response: text.substring(0, 2000),
+            },
+            null,
+            2,
+          ),
+        };
+      }),
+    );
 
     let acceptedIndex: number | null = null;
     let highestScore = -1;
-    evaluations.forEach((ev) => {
+    results.forEach((ev) => {
       if (ev.status === "accepted" && ev.score > highestScore) {
         highestScore = ev.score;
         acceptedIndex = ev.candidateIndex;
       }
     });
 
-    return evaluations.map((ev) => {
+    const evaluations = results.map((ev) => {
       if (ev.status === "accepted" && ev.candidateIndex !== acceptedIndex) {
         return { ...ev, status: "not_selected" as const };
       }
       return ev;
     });
+
+    return evaluations;
   }
 
   private extractScore(text: string, defaultScore: number): number {
