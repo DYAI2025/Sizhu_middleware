@@ -198,7 +198,10 @@ export async function sendMagicLink(email: string): Promise<ActionResult> {
   if (!client) return configError();
   const { error } = await client.auth.signInWithOtp({
     email,
-    options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+    options: {
+      shouldCreateUser: true,
+      emailRedirectTo: `${window.location.origin}/auth/callback`,
+    },
   });
   if (error) return { ok: false, error: error.message };
   return { ok: true };
