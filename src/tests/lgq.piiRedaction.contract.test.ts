@@ -1,76 +1,46 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { redactKnownPiiValues } from '../lib/providers/openrouter/piiRedaction';
 
 /**
- * RED CONTRACT — REQ-LGQ-005 / NFR-3 (PII redaction at the OUTBOUND OpenRouter
- * request body — carrier CORRECTED per spec-sanity F2).
- * Slice A · feat/sizhu-live-generate-qa-loop · TDD Phase 1 (written before impl).
+ * CONTRACT — REQ-LGQ-005 / NFR-3 (PII redaction), REVISED architecture (fidelity).
  *
- * Contract surface (T-LGQ-3 / T-LGQ-4, PRD §7):
- *   module:  src/lib/providers/openrouter/openRouterImageGenerationProvider.ts
- *     export class OpenRouterImageGenerationProvider implements ImageGenerationProvider
- *   module:  src/lib/providers/openrouter/openRouterQualityGateProvider.ts
- *     export class OpenRouterQualityGateProvider implements QualityGateProvider
- *   Both call OpenRouter via global fetch (POST {baseUrl}/chat/completions) and read
- *   the key server-side via resolveOpenRouterCredentials (env injected through the
- *   secret-ref). The PROMPT passed to generate()/evaluate() is the carrier the wire
- *   actually receives.
+ * The PII redaction now happens at the RUNNER (the only layer that knows the run's
+ * literal birth PII), which value-strips name/birth_date/birth_place/birth_time from
+ * the compiled prompt and the QA rubric while KEEPING the template art direction and
+ * the operator's scoring rubric. The providers then FORWARD that already-PII-free
+ * text faithfully — so the live loop keeps its fidelity AND no raw birth field reaches
+ * OpenRouter.
  *
- * F2 (belegt, runner.ts:235-239,252,281-282,306): raw PII (name/birth_date/
- * birth_place) rides the COMPILED PROMPT STRING (first arg to generate(), and the
- * vision-QA text). `customerData`/`resolvedVariables` carry ONLY non-PII derived
- * vars. So a sentinel guard written against customerData would be GREEN-WHILE-LEAKING.
- * This guard asserts on the CAPTURED OUTBOUND request body — the real wire.
- *
- * Kritische semantische Glättung — REQ-LGQ-005 (BOUNDARY: outbound HTTP egress to
- * a third party carrying customer birth data):
- *   These:      "We pass non-PII derived vars to the provider, so no PII leaks."
- *   Gegenthese: That claim is GREEN if you only inspect the derived-var args — yet
- *               the raw name/birth_date/birth_place are embedded in the COMPILED
- *               PROMPT (the first arg), which is exactly what gets serialized into
- *               the outbound `messages[].content`. The customer's PII crosses the
- *               wire to OpenRouter while every derived-var assertion stays green.
- *               (User value — "no PII leak" — is ZERO; this is the prior baseline's
- *               P2 origin defect repeating on a new path.)
- *   Schärfung:  Seed the prompt with UNIQUE sentinel PII tokens, run the REAL
- *               provider with a stubbed fetch, and assert the sentinels appear in
- *               NO outbound request body / header / system prompt — for BOTH
- *               image-gen AND vision-QA. The provider must STRIP/refuse raw birth
- *               fields from the prompt before it reaches fetch.
- *
- * VCHK (Vision value-check): a real customer's birth name/date/place never leaves
- *   the server to a third-party model — the operator can run live without leaking PII.
- *
- * Evidence class: integration-fake (mocked HTTP). The real-boundary assertion on
- * the actual OpenRouter body is owned by T-LGQ-9 (smoke). This file does NOT promote.
- *
- * EXPECTED NOW: RED — the openrouter provider modules do not exist yet (missing impl).
+ * This file pins three things:
+ *  (1) the runner-side guard (redactKnownPiiValues) strips the literal PII but retains
+ *      the surrounding art direction / rubric (anti-tautology: not emptied);
+ *  (2) the providers FORWARD the (PII-free) prompt/rubric faithfully — fidelity, the
+ *      art direction actually reaches the wire (not dropped);
+ *  (3) no-echo: raw PII never lands in returned provenance/metadata, and the
+ *      candidate's promptUsed is never forwarded by the QA call.
  */
 
-// Unique sentinels — astronomically unlikely to occur incidentally in a prompt/header.
 const PII_NAME = 'SENTINEL_NAME_Zzx9q_Aldebaran_DELETEME';
 const PII_BIRTH_DATE = 'SENTINEL_DATE_1991-07-23T_Zzx9q';
 const PII_BIRTH_PLACE = 'SENTINEL_PLACE_Vega-IV-Zzx9q_DELETEME';
 const ALL_PII = [PII_NAME, PII_BIRTH_DATE, PII_BIRTH_PLACE];
 
-// A prompt as the runner WOULD compile it today: raw PII rendered inline (this is
-// the real leak path per F2). The provider under test must NOT forward these raw
-// fields to OpenRouter. Non-PII derived vars (animal/element) are allowed through.
+// A prompt as the runner WOULD compile it (raw PII inline) PLUS real art direction.
 const COMPILED_PROMPT_WITH_RAW_PII = [
-  `Create a celestial totem for ${PII_NAME},`,
+  `Create a watercolor celestial totem for ${PII_NAME},`,
   `born ${PII_BIRTH_DATE} in ${PII_BIRTH_PLACE}.`,
-  `Zodiac animal: Dragon. Dominant element: Fire. Birth year: 1991.`,
+  `Zodiac animal: Dragon. Dominant element: Fire. Intricate linework, gold leaf accents.`,
 ].join(' ');
-
-interface CapturedRequest {
-  url: string;
-  init: { method?: string; headers?: Record<string, string>; body?: string };
-}
 
 const ENV = {
   OPENROUTER_BASE_URL: 'https://openrouter.ai/api/v1',
   OPENROUTER_API_KEY: 'test-openrouter-key-DO-NOT-LEAK',
 };
 
+interface CapturedRequest {
+  url: string;
+  init: { method?: string; headers?: Record<string, string>; body?: string };
+}
 let captured: CapturedRequest[];
 let originalFetch: typeof globalThis.fetch;
 
@@ -82,120 +52,74 @@ function installCapturingFetch(kind: 'image' | 'qa') {
     const body =
       kind === 'image'
         ? {
-            choices: [
-              {
-                message: {
-                  images: [
-                    { image_url: { url: 'data:image/png;base64,iVBORw0KGgoAAAANS' } },
-                  ],
-                  content: 'ok',
-                },
-              },
-            ],
+            choices: [{ message: { images: [{ image_url: { url: 'data:image/png;base64,iVBORw0KGgoAAAANS' } }], content: 'ok' } }],
             usage: { cost: 0.0387 },
           }
-        : {
-            choices: [
-              {
-                message: {
-                  content: JSON.stringify({ score: 90, reason: 'looks great', accepted: true }),
-                },
-              },
-            ],
-            usage: { cost: 0.0012 },
-          };
-    return {
-      ok: true,
-      status: 200,
-      json: async () => body,
-      text: async () => JSON.stringify(body),
-    } as any;
+        : { choices: [{ message: { content: JSON.stringify({ score: 90, reason: 'looks great' }) } }], usage: { cost: 0.0012 } };
+    return { ok: true, status: 200, json: async () => body, text: async () => JSON.stringify(body) } as any;
   }) as any;
 }
 
-beforeEach(() => {
-  vi.resetModules();
-});
-
+beforeEach(() => vi.resetModules());
 afterEach(() => {
   if (originalFetch) globalThis.fetch = originalFetch;
 });
 
-function assertNoPiiAnywhere(reqs: CapturedRequest[]) {
-  expect(reqs.length).toBeGreaterThan(0); // proves we actually hit the wire (no green-on-zero-calls)
+function assertNoPiiInBodies(reqs: CapturedRequest[]) {
+  expect(reqs.length).toBeGreaterThan(0); // proves we hit the wire (no green-on-zero-calls)
   for (const r of reqs) {
     const body = r.init.body ?? '';
     const headers = JSON.stringify(r.init.headers ?? {});
     for (const sentinel of ALL_PII) {
-      expect(body).not.toContain(sentinel); // outbound body (messages/system prompt)
-      expect(headers).not.toContain(sentinel); // headers
-      expect(r.url).not.toContain(sentinel); // url/query
+      expect(body).not.toContain(sentinel);
+      expect(headers).not.toContain(sentinel);
+      expect(r.url).not.toContain(sentinel);
     }
   }
 }
 
-describe('REQ-LGQ-005a/c — image-gen outbound body carries NO raw birth PII (the real carrier, F2)', () => {
-  it('strips name/birth_date/birth_place from the prompt before it reaches the OpenRouter wire', async () => {
+describe('REQ-LGQ-005 (1) — runner redaction strips literal PII but KEEPS art direction', () => {
+  it('redactKnownPiiValues removes name/date/place yet retains the art-direction text + derived vars', () => {
+    const out = redactKnownPiiValues(COMPILED_PROMPT_WITH_RAW_PII, [PII_NAME, PII_BIRTH_DATE, PII_BIRTH_PLACE]);
+    for (const sentinel of ALL_PII) expect(out).not.toContain(sentinel);
+    // Anti-tautology: the art direction and derived vars survive (fidelity).
+    expect(out).toContain('watercolor celestial totem');
+    expect(out).toContain('Intricate linework');
+    expect(out).toContain('Dragon');
+    expect(out).toContain('Fire');
+    // Mutation RED: revert the runner's redactKnownPiiValues call → the compiled
+    // prompt still carries the sentinels onto the wire.
+  });
+
+  it('is case-insensitive and skips too-short values (no over-redaction)', () => {
+    expect(redactKnownPiiValues('Hello ALDEBARAN world', ['aldebaran'])).toBe('Hello [redacted] world');
+    expect(redactKnownPiiValues('a quick fox', ['a'])).toBe('a quick fox'); // 1-char skipped
+  });
+});
+
+describe('REQ-LGQ-005 (2) — image provider FORWARDS the PII-free prompt faithfully (fidelity)', () => {
+  it('the art direction of a PII-free prompt actually reaches the outbound body', async () => {
     installCapturingFetch('image');
     const mod = await import('../lib/providers/openrouter/openRouterImageGenerationProvider');
     const provider = new mod.OpenRouterImageGenerationProvider({ env: ENV });
 
-    await provider.generate(
-      COMPILED_PROMPT_WITH_RAW_PII, // <-- the carrier (first arg) — F2
-      1,
-      'png',
-      'hd',
-      'google/gemini-2.5-flash-image',
-      'OPENROUTER_API_KEY',
-      // derived-vars arg: even if these were PII they are NOT the F2 carrier; the
-      // assertion targets the prompt-in-body, not this arg (would be green-while-leaking).
-      { animal: 'Dragon', element: 'Fire', dominant_element: 'Fire', iteration: 1 },
-    );
+    const piiFreePrompt = 'Watercolor celestial totem, Dragon motif, Fire palette, intricate gold linework.';
+    await provider.generate(piiFreePrompt, 1, 'png', 'hd', 'google/gemini-2.5-flash-image', 'OPENROUTER_API_KEY', {
+      animal: 'Dragon',
+      element: 'Fire',
+      iteration: 1,
+    });
 
-    assertNoPiiAnywhere(captured);
-    // The derived (non-PII) content MAY still appear — proves we asserted on a real
-    // leak path, not a prompt that was emptied entirely (anti-tautology).
-    const allBodies = captured.map((c) => c.init.body ?? '').join('');
-    expect(allBodies.toLowerCase()).toContain('dragon');
-    // Mutation RED (the real leak, F2): if the provider forwards the prompt verbatim
-    // (no redaction), the raw SENTINEL_NAME/DATE/PLACE land in messages[].content and
-    // assertNoPiiAnywhere fails. Reverting any redaction-of-prompt step → RED.
+    const bodies = captured.map((c) => c.init.body ?? '').join('');
+    expect(bodies).toContain('Watercolor celestial totem'); // art direction preserved
+    expect(bodies).toContain('intricate gold linework');
+    // Mutation RED: drop the prompt back to allowlist-reconstruction → the art
+    // direction never reaches the body (fidelity lost).
   });
 });
 
-describe('REQ-LGQ-005a/c — vision-QA outbound body carries NO raw birth PII (second carrier, F2)', () => {
-  it('strips raw birth PII from the QA text/prompt before the vision call', async () => {
-    installCapturingFetch('qa');
-    const mod = await import('../lib/providers/openrouter/openRouterQualityGateProvider');
-    const provider = new mod.OpenRouterQualityGateProvider({ env: ENV });
-
-    await provider.evaluate(
-      [
-        {
-          candidateIndex: 0,
-          // Candidate image data URI — and, critically, prompt provenance that the
-          // QA call must NOT echo raw to the wire.
-          storagePath: 'data:image/png;base64,iVBORw0KGgoAAAANS',
-          metadata: { promptUsed: COMPILED_PROMPT_WITH_RAW_PII, model: 'google/gemini-2.5-flash-image' },
-        },
-      ],
-      82,
-      // qaPrompt itself could be templated with raw PII in a misimplementation —
-      // assert that even a PII-bearing qaPrompt is redacted before egress.
-      `Score this totem for ${PII_NAME} born ${PII_BIRTH_DATE} in ${PII_BIRTH_PLACE}. Return JSON {score,reason}.`,
-      'OPENROUTER_API_KEY',
-      'google/gemini-2.5-flash',
-      { animal: 'Dragon', element: 'Fire', birth_year: 1991, dominant_element: 'Fire' },
-      1,
-    );
-
-    assertNoPiiAnywhere(captured);
-    // Mutation RED: forwarding qaPrompt/promptUsed verbatim → raw PII in the QA body.
-  });
-});
-
-describe('REQ-LGQ-005b — sentinel PII appears on NO returned surface (no-echo, P2 carry-over)', () => {
-  it('image provider returns metadata/candidates free of raw birth PII', async () => {
+describe('REQ-LGQ-005 (3) — image provider NEVER echoes raw PII into provenance/metadata', () => {
+  it('even given a still-PII-bearing prompt, returned metadata carries the derived string only', async () => {
     installCapturingFetch('image');
     const mod = await import('../lib/providers/openrouter/openRouterImageGenerationProvider');
     const provider = new mod.OpenRouterImageGenerationProvider({ env: ENV });
@@ -209,12 +133,46 @@ describe('REQ-LGQ-005b — sentinel PII appears on NO returned surface (no-echo,
       'OPENROUTER_API_KEY',
       { animal: 'Dragon', element: 'Fire', dominant_element: 'Fire', iteration: 1 },
     );
+    const serializedMeta = JSON.stringify(result[0].metadata);
+    for (const sentinel of ALL_PII) expect(serializedMeta).not.toContain(sentinel);
+    expect(serializedMeta.toLowerCase()).toContain('dragon'); // provenance is non-empty (anti-tautology)
+    // Mutation RED: set metadata.promptUsed = the raw prompt → sentinels echo into provenance.
+  });
+});
 
-    const serialized = JSON.stringify(result);
-    for (const sentinel of ALL_PII) {
-      expect(serialized).not.toContain(sentinel);
-    }
-    // Mutation RED: echoing prompt verbatim into metadata.promptUsed (the prior
-    // baseline's sanitizedRequestMetadata.{input} defect class) → RED here.
+describe('REQ-LGQ-005 (4/5) — QA provider forwards the PII-free rubric, never the candidate promptUsed', () => {
+  it('redactKnownPiiValues strips PII from a rubric while keeping the scoring criteria', () => {
+    const rubricWithPii = `Rate composition and color harmony for ${PII_NAME} born ${PII_BIRTH_DATE}. 0-100.`;
+    const out = redactKnownPiiValues(rubricWithPii, [PII_NAME, PII_BIRTH_DATE]);
+    for (const sentinel of [PII_NAME, PII_BIRTH_DATE]) expect(out).not.toContain(sentinel);
+    expect(out).toContain('composition and color harmony'); // real rubric retained
+  });
+
+  it('forwards a PII-free rubric to the body AND does NOT forward candidate.metadata.promptUsed', async () => {
+    installCapturingFetch('qa');
+    const mod = await import('../lib/providers/openrouter/openRouterQualityGateProvider');
+    const provider = new mod.OpenRouterQualityGateProvider({ env: ENV });
+
+    await provider.evaluate(
+      [
+        {
+          candidateIndex: 0,
+          storagePath: 'data:image/png;base64,iVBORw0KGgoAAAANS',
+          // promptUsed STILL carries raw PII — it must NOT be forwarded by the QA call.
+          metadata: { promptUsed: COMPILED_PROMPT_WITH_RAW_PII, model: 'google/gemini-2.5-flash-image' },
+        },
+      ],
+      82,
+      'Rate composition, color harmony and motif clarity 0-100.', // PII-free rubric (runner-redacted)
+      'OPENROUTER_API_KEY',
+      'google/gemini-2.5-flash',
+      { animal: 'Dragon', element: 'Fire', birth_year: 1991, dominant_element: 'Fire' },
+      1,
+    );
+
+    assertNoPiiInBodies(captured); // promptUsed's raw PII never reached the wire
+    const bodies = captured.map((c) => c.init.body ?? '').join('');
+    expect(bodies).toContain('color harmony'); // the real rubric WAS forwarded (fidelity)
+    // Mutation RED: forward candidate.metadata.promptUsed → its raw PII lands in the QA body.
   });
 });
