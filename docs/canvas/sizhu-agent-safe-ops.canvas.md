@@ -52,12 +52,17 @@ artifact classes this feature necessarily produces. Read by `plumbline-scope-che
 - `package.json`
 - `stryker.config.json`
 - `metrics/**`
+- `src/lib/app/**`
+- `src/lib/domain/**`
+- `src/types.ts`
+- `server/services/**`
 
-> NOTE (scope-clarification, surfaced to user 2026-06-17): the bullets above are CAN-011 verbatim + P5
-> process artifacts. The build will additionally need wiring files NOT in CAN-011's literal list
-> (`src/lib/app/**` facade, `src/lib/domain/**` / `src/types.ts` for the `ApprovalRecord` type,
-> `server/services/**` for the dispatch service). Those are pending explicit user scope-confirmation —
-> NOT added here silently; they are escalated at the USER GATE / point-of-need.
+> NOTE (scope expanded with explicit user confirmation 2026-06-17): the last four bullets
+> (`src/lib/app/**`, `src/lib/domain/**`, `src/types.ts`, `server/services/**`) were added at the
+> Phase 0.6 scope-expansion gate. The planner confirmed they are the minimal wiring needed for the
+> ApprovalRepository to be reachable in production (P9 wired-in-prod): `appServices.ts:93`
+> `selectDependency()` seam, the `DispatchApproval` type in both type homes, and the dispatch service.
+> User chose "Expand". The rest are CAN-011 verbatim + P5 process artifacts.
 
 ## User Confirmation
 
