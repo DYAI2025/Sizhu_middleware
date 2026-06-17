@@ -15,6 +15,7 @@
     "smoke:fufire": "tsx scripts/smoke/fufire-live-smoke.ts",
     "probe:fufire-location": "tsx scripts/smoke/fufire-location-probe.ts",
     "smoke:openrouter": "tsx scripts/smoke/openrouter-live-smoke.ts",
+    "smoke:lgq": "tsx scripts/smoke/lgq-live-smoke.ts",
     "mcp:stdio": "tsx server/mcp/server.ts --transport=stdio",
     "test:mcp": "vitest run server/mcp/tests"
   },
