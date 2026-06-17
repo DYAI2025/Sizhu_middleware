@@ -203,3 +203,29 @@ export interface AppUser {
   role: AppRoleName;
   createdAt: string;
 }
+
+// dispatch_approvals (REQ-002 — sizhu-agent-safe-ops)
+// A persisted, single-use approval record on the ApprovalRepository seam. It is the
+// SERVER-SIDE decider for a real-money POD dispatch: server-side keyed on
+// (workflowRunId, artifactId), carries an expiry + a nonce, and a status that flips
+// exactly once unused→used on a successful consume (no sequential or concurrent replay).
+// T1 (this slice) defines the record SHAPE only; the atomic single-use consume
+// BEHAVIOUR lives in T2 (LocalApprovalRepository).
+export interface DispatchApproval {
+  /** Stable record identifier (the nonce). Lookups + consume are keyed on this. */
+  id: string;
+  /** The run this approval was minted for. consume() must match this exactly. */
+  workflowRunId: string;
+  /** The approved artifact. A dispatched artifactId MUST equal this one (no swap). */
+  artifactId: string;
+  /** Issuer/approver identity (e.g. an admin email). */
+  approverId: string;
+  /** Single-use lifecycle: minted `unused`, flipped to `used` on first consume. */
+  status: 'unused' | 'used';
+  /** ISO timestamp after which the record is expired and no longer consumable. */
+  expiresAt: string;
+  /** ISO timestamp the record was minted. */
+  createdAt: string;
+  /** ISO timestamp the record was consumed (set when status flips to `used`). */
+  usedAt?: string;
+}

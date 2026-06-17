@@ -1,10 +1,11 @@
-import { 
-  Product, 
-  ApiProvider, 
-  ReferenceImage, 
-  Role, 
-  QualityGateConfig, 
-  PersonalizationApiConfig 
+import {
+  Product,
+  ApiProvider,
+  ReferenceImage,
+  Role,
+  QualityGateConfig,
+  PersonalizationApiConfig,
+  DispatchApproval
 } from '../domain/models';
 import { 
   PromptTemplate, 
@@ -60,6 +61,57 @@ export interface RoleRepository {
   saveUsers(users: AppUser[]): Promise<void>;
   getActiveRole(): Promise<AppRoleName>;
   setActiveRole(role: AppRoleName): Promise<void>;
+}
+
+// ── ApprovalRepository (REQ-002 — sizhu-agent-safe-ops) ─────────────────────────
+// The seam for the SOLE load-bearing money gate: a persisted, single-use approval
+// record that gates a real POD dispatch. T1 (this slice) defines the contract only;
+// the atomic single-use consume BEHAVIOUR (no sequential/concurrent replay, expiry,
+// nonce-tamper, and artifactId/run binding) is T2's LocalApprovalRepository.
+
+/** Machine-readable verdict codes for a rejected consume (fail-closed). */
+export type ApprovalConsumeErrorCode = 'APPROVAL_TOKEN_INVALID' | 'DISPATCH_NOT_ALLOWED';
+
+/** Input to mint a fresh, unused approval record. */
+export interface CreateApprovalInput {
+  workflowRunId: string;
+  artifactId: string;
+  /** Issuer/approver identity (stored on the record as `approverId`). */
+  approver: string;
+  /** ISO timestamp after which the record is expired. */
+  expiresAt: string;
+}
+
+/** Input to consume (single-use) an approval record at dispatch time. */
+export interface ConsumeApprovalInput {
+  recordId: string;
+  workflowRunId: string;
+  artifactId: string;
+  /** The nonce minted with the record; a tampered/forged nonce must be rejected (T2). */
+  nonce?: string;
+}
+
+/**
+ * Result of a consume attempt. The RECORD — not a caller-controlled body field — is
+ * the decider: a valid, matching, unused, unexpired record yields `{ ok: true }`;
+ * any other case yields `{ ok: false }` with a fail-closed verdict code.
+ */
+export type ConsumeApprovalResult =
+  | { ok: true; record: DispatchApproval }
+  | { ok: false; error_code: ApprovalConsumeErrorCode };
+
+export interface ApprovalRepository {
+  /** Mint a new `unused` approval record bound to (workflowRunId, artifactId). */
+  createApproval(input: CreateApprovalInput): Promise<DispatchApproval>;
+  /** Look up a record by its id (the nonce). */
+  getApproval(recordId: string): Promise<DispatchApproval | null>;
+  /**
+   * Atomically consume a single-use record (T2 behaviour): returns the record ONLY
+   * if it exists, is unexpired, is still `unused`, and its (workflowRunId, artifactId)
+   * match the call — flipping it to `used` in one critical section so no sequential
+   * or concurrent replay can succeed. Otherwise a fail-closed `{ ok: false }` verdict.
+   */
+  consumeApproval(input: ConsumeApprovalInput): Promise<ConsumeApprovalResult>;
 }
 
 export interface SettingsRepository {
