@@ -151,10 +151,13 @@ export function createApp(): Express {
       const result = await runWorkflow(input);
       res.json(result);
     } catch (err: any) {
+      // Keep the detail server-side: err.message can embed a third-party (OpenRouter)
+      // response string. Do NOT relay it verbatim to the client (sec review I-2).
+      console.error(`[workflows/run] run failed for order ${req.params?.id}:`, err?.message);
       res.status(500).json({
         ok: false,
         error_code: "INTERNAL_SERVER_ERROR",
-        message: err.message,
+        message: "Workflow run failed. See server logs for detail.",
         retryable: false,
       });
     }

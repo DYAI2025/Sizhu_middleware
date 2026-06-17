@@ -35,6 +35,13 @@ const DEFAULT_MAX_IMAGES_FLOOR = 12;
 /** Default per-run $ spend ceiling: $1.00 (above the ~$0.23 worst-case + headroom). */
 const DEFAULT_MAX_USD = 1.0;
 
+/**
+ * Belegt per-image price (R9: $0.0387/image, google/gemini-2.5-flash-image). Used
+ * as a FALLBACK estimate for the $ ceiling when a real OpenRouter response omits
+ * `usage.cost` — so the spend cap never silently degrades to a no-op (sec review I-1).
+ */
+export const DEFAULT_IMAGE_PRICE_USD = 0.0387;
+
 /** Cap configuration: both an image-count cap and an independent $ ceiling. */
 export interface CostCap {
   maxImagesPerRun: number;

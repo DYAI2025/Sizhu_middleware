@@ -10,14 +10,18 @@ import {
 /**
  * Decorator that makes the cost cap LOAD-BEARING on the real image path
  * (REQ-LGQ-004, the contract's Gegenthese: a cap that is never called is
- * decorative). It wraps a real ImageGenerationProvider and, BEFORE issuing each
- * generate() batch, refuses the call if it would exceed EITHER cap — then records
- * the real per-candidate cost after the batch returns.
+ * decorative). It wraps a real ImageGenerationProvider and gates each generate()
+ * batch, then records the real per-candidate cost after the batch returns.
  *
- * Granularity: the underlying provider issues one batched request for
- * `numCandidates` images, so the cap bites at batch (iteration) boundaries — a run
- * cannot start a new image batch once it has hit the image-count or $ ceiling. The
- * derived default cap (worst-case + headroom) absorbs a single in-flight batch.
+ * Guarantee strength (honest, per code review I3):
+ *  - The image-COUNT cap is HARD: a batch is refused up front if issuing it would
+ *    push the run past `maxImagesPerRun` (whole-batch refusal — a batch can never
+ *    straddle the count ceiling).
+ *  - The $ ceiling bites at BATCH (iteration) boundaries: real cost is known only
+ *    AFTER a batch returns, so the next batch is refused once accumulated spend has
+ *    crossed `maxUsdPerRun` — a single in-flight batch MAY overshoot the $ ceiling.
+ *    The derived default ($1 vs ~$0.23 worst-case) absorbs one in-flight batch, and
+ *    the hard count cap is the primary bound; the $ ceiling is defense-in-depth.
  */
 export class CostCappedImageGenerationProvider implements ImageGenerationProvider {
   readonly enforcer: CostCapEnforcer;

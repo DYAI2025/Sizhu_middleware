@@ -20,7 +20,7 @@ import {
 import { OpenRouterImageGenerationProvider } from "../../src/lib/providers/openrouter/openRouterImageGenerationProvider";
 import { OpenRouterQualityGateProvider } from "../../src/lib/providers/openrouter/openRouterQualityGateProvider";
 import { CostCappedImageGenerationProvider } from "../../src/lib/providers/openrouter/costCappedImageProvider";
-import { deriveDefaultCap, CostCapError, COST_CAP_REACHED, type CostCap } from "../../src/lib/workflow/costCap";
+import { deriveDefaultCap, COST_CAP_REACHED, type CostCap } from "../../src/lib/workflow/costCap";
 import { WorkflowRunner } from "../../src/lib/workflow/runner";
 import { resolveOpenRouterCredentials } from "../../src/lib/modelGateway";
 import type { ImageGenerationProvider, QualityGateProvider } from "../../src/lib/providers/interfaces";
@@ -41,6 +41,10 @@ export interface RunWorkflowResult extends WorkflowRun {
   imageCallCount: number;
   capStopped: boolean;
   escalationReason?: string;
+  rejectionRate: number;
+  // false on the mock path: realCostUsd is NOT a measured value (mock records 0),
+  // so a 0 must not be read as "measured zero cost".
+  costMeasured: boolean;
 }
 
 function buildRealProviders(): {
@@ -71,7 +75,10 @@ export async function runWorkflow(input: RunWorkflowInput): Promise<RunWorkflowR
   const genConfigs = await settingsRepo.getGenConfigs();
   const qualityConfigs = await settingsRepo.getQualityConfigs();
   const genConfig = genConfigs.find((c) => c.productId === input.productId) ?? genConfigs[0];
-  const derived = deriveDefaultCap(genConfigs as any, qualityConfigs as any);
+  const derived = deriveDefaultCap(
+    genConfigs.map((c) => ({ productId: c.productId, numInitiallyGenerated: c.numInitiallyGenerated })),
+    qualityConfigs.map((q) => ({ productId: q.productId, maxRejectedBeforeEscalation: q.maxRejectedBeforeEscalation })),
+  );
   const cap: CostCap = {
     maxImagesPerRun: genConfig?.maxImagesPerRun ?? derived.maxImagesPerRun,
     maxUsdPerRun: genConfig?.maxUsdPerRun ?? derived.maxUsdPerRun,
@@ -93,11 +100,12 @@ export async function runWorkflow(input: RunWorkflowInput): Promise<RunWorkflowR
   const cappedGen = new CostCappedImageGenerationProvider(baseGen, cap);
   const genProvider: ImageGenerationProvider = cappedGen;
 
+  const artifactsRepo = new LocalArtifactRepository();
   const runner = new WorkflowRunner(
     new LocalProductRepository(),
     new LocalTemplateRepository(),
     new LocalWorkflowRepository(),
-    new LocalArtifactRepository(),
+    artifactsRepo,
     settingsRepo,
     new LocalRoleRepository(),
     genProvider,
@@ -109,58 +117,33 @@ export async function runWorkflow(input: RunWorkflowInput): Promise<RunWorkflowR
 
   await runner["roleRepo"].setActiveRole("Owner");
 
-  const telemetry = () => ({
-    // realCostUsd is meaningful only on the real path (mock records 0); imageCallCount
-    // reflects the universal count-cap accounting.
+  // The runner owns runId + state: a cost-cap bite is caught INSIDE its loop and
+  // persisted as status=escalated + escalationReason=COST_CAP_REACHED. We read the
+  // outcome off the returned run — no out-of-band run lookup, no concurrent-run race.
+  const run = await runner.run(
+    input.orderNumber,
+    input.productId,
+    input.customerName,
+    input.birthDate,
+    input.birthTime,
+    input.birthTimeKnown,
+    input.birthPlace,
+  );
+
+  // Per-run rejection rate from the persisted artifacts for THIS run id.
+  const runArtifacts = (await artifactsRepo.getImageArtifacts()).filter((a) => a.workflowRunId === run.id);
+  const rejected = runArtifacts.filter((a) => a.status !== "accepted").length;
+  const rejectionRate = runArtifacts.length > 0 ? rejected / runArtifacts.length : 0;
+
+  const capStopped = run.status === "escalated" && run.escalationReason === COST_CAP_REACHED;
+
+  return {
+    ...run,
     realCostUsd: cappedGen.enforcer.accumulatedUsd,
     imageCallCount: cappedGen.enforcer.imageCallCount,
-  });
-
-  try {
-    const run = await runner.run(
-      input.orderNumber,
-      input.productId,
-      input.customerName,
-      input.birthDate,
-      input.birthTime,
-      input.birthTimeKnown,
-      input.birthPlace,
-    );
-    return { ...run, ...telemetry(), capStopped: false };
-  } catch (err) {
-    if (err instanceof CostCapError) {
-      // OQ-2 RESOLVED: a cap-bite escalates (reusing the escalated terminal state)
-      // with the DISTINCT COST_CAP_REACHED reason so it stays honestly
-      // distinguishable from quality-exhaustion. Mark the in-flight run escalated.
-      const workflowRepo = new LocalWorkflowRepository();
-      const runs = await workflowRepo.getWorkflowRuns();
-      const idx = runs.findIndex(
-        (r) => r.orderNumber === input.orderNumber && r.productId === input.productId && r.status === "running",
-      );
-      let escalatedRun: WorkflowRun;
-      if (idx !== -1) {
-        runs[idx].status = "escalated";
-        runs[idx].completedAt = new Date().toISOString();
-        await workflowRepo.saveWorkflowRuns(runs);
-        escalatedRun = runs[idx];
-      } else {
-        escalatedRun = {
-          id: `wf-run-capstop-${input.orderNumber}`,
-          orderNumber: input.orderNumber,
-          productId: input.productId,
-          customerName: input.customerName,
-          birthDate: input.birthDate,
-          birthTime: input.birthTime,
-          birthTimeKnown: input.birthTimeKnown,
-          birthPlace: input.birthPlace,
-          status: "escalated",
-          startedAt: new Date().toISOString(),
-          completedAt: new Date().toISOString(),
-          currentIteration: 0,
-        };
-      }
-      return { ...escalatedRun, ...telemetry(), capStopped: true, escalationReason: COST_CAP_REACHED };
-    }
-    throw err;
-  }
+    costMeasured: useReal,
+    capStopped,
+    escalationReason: run.escalationReason,
+    rejectionRate,
+  };
 }

@@ -131,6 +131,9 @@ export interface WorkflowRun {
   personalizationData?: any;
   acceptedArtifactId?: string;
   currentIteration: number;
+  // Distinct escalation reason persisted on the run (OQ-2): COST_CAP_REACHED for a
+  // cost-cap bite, else unset (status 'escalated' alone = quality exhaustion).
+  escalationReason?: string;
 }
 
 export interface ImageArtifact {

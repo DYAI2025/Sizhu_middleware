@@ -1,6 +1,7 @@
 import type { ImageGenerationProvider } from '../interfaces';
 import { ContractDriftError, OpenRouterHttpError } from './errors';
 import { buildRedactedPrompt, buildProvenanceString } from './piiRedaction';
+import { DEFAULT_IMAGE_PRICE_USD } from '../../workflow/costCap';
 
 type EnvSource = Record<string, string | undefined>;
 
@@ -110,56 +111,51 @@ export class OpenRouterImageGenerationProvider implements ImageGenerationProvide
       );
     }
 
+    // Collect every REAL image url across ALL choices (belegt R9 shape:
+    // choices[].message.images[].image_url.url). Each candidate must be a DISTINCT
+    // real image — never one image fanned out into N (which would inflate the
+    // count-cap accounting and make the QA gate score byte-identical dupes).
+    const urls: string[] = [];
+    for (const choice of choices) {
+      const images = choice?.message?.images;
+      if (!Array.isArray(images)) continue;
+      for (const img of images) {
+        const u: unknown = img?.image_url?.url;
+        if (typeof u === 'string' && u.length > 0) urls.push(u);
+      }
+    }
+    if (urls.length === 0) {
+      throw new ContractDriftError(
+        'OpenRouter image response carried no image_url.url in any choice — contract drift, refusing a fake-success placeholder.',
+        JSON.stringify(data).slice(0, 300),
+      );
+    }
+    // Use at most the requested count; if the API returned fewer real images, emit
+    // fewer HONEST candidates (no duplication, no padding).
+    const chosen = urls.slice(0, numCandidates);
+
     const rawCost = data?.usage?.cost;
-    const totalCost = typeof rawCost === 'number' && isFinite(rawCost) ? rawCost : 0;
-    const perCandidateCost = numCandidates > 0 ? totalCost / numCandidates : totalCost;
+    // Absent/non-finite usage.cost would silently leave the $ ceiling at 0 (sec I-1):
+    // fall back to the belegt per-image estimate so real spend still accrues to the cap.
+    const totalCost =
+      typeof rawCost === 'number' && isFinite(rawCost)
+        ? rawCost
+        : DEFAULT_IMAGE_PRICE_USD * chosen.length;
+    const perCandidateCost = totalCost / chosen.length;
     const resolution = quality === 'hd' ? '1792x2304' : '1024x1024';
 
-    const results: {
-      candidateIndex: number;
-      storagePath: string;
+    return chosen.map((url, i) => ({
+      candidateIndex: i,
+      storagePath: url,
       metadata: {
-        promptUsed: string;
-        model: string;
-        provider: string;
-        quality: string;
-        resolution: string;
-        usdCost?: number;
-      };
-    }[] = [];
-
-    for (let i = 0; i < numCandidates; i++) {
-      // One image per choice (belegt R9); tolerate a single choice carrying n images.
-      const choice = choices[i] ?? (choices.length === 1 ? choices[0] : undefined);
-      const images = choice?.message?.images;
-      if (!Array.isArray(images) || images.length === 0) {
-        throw new ContractDriftError(
-          `OpenRouter image response choice[${i}] has no images[] — contract drift (belegt shape is choices[].message.images[0].image_url.url).`,
-        );
-      }
-      const img = images[i] ?? images[0];
-      const url: unknown = img?.image_url?.url;
-      if (typeof url !== 'string' || url.length === 0) {
-        throw new ContractDriftError(
-          `OpenRouter image response choice[${i}] has no image_url.url — contract drift, refusing a fake-success placeholder.`,
-        );
-      }
-
-      results.push({
-        candidateIndex: i,
-        storagePath: url,
-        metadata: {
-          // PII-safe provenance ONLY — never the raw prompt (OQ-3 / REQ-LGQ-006c).
-          promptUsed: provenance,
-          model,
-          provider: 'OpenRouter',
-          quality,
-          resolution,
-          usdCost: perCandidateCost,
-        },
-      });
-    }
-
-    return results;
+        // PII-safe provenance ONLY — never the raw prompt (OQ-3 / REQ-LGQ-006c).
+        promptUsed: provenance,
+        model,
+        provider: 'OpenRouter',
+        quality,
+        resolution,
+        usdCost: perCandidateCost,
+      },
+    }));
   }
 }

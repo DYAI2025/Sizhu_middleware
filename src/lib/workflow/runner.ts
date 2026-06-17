@@ -28,6 +28,7 @@ import {
 } from '../providers/interfaces';
 
 import { renderPrompt } from './promptRenderer';
+import { CostCapError } from './costCap';
 import { WorkflowStateMachine } from './stateMachine';
 import { ArtifactService } from './artifactService';
 import { EscalationService } from './escalationService';
@@ -216,6 +217,9 @@ export class WorkflowRunner {
     let currentIteration = 1;
     let matchedArtifact: ImageArtifact | null = null;
     const allSwarmArtifacts: ImageArtifact[] = [];
+    // Set when the cost cap halts the run mid-loop (OQ-2): carried into the
+    // escalation so a cap-stop is persisted distinguishably from quality exhaustion.
+    let capStopReason: string | null = null;
 
     while (currentIteration <= qualityConfig.maxRejectedBeforeEscalation) {
       newRun.currentIteration = currentIteration;
@@ -278,15 +282,27 @@ export class WorkflowRunner {
         iteration: currentIteration
       };
 
-      const generatedCandidates = await this.genProvider.generate(
-        compiledPrompt,
-        genConfig.numInitiallyGenerated,
-        genConfig.imageFormat,
-        genConfig.imageQuality,
-        modelUsed,
-        currentIteration > 1 ? genConfig.fallbackSecretRef : genConfig.primarySecretRef,
-        generationParams
-      );
+      let generatedCandidates;
+      try {
+        generatedCandidates = await this.genProvider.generate(
+          compiledPrompt,
+          genConfig.numInitiallyGenerated,
+          genConfig.imageFormat,
+          genConfig.imageQuality,
+          modelUsed,
+          currentIteration > 1 ? genConfig.fallbackSecretRef : genConfig.primarySecretRef,
+          generationParams
+        );
+      } catch (e: any) {
+        // Cost cap bite: halt the run HERE (the runner owns runId + state), so the
+        // escalation persists the distinct reason — no fragile out-of-band run lookup.
+        if (e instanceof CostCapError) {
+          capStopReason = e.reason;
+          await saveAndFireLog(`Cost cap reached: ${e.message}. Halting run before further image spend.`, 'COST_CAP', 'error');
+          break;
+        }
+        throw e;
+      }
 
       // QA Evaluation Stage
       // REQ-A-002: route the quality-gate model id through the OpenRouter
@@ -364,7 +380,11 @@ export class WorkflowRunner {
       await saveAndFireLog(`Automated orchestration paused awaiting execution boundary.`, 'PIPELINE_COMPLETE', 'success');
     } else {
       // Escalate using EscalationService!
-      await saveAndFireLog(`ESCALATION LIMIT TRIGGERED! Exceeded maximum limit of ${qualityConfig.maxRejectedBeforeEscalation} rejected iterations.`, 'ESCALATION_TRIGGER', 'error');
+      if (capStopReason) {
+        await saveAndFireLog(`Run halted by cost cap (${capStopReason}) before quality exhaustion. Escalating for human review.`, 'ESCALATION_TRIGGER', 'error');
+      } else {
+        await saveAndFireLog(`ESCALATION LIMIT TRIGGERED! Exceeded maximum limit of ${qualityConfig.maxRejectedBeforeEscalation} rejected iterations.`, 'ESCALATION_TRIGGER', 'error');
+      }
 
       const escEvent = await this.escalationService.triggerEscalation(
         newRun,
@@ -383,6 +403,7 @@ export class WorkflowRunner {
       if (lIdx !== -1) {
         runsLatest[lIdx].status = 'escalated';
         runsLatest[lIdx].completedAt = new Date().toISOString();
+        if (capStopReason) runsLatest[lIdx].escalationReason = capStopReason;
         await this.workflowRepo.saveWorkflowRuns(runsLatest);
       }
     }
