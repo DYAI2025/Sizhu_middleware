@@ -224,7 +224,16 @@ export class WorkflowRunner {
 
     // The run's literal birth PII — value-stripped from every outbound prompt/rubric
     // (REQ-LGQ-005). The runner is the only layer that knows these exact values.
-    const piiValues = [customerName, birthDate, birthPlace, birthTimeKnown ? birthTime : undefined];
+    // Includes BOTH the raw birthTime AND the engine-normalized resolvedTime, because
+    // the prompt is rendered with resolvedTime (templatePayload.personalization.birth_time
+    // = personalizationVars.resolvedTime) which can differ in format from the raw input.
+    const piiValues = [
+      customerName,
+      birthDate,
+      birthPlace,
+      birthTimeKnown ? birthTime : undefined,
+      birthTimeKnown ? personalizationVars.resolvedTime : undefined,
+    ];
 
     while (currentIteration <= qualityConfig.maxRejectedBeforeEscalation) {
       newRun.currentIteration = currentIteration;

@@ -28,6 +28,7 @@ import {
 const PII_NAME = 'SENTINEL_NAME_Qx7_Aldebaran';
 const PII_DATE = 'SENTINEL_DATE_1991-07-23_Qx7';
 const PII_PLACE = 'SENTINEL_PLACE_Vega-IV_Qx7';
+const PII_TIME = 'SENTINEL_TIME_03h14_Qx7';
 const ART = 'Watercolor celestial totem with intricate gold linework';
 
 describe('REQ-LGQ-005 — the runner strips literal PII from the prompt before generate(), keeps art direction', () => {
@@ -51,7 +52,7 @@ describe('REQ-LGQ-005 — the runner strips literal PII from the prompt before g
           ? {
               ...t,
               status: 'active' as const,
-              content: `${ART} for ${PII_NAME}, born ${PII_DATE} in ${PII_PLACE}.`,
+              content: `${ART} for ${PII_NAME}, born ${PII_DATE} at ${PII_TIME} in ${PII_PLACE}.`,
             }
           : t,
       ),
@@ -84,13 +85,14 @@ describe('REQ-LGQ-005 — the runner strips literal PII from the prompt before g
     );
     await roleRepo.setActiveRole('Owner');
 
-    await runner.run('ORD-REDACT-1', product.id, PII_NAME, PII_DATE, '14:00', true, PII_PLACE);
+    await runner.run('ORD-REDACT-1', product.id, PII_NAME, PII_DATE, PII_TIME, true, PII_PLACE);
 
     expect(captured.length).toBeGreaterThan(0);
     const prompt = captured[0];
     expect(prompt).not.toContain(PII_NAME);
     expect(prompt).not.toContain(PII_DATE);
     expect(prompt).not.toContain(PII_PLACE);
+    expect(prompt).not.toContain(PII_TIME); // birth-time surface (raw + resolvedTime) redacted
     // Fidelity: the art direction survives the redaction (anti-tautology).
     expect(prompt).toContain('Watercolor celestial totem');
     expect(prompt).toContain('intricate gold linework');
