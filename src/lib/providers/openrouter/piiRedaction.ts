@@ -8,18 +8,12 @@
  * (animal/element/dominant_element/birth_year). So a redaction written against the
  * derived-var args would be GREEN-WHILE-LEAKING.
  *
- * MECHANISM (REVISED — fidelity-preserving redaction at the RUNNER):
- * The PRIMARY redaction now happens at the RUNNER, the one place that KNOWS the
- * exact PII VALUES for the run (`customerName`/`birthDate`/`birthPlace`/`birthTime`).
- * `redactKnownPiiValues` value-strips those exact strings from the compiled prompt
- * and the QA rubric, leaving the template ART DIRECTION and derived vars intact — so
- * the live loop keeps its fidelity while no raw PII reaches the wire. The provider
- * then forwards that already-PII-free prompt.
- *
- * The earlier canvas-A4 allowlist RECONSTRUCTION (`buildRedactedPrompt`) is retained
- * as a structural fallback/utility, but it is no longer the prompt path because it
- * discarded the template's art direction. `buildProvenanceString` still derives the
- * PII-safe provenance string for artifact metadata (no-echo, OQ-3).
+ * MECHANISM (canvas A4): the free-form incoming prompt string is treated as
+ * PII-tainted and is NOT forwarded verbatim. The outbound prompt is RECONSTRUCTED
+ * from an explicit ALLOWLIST of non-PII derived vars. Anything not on the allowlist
+ * (the free-form prompt's raw name/date/place) never reaches the wire. This is a
+ * positive allowlist, not a blocklist of known PII shapes — a new free-form field
+ * cannot leak by default.
  */
 
 /**
@@ -51,39 +45,6 @@ export const RAW_PII_FIELD_NAMES = [
 ] as const;
 
 type Vars = Record<string, unknown> | null | undefined;
-
-/** Token substituted for a stripped PII value in a prompt/rubric. */
-export const PII_REDACTION_TOKEN = '[redacted]';
-
-/**
- * PRIMARY redaction (runner-side): value-strip the exact known PII strings from a
- * free-form text (the compiled prompt / QA rubric), preserving everything else (the
- * template art direction, scoring rubric, derived vars). The runner is the only
- * layer that knows the run's literal PII VALUES, so it can scrub them completely
- * without discarding the surrounding art direction — unlike a downstream provider,
- * which cannot value-strip PII it never sees.
- *
- * Values shorter than 2 chars are skipped to avoid over-redacting incidental
- * substrings. Matching is case-insensitive and global; regex metacharacters in a
- * value are escaped so the value is matched literally.
- *
- * @param text      free-form text that may contain raw PII (post-render prompt/rubric).
- * @param piiValues the run's literal PII strings (name/birth_date/birth_place/birth_time).
- */
-export function redactKnownPiiValues(
-  text: string,
-  piiValues: Array<string | null | undefined>,
-): string {
-  let out = String(text ?? '');
-  for (const v of piiValues) {
-    if (typeof v !== 'string') continue;
-    const value = v.trim();
-    if (value.length < 2) continue; // skip empty/too-short to avoid over-redaction
-    const escaped = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    out = out.replace(new RegExp(escaped, 'gi'), PII_REDACTION_TOKEN);
-  }
-  return out;
-}
 
 /**
  * Reconstruct a PII-free prompt for OpenRouter from the non-PII derived vars
