@@ -21,6 +21,9 @@ export interface ImageGenerationProvider {
       provider: string;
       quality: string;
       resolution: string;
+      // Real per-candidate $ cost (usage.cost / numCandidates), surfaced for the
+      // cost-cap enforcer + run telemetry (REQ-LGQ-006). Optional for the mock path.
+      usdCost?: number;
     };
   }[]>;
 }

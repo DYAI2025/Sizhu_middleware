@@ -37,7 +37,12 @@ export class ArtifactService {
           qaScore: evaluation.score,
           rejectionReason: evaluation.reason,
           qaResultJson: evaluation.detailedJson,
-          generatedAt: new Date().toISOString()
+          generatedAt: new Date().toISOString(),
+          // Provenance (REQ-LGQ-006): the model that produced the artifact and a
+          // PII-SAFE provenance string. `metadata.promptUsed` is already the
+          // redacted non-PII provenance for the real provider (OQ-3).
+          modelUsed: candidate.metadata?.model,
+          promptVarsProvenance: candidate.metadata?.promptUsed
         });
       } else {
         // If some error happens and a candidate isn't evaluated, it becomes rejected/failed rather than disappearing
@@ -54,7 +59,9 @@ export class ArtifactService {
           qaScore: 0,
           rejectionReason: 'Missing evaluation metadata, marked as failed.',
           qaResultJson: '{}',
-          generatedAt: new Date().toISOString()
+          generatedAt: new Date().toISOString(),
+          modelUsed: candidate.metadata?.model,
+          promptVarsProvenance: candidate.metadata?.promptUsed
         });
       }
     }

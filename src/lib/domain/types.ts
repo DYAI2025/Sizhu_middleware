@@ -177,6 +177,8 @@ export interface WorkflowRun {
   personalizationData?: any;
   acceptedArtifactId?: string;
   currentIteration: number;
+  // Distinct escalation reason (OQ-2): COST_CAP_REACHED for a cost-cap bite.
+  escalationReason?: string;
 }
 
 // 15. image_artifacts

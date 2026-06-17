@@ -28,6 +28,8 @@ import {
 } from '../providers/interfaces';
 
 import { renderPrompt } from './promptRenderer';
+import { redactKnownPiiValues } from '../providers/openrouter/piiRedaction';
+import { CostCapError } from './costCap';
 import { WorkflowStateMachine } from './stateMachine';
 import { ArtifactService } from './artifactService';
 import { EscalationService } from './escalationService';
@@ -216,6 +218,13 @@ export class WorkflowRunner {
     let currentIteration = 1;
     let matchedArtifact: ImageArtifact | null = null;
     const allSwarmArtifacts: ImageArtifact[] = [];
+    // Set when the cost cap halts the run mid-loop (OQ-2): carried into the
+    // escalation so a cap-stop is persisted distinguishably from quality exhaustion.
+    let capStopReason: string | null = null;
+
+    // The run's literal birth PII — value-stripped from every outbound prompt/rubric
+    // (REQ-LGQ-005). The runner is the only layer that knows these exact values.
+    const piiValues = [customerName, birthDate, birthPlace, birthTimeKnown ? birthTime : undefined];
 
     while (currentIteration <= qualityConfig.maxRejectedBeforeEscalation) {
       newRun.currentIteration = currentIteration;
@@ -250,6 +259,11 @@ export class WorkflowRunner {
       let compiledPrompt = '';
       try {
         compiledPrompt = renderPrompt(activeTemplate.content, templatePayload);
+        // PRIMARY PII redaction (REQ-LGQ-005): strip the run's literal birth PII from
+        // the compiled prompt while KEEPING the template art direction. The provider
+        // forwards this already-PII-free prompt, so fidelity is preserved AND no raw
+        // birth field reaches OpenRouter.
+        compiledPrompt = redactKnownPiiValues(compiledPrompt, piiValues);
       } catch (err: any) {
         await saveAndFireLog(`Compile Exception: ${err.message}`, 'GENERATE_CANDIDATES', 'error');
         newRun.status = 'failed';
@@ -278,15 +292,27 @@ export class WorkflowRunner {
         iteration: currentIteration
       };
 
-      const generatedCandidates = await this.genProvider.generate(
-        compiledPrompt,
-        genConfig.numInitiallyGenerated,
-        genConfig.imageFormat,
-        genConfig.imageQuality,
-        modelUsed,
-        currentIteration > 1 ? genConfig.fallbackSecretRef : genConfig.primarySecretRef,
-        generationParams
-      );
+      let generatedCandidates;
+      try {
+        generatedCandidates = await this.genProvider.generate(
+          compiledPrompt,
+          genConfig.numInitiallyGenerated,
+          genConfig.imageFormat,
+          genConfig.imageQuality,
+          modelUsed,
+          currentIteration > 1 ? genConfig.fallbackSecretRef : genConfig.primarySecretRef,
+          generationParams
+        );
+      } catch (e: any) {
+        // Cost cap bite: halt the run HERE (the runner owns runId + state), so the
+        // escalation persists the distinct reason — no fragile out-of-band run lookup.
+        if (e instanceof CostCapError) {
+          capStopReason = e.reason;
+          await saveAndFireLog(`Cost cap reached: ${e.message}. Halting run before further image spend.`, 'COST_CAP', 'error');
+          break;
+        }
+        throw e;
+      }
 
       // QA Evaluation Stage
       // REQ-A-002: route the quality-gate model id through the OpenRouter
@@ -297,10 +323,13 @@ export class WorkflowRunner {
         'quality_gate',
         qualityConfig.model
       );
+      // Redact any literal birth PII the operator may have templated into the QA
+      // rubric, keeping the real scoring criteria (fidelity). The provider forwards it.
+      const safeQaPrompt = redactKnownPiiValues(qualityConfig.qaPrompt, piiValues);
       const evaluations = await this.qaProvider.evaluate(
         generatedCandidates,
         qualityConfig.minAcceptanceScore,
-        qualityConfig.qaPrompt,
+        safeQaPrompt,
         qualityConfig.secretRef,
         qaModelUsed,
         personalizationVars,
@@ -364,7 +393,11 @@ export class WorkflowRunner {
       await saveAndFireLog(`Automated orchestration paused awaiting execution boundary.`, 'PIPELINE_COMPLETE', 'success');
     } else {
       // Escalate using EscalationService!
-      await saveAndFireLog(`ESCALATION LIMIT TRIGGERED! Exceeded maximum limit of ${qualityConfig.maxRejectedBeforeEscalation} rejected iterations.`, 'ESCALATION_TRIGGER', 'error');
+      if (capStopReason) {
+        await saveAndFireLog(`Run halted by cost cap (${capStopReason}) before quality exhaustion. Escalating for human review.`, 'ESCALATION_TRIGGER', 'error');
+      } else {
+        await saveAndFireLog(`ESCALATION LIMIT TRIGGERED! Exceeded maximum limit of ${qualityConfig.maxRejectedBeforeEscalation} rejected iterations.`, 'ESCALATION_TRIGGER', 'error');
+      }
 
       const escEvent = await this.escalationService.triggerEscalation(
         newRun,
@@ -383,6 +416,7 @@ export class WorkflowRunner {
       if (lIdx !== -1) {
         runsLatest[lIdx].status = 'escalated';
         runsLatest[lIdx].completedAt = new Date().toISOString();
+        if (capStopReason) runsLatest[lIdx].escalationReason = capStopReason;
         await this.workflowRepo.saveWorkflowRuns(runsLatest);
       }
     }
