@@ -281,6 +281,32 @@ Evidence, `wired-in-prod?`, `evidence-class`, and a True-Line check — no orpha
 DEFERRED (Epic C backlog). **F1 BLOCKER resolved**: the matrix now carries the full required schema.
 Open: OQ-005 (approval-store home — leading ASSUMPTION, confirm at Phase 0.5). No other open BLOCKER.
 
+## Build outcome — Phase 3 (2026-06-17)
+
+Phase 2 committed: T1 `85dc169`, T2 `10966cc`, T4 `645bd70`, T3 `cceeb34`, T6 `a0dd004`, T5 `9b614ca`.
+T7 subsumed into REQ-008's already-green guard (M re-scoped 8→7). Full suite **462 passed / 0 failed /
+1 skip** (the documented route-happy-path `it.skip`); tsc green. PRIL reality-check **PASS** at
+`--min-evidence integration` (`docs/reality/sizhu-agent-safe-ops.evidence.jsonl`). The money path (T2/T3)
+ran the full per-increment chain: code-review + security-review + Watcher.
+
+| REQ | wired-in-prod | evidence-class | proof |
+|---|---|---|---|
+| REQ-001 | **yes** | real-boundary-smoke | gate @ `server/index.ts:279` (consumeApproval before dispatch); aso.dispatch.gate + aso.gate.wiredInProd green; P9 importer-grep |
+| REQ-002 | **yes** | integration | LocalApprovalRepository; aso.approvalRecord 10/10; Stryker money-guards 100% killed (68.29% total — survivors are storage-env) |
+| REQ-003 | **yes** | real-boundary-smoke | 501 NOT_IMPLEMENTED; aso.truthfulReads green |
+| REQ-004 | **yes** | real-boundary-smoke | VALIDATION_SHAPE_ONLY (no bare READY_FOR_DISPATCH); aso.truthfulReads green |
+| REQ-005 | **yes** | real-boundary-smoke | MCP_ENABLE_DISPATCH gate; live tools/list smoke 2026-06-15 |
+| REQ-006 | **yes** | integration | single HTTP catalog post stdio-delete; aso.mcpCatalog 7/7 |
+| REQ-007 | **yes** | real-boundary-smoke | server/mcp deleted (0 importers, CONCERN-3 cleared); tsc + suite green |
+| REQ-008 | **yes** | integration | dispatch off-by-default guard; mutation-verified RED-on-revert |
+
+Reality-Ledger caveats (carried, NOT laundered): **prod dispatch is fail-closed this iteration**
+(CONCERN-1, user-accepted) — evidence is real-boundary via `createApp` + the real Local repo, NOT a
+live POD/Supabase dispatch (deferred prod-store slice). **Mutation 68.29%** reflects untestable
+storage-env survivors; the money-consume guards are 100% killed. Follow-ups: (a) survivor-hardening
+(jsdom localStorage path), (b) un-skip aso.dispatch.gate.routes.test.ts:175 (route-happy-path) when an
+approval-mint route + prod store land, (c) doc-cleanup of stale server/mcp references.
+
 ## User Confirmation (sizhu-agent-safe-ops)
 
 The assistant must not confirm this matrix. Bestätigung erfolgt durch den Nutzer (Confirmation-Block im Chat).

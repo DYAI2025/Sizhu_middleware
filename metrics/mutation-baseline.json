@@ -69,6 +69,13 @@
         { "date": "2026-06-14", "pass": "FX6-baseline", "mutationScoreTotal": 39.3, "killed": 11, "survived": 17, "noCoverage": 0 },
         { "date": "2026-06-14", "pass": "FX6-hardening", "mutationScoreTotal": 100.0, "killed": 28, "survived": 0, "noCoverage": 0, "addedTest": "server/tests/birthInputNormalizer.mutation.test.ts (16 tests)", "note": "default-noon rule full truth-table" }
       ]
+    },
+    {
+      "module": "src/lib/repositories/approvalRepository.ts",
+      "feature": "sizhu-agent-safe-ops",
+      "history": [
+        { "date": "2026-06-17", "pass": "T8-baseline", "mutationScoreTotal": 68.29, "mutationScoreCovered": 76.71, "killed": 56, "survived": 17, "noCoverage": 9, "timeout": 0, "moneyGuardsKilled": true, "note": "SOLE money gate (REQ-002). The security-critical consume guards are ALL killed — (workflowRunId,artifactId) binding/AC-002b (7 killed), expiry (7), tampered-nonce (7), sequential-replay (5), absent-record (3). The survived+no-coverage mutants are NOT in the gate logic: storage-env detection (isBrowser typeof window / the localStorage browser branch never runs in the Node vitest env) + the newToken Math.random fallback (structurally unreachable while crypto.randomUUID exists) + a few persist-path literals. Honest baseline; no figure inflated.", "remainingSurvivorsAreEnvEquivalent": "partial — the isBrowser/localStorage browser branch would need a jsdom harness to exercise; the crypto fallback is unreachable. The money-consume logic itself is fully killed.", "followUp": "survivor-hardening pass (jsdom localStorage path + persist-path literals) toward the ~90% norm of the other critical modules — deferred to a backlog item; the money-gate anti-tautology proof (consume guards 100% killed + per-increment RED-on-revert) already stands." }
+      ]
     }
   ],
   "_fx6": "FX6 (2026-06-14): expanded Stryker to the curated critical set. Aggregate over the 5 FX6 modules 92.4% (449/486). Independent code-reviewer HONEST on all 4 agent-authored files (reproduced PII/safety RED-on-mutation; SHA-256 digests are genuine independent anchors; no over-mock/leak/prod-edit). npm run test:mutation now covers all 6 hardened modules."
