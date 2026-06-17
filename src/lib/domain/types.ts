@@ -97,6 +97,10 @@ export interface GenerationConfig {
   fallbackModel: string;
   fallbackLLM: string;
   fallbackSecretRef: string;
+  // Hard cost cap per run (REQ-LGQ-004 / OQ-4). Optional; when absent the server
+  // runner applies deriveDefaultCap() (default 12 images / $1.00). See costCap.ts.
+  maxImagesPerRun?: number;
+  maxUsdPerRun?: number;
 }
 
 // 10. quality_gate_configs
@@ -190,6 +194,12 @@ export interface ImageArtifact {
   rejectionReason?: string;
   qaResultJson: string;
   generatedAt: string;
+  // Per-candidate provenance (REQ-LGQ-006a). `modelUsed` = the real model id.
+  // `promptVarsProvenance` carries ONLY the non-PII derived variables — NEVER
+  // raw name/birth_date/birth_place (OQ-3, NFR-3). Optional until the real
+  // providers populate them (threaded in T7); tightened to required then.
+  modelUsed?: string;
+  promptVarsProvenance?: string;
 }
 
 // 16. workflow_logs
