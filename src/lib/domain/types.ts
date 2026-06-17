@@ -9,6 +9,10 @@ import { QualityIssue, GatewayIssue } from './issueTaxonomy';
 // Explicit exports for compatibility and cleaner imports
 export type { QualityIssue, GatewayIssue };
 export type { AppRoleName, VisualWorkflow } from '../../types';
+// 27. dispatch_approvals (REQ-002 — sizhu-agent-safe-ops). Canonical shape lives in
+// the UI/runtime type home (src/types.ts); re-exported here so the db-mapped-entities
+// reference carries it too (the two-type-home rule), with a single source of truth.
+export type { DispatchApproval } from '../../types';
 export type Product = ShopProduct;
 export type Role = AppRole;
 

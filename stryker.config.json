@@ -8,7 +8,8 @@
     "server/services/fufireResponseInterpreter.ts",
     "server/services/podDispatchService.ts",
     "server/services/fufireOperations.ts",
-    "server/services/birthInputNormalizer.ts"
+    "server/services/birthInputNormalizer.ts",
+    "src/lib/repositories/approvalRepository.ts"
   ],
   "reporters": [
     "clear-text",

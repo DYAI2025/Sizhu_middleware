@@ -144,13 +144,25 @@ describe("AC-S-002c — MFA/AAL2 gate on every sensitive route", () => {
       expect(res.body.error_code).toBe("MFA_REQUIRED_FOR_ACTION");
     });
 
-    it(`${route} → passes the guard for an admin at aal2 (not 401/403)`, async () => {
+    it(`${route} → passes the guard for an admin at aal2 (not blocked by an auth-layer code)`, async () => {
       const res = await request(app)
         .post(route)
         .set(...bearer(token()))
         .send({});
+      // AC-S-002c proves the apiGuard (auth LAYER) clears an aal2 admin and defers
+      // to the handler. A handler-level rejection (e.g. /pod/dispatch returning 403
+      // DISPATCH_NOT_ALLOWED for a bare, un-approved dispatch under REQ-001) is NOT
+      // an auth-layer block — so we assert the auth layer passed by the absence of
+      // an auth-layer error_code, not by a blanket "not 403".
       expect(res.status).not.toBe(401);
-      expect(res.status).not.toBe(403);
+      const AUTH_LAYER_CODES = [
+        "AUTH_REQUIRED",
+        "INVALID_AUTH_TOKEN",
+        "EMAIL_VERIFICATION_REQUIRED",
+        "ADMIN_ROLE_REQUIRED",
+        "MFA_REQUIRED_FOR_ACTION",
+      ];
+      expect(AUTH_LAYER_CODES).not.toContain(res.body?.error_code);
     });
   }
 });

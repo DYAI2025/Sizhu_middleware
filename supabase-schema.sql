@@ -498,6 +498,28 @@ CREATE TABLE IF NOT EXISTS qa_calibration_cases (
     divergence NUMERIC(5,2) NOT NULL DEFAULT 0.00
 );
 
+-- 27. DISPATCH APPROVALS TABLE (REQ-002 — sizhu-agent-safe-ops)
+-- The SOLE load-bearing money gate: a persisted, single-use approval record that gates
+-- a real POD dispatch. Mirrors the DispatchApproval domain shape (src/types.ts). This is
+-- the production persistence CONTRACT only — no runtime persistence is wired yet (the
+-- SupabaseApprovalRepository throws SUPABASE_NOT_CONFIGURED). Notes for the eventual
+-- implementation, encoded as constraints so the contract is unambiguous:
+--   * `nonce` is the secret consume token, DISTINCT from `id` (UNIQUE so it is a lookup key).
+--   * `status` is the single-use lifecycle: minted 'unused', flipped to 'used' exactly once.
+--   * (workflow_run_id, artifact_id) bind the approval to a specific run + artifact.
+--   * `used_at` is set when, and only when, status flips to 'used'.
+CREATE TABLE IF NOT EXISTS dispatch_approvals (
+    id VARCHAR(64) PRIMARY KEY,
+    workflow_run_id VARCHAR(64) NOT NULL REFERENCES workflow_runs(id) ON DELETE CASCADE,
+    artifact_id VARCHAR(64) NOT NULL REFERENCES image_artifacts(id) ON DELETE CASCADE,
+    approver_id VARCHAR(255) NOT NULL,
+    nonce VARCHAR(128) NOT NULL UNIQUE,
+    status VARCHAR(16) NOT NULL DEFAULT 'unused' CHECK (status IN ('unused', 'used')),
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    used_at TIMESTAMP WITH TIME ZONE
+);
+
 
 -- =========================================================================
 -- ADDITIONAL ROW-LEVEL SECURITY POLICIES
@@ -570,5 +592,17 @@ CREATE POLICY write_calruns ON qa_calibration_runs FOR ALL TO authenticated USIN
 
 CREATE POLICY select_calcases ON qa_calibration_cases FOR SELECT TO authenticated USING (public.has_permission('view_dashboard'));
 CREATE POLICY write_calcases ON qa_calibration_cases FOR ALL TO authenticated USING (public.has_permission('manage_templates'));
+
+-- M. DISPATCH APPROVALS (REQ-002 — the load-bearing money gate)
+-- RLS mirrors the existing operational tables. READ is the standard dashboard read.
+-- WRITE (mint/consume an approval) is gated to the highest-privilege operational
+-- permission ('manage_credentials' → Owner/Admin only; never Observer/Custom), matching
+-- the real-money sensitivity of the gate within the existing permission vocabulary.
+-- NOTE: RLS is a defence-in-depth layer; it is NOT the single-use atomicity guard. The
+-- unused→used flip / no-replay invariant is enforced by the ApprovalRepository consume
+-- logic, and the actual server-side authorization remains the apiGuard/MFA boundary.
+ALTER TABLE dispatch_approvals ENABLE ROW LEVEL SECURITY;
+CREATE POLICY select_approvals ON dispatch_approvals FOR SELECT TO authenticated USING (public.has_permission('view_dashboard'));
+CREATE POLICY write_approvals ON dispatch_approvals FOR ALL TO authenticated USING (public.has_permission('manage_credentials'));
 
 

@@ -12,6 +12,9 @@ import {
 import { apiGuard } from "./middleware/auth";
 import { getAppMode } from "../src/lib/app/appMode";
 import { runWorkflow, RunWorkflowInput } from "./services/workflowRunService";
+import { appServices } from "../src/lib/app/appServices";
+import { WorkflowStateMachine } from "../src/lib/workflow/stateMachine";
+import type { WorkflowRun, ImageArtifact } from "../src/types";
 
 dotenv.config();
 
@@ -121,12 +124,29 @@ export function createApp(): Express {
     });
   });
 
+  // REQ-003 (sizhu-agent-safe-ops) — truthful reads, no fabricated empty success.
+  //
+  // No real persistence source is wired (OQ-003 resolved: NOT_IMPLEMENTED, no
+  // in-memory store). An empty `issues:[]` / `workflows:[]` 200 would be a LYING
+  // SENSOR: an agent reading it concludes "all healthy / nothing to do" when in
+  // truth NOTHING is connected (CAN-001). So we answer the honest absence signal
+  // — 501 NOT_IMPLEMENTED, no array to mistake for data — never a 200 empty array.
   app.get("/api/gateway-issues", (_req, res) => {
-    res.json({ status: "OK", issues: [] });
+    res.status(501).json({
+      status: "NOT_IMPLEMENTED",
+      error_code: "NOT_IMPLEMENTED",
+      message:
+        "No gateway-issues source is configured. This endpoint does not fabricate empty success.",
+    });
   });
 
   app.get("/api/workflows/*", (_req, res) => {
-    res.json({ status: "OK", workflows: [] });
+    res.status(501).json({
+      status: "NOT_IMPLEMENTED",
+      error_code: "NOT_IMPLEMENTED",
+      message:
+        "No workflows source is configured. This endpoint does not fabricate empty success.",
+    });
   });
 
   // POST /api/workflows/:id/run — run the full generate→QA pipeline
@@ -220,21 +240,123 @@ export function createApp(): Express {
     res.json({ status: "READY" });
   });
 
+  // REQ-004 (sizhu-agent-safe-ops) — validate-dispatch is NOT an approval go-signal.
+  //
+  // This endpoint only checks request SHAPE; it does NOT consult the single-use
+  // approval store and does NOT inspect QA acceptance. A bare `READY_FOR_DISPATCH`
+  // here would be a green light over a cliff — a caller could mistake a well-formed
+  // body around a rejected/never-approved artifact for authorization to spend money.
+  // The REAL money gate is POST /api/fulfillment/pod/dispatch (consumeApproval +
+  // assertDispatchAllowed). So we label this verdict `VALIDATION_SHAPE_ONLY` and
+  // carry `shapeOnly: true` so no consumer can read it as an approval (REQ-004/AC-006).
   app.post("/api/fulfillment/pod/validate-dispatch", async (req, res) => {
     const { workflowRunId, artifact } = req.body;
     if (!workflowRunId || !artifact) {
       return res.status(400).json({ ok: false, error_code: "INVALID_REQUEST" });
     }
-    res.json({ ok: true, status: "READY_FOR_DISPATCH" });
+    res.json({
+      ok: true,
+      status: "SHAPE_VALID",
+      label: "VALIDATION_SHAPE_ONLY",
+      shapeOnly: true,
+      message:
+        "Request shape is well-formed. This is NOT dispatch authorization — the approval gate is POST /api/fulfillment/pod/dispatch.",
+    });
   });
 
+  // REQ-001 (sizhu-agent-safe-ops) — THE load-bearing money gate.
+  //
+  // dispatchArtifact is real-money POD work. Before ANY dispatch work runs, the
+  // request must present a server-side approval record that:
+  //   • exists, is unexpired, is still `unused`,
+  //   • carries the exact minted nonce (a forged/missing nonce fails closed), and
+  //   • is BOUND to this (workflowRunId, artifactId) — the RECORD decides, never a
+  //     caller-supplied body field like `artifact.status` (BLOCKER-3).
+  //
+  // appServices.approvals is the SAME mode-switched seam as every other repo: the
+  // durable LocalApprovalRepository in DEMO_LOCAL, the throwing Supabase stub in every
+  // other mode. So in production consumeApproval THROWS ⇒ this route fails CLOSED
+  // (403, no provider call) — never a 500, never a fall-through to dispatchArtifact.
+  //
+  // assertDispatchAllowed is the SECONDARY shape-check below; consumeApproval is the
+  // PRIMARY/load-bearing decider. The nonce is a secret consume token and is NEVER
+  // logged or echoed; error responses carry only the machine-readable error_code.
   app.post("/api/fulfillment/pod/dispatch", async (req, res) => {
+    const { workflowRunId, input, artifact } = req.body ?? {};
+
+    // Accept the approval credentials under either the explicit field name or the
+    // `approval`-prefixed alias. artifactId comes from the approval body / the artifact.
+    const recordId: unknown = req.body?.recordId ?? req.body?.approvalRecordId;
+    const nonce: unknown = req.body?.nonce ?? req.body?.approvalNonce;
+    const artifactId: unknown = req.body?.artifactId ?? artifact?.id;
+
+    // No credentials presented → nothing to consume → gate-reject. (AC-001 / AC-002:
+    // a fabricated body with no approval record can never authorize a dispatch.)
+    if (
+      typeof workflowRunId !== "string" ||
+      typeof artifactId !== "string" ||
+      typeof recordId !== "string" ||
+      typeof nonce !== "string"
+    ) {
+      return res
+        .status(403)
+        .json({ ok: false, error_code: "DISPATCH_NOT_ALLOWED" });
+    }
+
+    // PRIMARY GATE: atomically consume the single-use approval record. In prod the
+    // store throws (SupabaseNotConfiguredError) → fail closed with 403, no provider
+    // call (AC-003b). A {ok:false} verdict (absent/tampered/expired/used/binding-
+    // mismatch) likewise yields 403 with the store's own error_code.
+    let consumed;
     try {
-      const { workflowRunId, input, artifact } = req.body;
+      consumed = await appServices.approvals.consumeApproval({
+        recordId,
+        workflowRunId,
+        artifactId,
+        nonce,
+      });
+    } catch {
+      // Prod / store-not-configured boundary: never a 500, never a fall-through.
+      return res
+        .status(403)
+        .json({ ok: false, error_code: "DISPATCH_NOT_ALLOWED" });
+    }
+
+    if (!consumed.ok) {
+      return res
+        .status(403)
+        .json({ ok: false, error_code: consumed.error_code });
+    }
+
+    // The record is the decider: dispatch ONLY the artifactId the record approved
+    // (the consume already enforced the binding — do NOT re-trust the body here).
+    const approvedArtifactId = consumed.record.artifactId;
+
+    // SECONDARY shape-check: assertDispatchAllowed mirrors the server-side decision
+    // onto the run/artifact shape (and gives that guard a real server-route caller,
+    // P9). It is NOT the load-bearing gate — the consumed record above already is.
+    const gateRun = {
+      id: consumed.record.workflowRunId,
+      status: "pod_ready",
+      acceptedArtifactId: approvedArtifactId,
+    } as WorkflowRun;
+    const gateArtifact = {
+      id: approvedArtifactId,
+      status: "accepted",
+    } as ImageArtifact;
+    try {
+      WorkflowStateMachine.assertDispatchAllowed(gateRun, gateArtifact);
+    } catch {
+      return res
+        .status(403)
+        .json({ ok: false, error_code: "DISPATCH_NOT_ALLOWED" });
+    }
+
+    try {
       const result = await podDispatchService.dispatchArtifact(
         workflowRunId,
         input,
-        artifact,
+        { ...(artifact ?? {}), id: approvedArtifactId },
       );
       if (!result.ok) {
         return res.status(400).json(result);

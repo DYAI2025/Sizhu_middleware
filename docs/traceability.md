@@ -193,3 +193,120 @@ Date: 2026-06-15
   classification suffice; no new `run_live` RBAC permission this slice.
 - NFR-5 latency = `ungeprüft` — benchmark in build; do not assert a number.
 - No open BLOCKER (canvas decisions R1/R2/R3/R8/A3/A4/C2/§5/§7 all RESOLVED).
+
+---
+
+# Traceability Matrix: sizhu-agent-safe-ops
+
+Status: user-confirmed
+Confirmed by user: yes
+Confirmation date: 2026-06-17
+Feature Slug: sizhu-agent-safe-ops
+PRD: docs/prd/sizhu-agent-safe-ops.prd.md
+Vision: docs/vision/sizhu-agent-safe-ops.vision.md
+Canvas: docs/canvas/sizhu-agent-safe-ops.canvas.md
+
+> **Re-baselined 2026-06-17 gegen HEAD nach dem LGQ-Merge** + **amended after the Phase 0.16
+> Council** (full-schema rebuild: F1 BLOCKER fixed — the 6 mandatory Canvas fields + True-Line
+> fields + `wired-in-prod?` + `evidence-class` now present on every top-level REQ).
+> Namens-Hinweis: NICHT zu verwechseln mit `sizhu-live-generate-qa-loop (Slice A)` oben.
+> Council decisions encoded: gate = Defense-in-Depth (REQ-001/002); Epic C (REQ-009/010/011)
+> DEFERRED; Epic B = delete stdio (REQ-006/007); REQ-005 already done on the HTTP transport.
+
+## Legend / shared values (sizhu-agent-safe-ops)
+
+- **canvas-link** (all rows): `docs/canvas/sizhu-agent-safe-ops.canvas.md`
+- **vision-link** (all rows): `docs/vision/sizhu-agent-safe-ops.vision.md`
+- **canvas-problem CAN-001**: POD pipeline never e2e-tested; agent `/api`+MCP surface mixes
+  real / lying (empty lists, shape-only `READY`) / un-gated elements; dispatch bypasses the gate.
+- **canvas-target-user CAN-002**: Sizhu operators + remote AI agents (Claude Code, Codex, Hermes, openclaw).
+- **canvas-value CAN-003**: an agent-safe, truthful ops layer — no fake success, no ungated money path, one MCP surface.
+- **canvas-success CAN-009**: dispatch only with a valid (single-use, consumed) approval + gate; no fabricated empty data; one tool catalog.
+- **wired-in-prod?** = a NON-TEST importer reachable from `createApp()` proves the capability on the live path (P1/P9). The gate (REQ-001) is the load-bearing P9 case: `assertDispatchAllowed` must gain a server-route caller (today it has ZERO — belegt, server/index.ts:231-234).
+- **evidence-class** ∈ {unit-fake, integration-fake, real-boundary-smoke, production-verified}; cells show the **TARGET** for TO-BUILD rows.
+- **value-check-id** ties each REQ to its True-Line check; **true-line-status** ∈ {aligned, value-risk, contradiction, deferred}.
+
+### In-scope this iteration (Epic A + Epic B)
+
+| REQ-ID | requirement (short) | acceptance-test(s) | task(s) | evidence | wired-in-prod? | evidence-class (TARGET) | canvas-problem | canvas-target-user | canvas-value-claim | canvas-success-signal | canvas-risk-status | value-check-id | true-line-status |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| REQ-001 | Dispatch route money-gate. sensitive/aal2 = **DONE** (auth.ts:154, caller-auth NOT the gate); TO-BUILD = approval-record consume + artifact-identity binding at the route. REQ-002 is the sole load-bearing gate. | AC-001, AC-003b, AC-004 | T-ASO-2 | TO BUILD — importer-grep (gate gains a server-route caller, P9/EV-001) + 403 supertest RED-on-revert. (sensitive-classify already belegt, not re-counted as work — spec-audit BLOCKER-2) | planned → **yes** (P9 core: route caller) | real-boundary-smoke (auth/gate via supertest vs createApp; pass-path integration) | CAN-001 | CAN-002 | CAN-003 | CAN-009 | aligned | VC-001 | aligned (verify Gate E on build) |
+| REQ-002 | **Sole load-bearing money gate**: persisted single-use approval-record (ApprovalRepository; binds runId+artifactId server-side; atomic consume; no sequential OR concurrent replay; dispatched-id must == approved-id) | AC-002, AC-002b, AC-003, AC-003c, AC-004 | T-ASO-1 | TO BUILD — unit: valid/tampered/expired/used/id-mismatch → correct verdict (EV-002); sequential+concurrent replay rejected (spec-audit BLOCKER-3/CONCERN-2) | planned → **yes** (consumed by REQ-001 route) | integration-fake → real-boundary-smoke | CAN-001 | CAN-002 | CAN-003 | CAN-009 | aligned (narrow persistence carve-out; OQ-005 prod fail-closed) | VC-002 | aligned (verify Gate E) |
+| REQ-003 | Truthful reads `NOT_IMPLEMENTED`/`SOURCE_NOT_CONFIGURED` (no fabricated empty success) | AC-005 | T-ASO-3 | TO BUILD — route test vs createApp: no `200 {workflows:[]}`/`{issues:[]}` (EV-003) | planned → **yes** | real-boundary-smoke (supertest vs createApp) | CAN-001 | CAN-002 | CAN-003 | CAN-009 | aligned (RISK-002 consumer-break: coordinate UI/MCP) | VC-003 | aligned (verify Gate E) |
+| REQ-004 | `validate-dispatch` never `READY_FOR_DISPATCH` for non-accepted artifact | AC-006 | T-ASO-3 | TO BUILD — non-accepted ⇏ READY (EV-004) | planned → **yes** | real-boundary-smoke | CAN-001 | CAN-002 | CAN-003 | CAN-009 | aligned | VC-004 | aligned (verify Gate E) |
+| REQ-005 | `sizhu_pod_dispatch` registered only with `MCP_ENABLE_DISPATCH=true` | AC-007 | (done) | **DONE (HTTP transport)** — `mcp-server/src/server.ts:138` + smoke off→10/on→11 tools (EV-005); keep guard green | **yes** (HTTP, verified) | real-boundary-smoke (live tools/list smoke run 2026-06-15) | CAN-001 | CAN-002 | CAN-003 | CAN-009 | aligned | VC-005 | aligned |
+| REQ-006 | Single tool-catalog source (HTTP `mcp-server` after stdio deleted) | AC-008 | T-ASO-4 | TO BUILD — grep: no second hand-catalog after deletion (EV-006) | planned → **yes** | integration → real-boundary-smoke | CAN-001 | CAN-002 | CAN-003 | CAN-009 | aligned | VC-006 | aligned (verify Gate E) |
+| REQ-007 | Delete the redundant `server/mcp` stdio transport + `package.json` scripts (0 importers, ADR-0001) | AC-009 | T-ASO-4 | TO BUILD — `server/mcp` removed; importer-grep already = ZERO (belegt); build green (EV-007). **agentPolicy check (spec-audit CONCERN-3, belegt):** `server/mcp/auth/agentPolicy.ts` is stdio-only; HTTP surface forwards aal2 → `/api` apiGuard enforces; deletion widens no auth gap. | **yes** (removal verified by absence + importer-grep) | real-boundary-smoke (build/test green post-removal) | CAN-001 | CAN-002 | CAN-003 | CAN-009 | aligned (attack-surface reduced) | VC-007 | aligned (verify Gate E) |
+| REQ-008 | Guard test: dangerous tools (dispatch) off-by-default on the single HTTP surface, RED-on-revert | AC-010 | T-ASO-5 | TO BUILD — off-by-default test + RED-on-revert (EV-008) | planned → **yes** | unit-fake → integration | CAN-001 | CAN-002 | CAN-003 | CAN-009 | aligned | VC-008 | aligned (verify Gate E) |
+
+### Deferred this iteration (Epic C — Backlog, NOT a working premise)
+
+| REQ-ID | requirement | wired-in-prod? | evidence-class | canvas-risk-status | true-line-status |
+|---|---|---|---|---|---|
+| REQ-009 | OrderInputSchema / ProductTemplateSchema (types) | n/a | n/a (deferred) | blocked (deferred; build with a real consumer) | deferred |
+| REQ-010 | Granular WorkflowState machine | n/a | n/a (deferred) | blocked (deferred; gate uses coarse stateMachine.ts) | deferred |
+| REQ-011 | WorkflowEvent + Record contracts | n/a | n/a (deferred) | blocked (deferred) | deferred |
+
+## Reality-Ledger notes (must not be laundered)
+
+- **REQ-001 is the load-bearing P9 case.** Today `assertDispatchAllowed` has ZERO server-route
+  callers (belegt: server/index.ts:231-234 → dispatchArtifact() direct). The row may NOT flip
+  `wired-in-prod=yes` until an importer-grep shows the gate called on the live `/dispatch` route.
+- **Spec-audit (Phase 0.7) premise corrections — must not regress:**
+  - *BLOCKER-1:* the sole load-bearing money gate is **REQ-002 (approval record)**. aal2/sensitive
+    is caller-auth (already at auth.ts:154 and still ungated today = C-1); `assertDispatchAllowed`
+    reads `artifact.status` (a body field) = secondary shape-check. Do NOT present three co-equal
+    money-path layers.
+  - *BLOCKER-2:* `/dispatch` sensitive-classification is **already DONE** (auth.ts:154) — not counted
+    as TO-BUILD work; only the record-consume + artifact-binding is TO-BUILD (the P9 case).
+  - *BLOCKER-3:* "server state decides" (AC-002) is credited to the **approval-record leg**, never to
+    `assertDispatchAllowed`. There is no RunRepository read-by-id (interfaces.ts = save-only), so the
+    record's server-side (runId, artifactId) binding IS the server state; dispatched artifactId must
+    equal the approved one (AC-002b).
+  - *CONCERN-1 (value-truth):* in PRODUCTION (`sizhu.fufire.space`, VIS-001) dispatch is **fail-closed /
+    non-functional this iteration** (prod approval store = throwing Supabase stub). Recorded plainly,
+    requires explicit user acceptance at the USER GATE; never softened to "blocks safely".
+- **REQ-005 is the only DONE row** (HTTP transport flag-gate, verified live 2026-06-15). All other
+  in-scope rows are TO BUILD; cells show TARGET evidence-class.
+- **Approval-record durability (OQ-005).** Restart-survival holds in DEMO_LOCAL (Local repo); in
+  prod the Supabase stub throws ⇒ dispatch fail-closed. This is safe-by-blocking, recorded — not a
+  silent in-memory shortcut (which would re-create the replay theatre the Council flagged).
+- **Epic C deferral is recorded, never "done".** REQ-009/010/011 are backlog; Vision VIS-006 #4
+  (granular contracts referenced by gate) is explicitly NOT delivered this iteration (PRD §Scope status).
+
+## Coverage (sizhu-agent-safe-ops)
+
+In-scope REQ-001..008 each bind to Vision, Canvas (all 6 mandatory fields), Acceptance Criteria,
+Evidence, `wired-in-prod?`, `evidence-class`, and a True-Line check — no orphan. REQ-009/010/011
+DEFERRED (Epic C backlog). **F1 BLOCKER resolved**: the matrix now carries the full required schema.
+Open: OQ-005 (approval-store home — leading ASSUMPTION, confirm at Phase 0.5). No other open BLOCKER.
+
+## Build outcome — Phase 3 (2026-06-17)
+
+Phase 2 committed: T1 `85dc169`, T2 `10966cc`, T4 `645bd70`, T3 `cceeb34`, T6 `a0dd004`, T5 `9b614ca`.
+T7 subsumed into REQ-008's already-green guard (M re-scoped 8→7). Full suite **462 passed / 0 failed /
+1 skip** (the documented route-happy-path `it.skip`); tsc green. PRIL reality-check **PASS** at
+`--min-evidence integration` (`docs/reality/sizhu-agent-safe-ops.evidence.jsonl`). The money path (T2/T3)
+ran the full per-increment chain: code-review + security-review + Watcher.
+
+| REQ | wired-in-prod | evidence-class | proof |
+|---|---|---|---|
+| REQ-001 | **yes** | real-boundary-smoke | gate @ `server/index.ts:279` (consumeApproval before dispatch); aso.dispatch.gate + aso.gate.wiredInProd green; P9 importer-grep |
+| REQ-002 | **yes** | integration | LocalApprovalRepository; aso.approvalRecord 10/10; Stryker money-guards 100% killed (68.29% total — survivors are storage-env) |
+| REQ-003 | **yes** | real-boundary-smoke | 501 NOT_IMPLEMENTED; aso.truthfulReads green |
+| REQ-004 | **yes** | real-boundary-smoke | VALIDATION_SHAPE_ONLY (no bare READY_FOR_DISPATCH); aso.truthfulReads green |
+| REQ-005 | **yes** | real-boundary-smoke | MCP_ENABLE_DISPATCH gate; live tools/list smoke 2026-06-15 |
+| REQ-006 | **yes** | integration | single HTTP catalog post stdio-delete; aso.mcpCatalog 7/7 |
+| REQ-007 | **yes** | real-boundary-smoke | server/mcp deleted (0 importers, CONCERN-3 cleared); tsc + suite green |
+| REQ-008 | **yes** | integration | dispatch off-by-default guard; mutation-verified RED-on-revert |
+
+Reality-Ledger caveats (carried, NOT laundered): **prod dispatch is fail-closed this iteration**
+(CONCERN-1, user-accepted) — evidence is real-boundary via `createApp` + the real Local repo, NOT a
+live POD/Supabase dispatch (deferred prod-store slice). **Mutation 68.29%** reflects untestable
+storage-env survivors; the money-consume guards are 100% killed. Follow-ups: (a) survivor-hardening
+(jsdom localStorage path), (b) un-skip aso.dispatch.gate.routes.test.ts:175 (route-happy-path) when an
+approval-mint route + prod store land, (c) doc-cleanup of stale server/mcp references.
+
+## User Confirmation (sizhu-agent-safe-ops)
+
+The assistant must not confirm this matrix. Bestätigung erfolgt durch den Nutzer (Confirmation-Block im Chat).

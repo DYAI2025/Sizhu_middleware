@@ -1,7 +1,20 @@
 # ADR 0001 — Canonical MCP-Surface für Agenten
 
-Status: **Accepted** — 2026-06-17
+Status: **Superseded in part** — 2026-06-17 (by feature `sizhu-agent-safe-ops`; see banner)
 Kontext-Slice: MCP-Konsolidierung (Slice B aus `docs/audit/2026-06-17-architecture-mcp-audit.md`)
+
+> **SUPERSEDED IN PART (2026-06-17, feature `sizhu-agent-safe-ops`).** Reversed/resolved since this ADR
+> was accepted (the historical record below is kept intact for context):
+> - **Decision #2 + "Bewusst NICHT: Löschen der stdio-Surface" → REVERSED.** The stdio surface
+>   (`server/mcp/`, `npm run mcp:stdio`/`test:mcp`) was **deleted** (REQ-006/007 — verified zero
+>   production importers). The HTTP `mcp-server/` is now the **single** canonical surface. `agentPolicy`
+>   was stdio-only; the HTTP path's auth is `/api`'s apiGuard (token-forwarding), so the deletion widens
+>   no auth gap. (The "Portierung von agentPolicy" rejection is therefore moot.)
+> - **Decision #4's open dependency (C-1) → RESOLVED.** `POST /api/fulfillment/pod/dispatch` now enforces
+>   a server-side **single-use approval-record gate** (`consumeApproval`); `sizhu_pod_dispatch` stays
+>   default-off. **Caveat (CONCERN-1):** prod dispatch is fail-closed/non-functional this iteration (the
+>   prod approval store is a throwing Supabase stub) — a working prod dispatch awaits the Supabase slice.
+> - The "Verifikation" `npm run test:mcp` line is obsolete (those tests were deleted with the surface).
 
 ## Kontext
 

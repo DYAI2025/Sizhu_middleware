@@ -8,15 +8,18 @@ import {
   LocalRoleRepository,
   LocalProviderRepository
 } from '../repositories/localRepository';
-import { 
-  SupabaseProductRepository, 
-  SupabaseTemplateRepository, 
-  SupabaseWorkflowRepository, 
-  SupabaseArtifactRepository, 
-  SupabaseSettingsRepository, 
+import { LocalApprovalRepository } from '../repositories/approvalRepository';
+import {
+  SupabaseProductRepository,
+  SupabaseTemplateRepository,
+  SupabaseWorkflowRepository,
+  SupabaseArtifactRepository,
+  SupabaseSettingsRepository,
   SupabaseRoleRepository,
-  SupabaseProviderRepository
+  SupabaseProviderRepository,
+  SupabaseApprovalRepository
 } from '../repositories/supabaseRepository.stub';
+import { ApprovalRepository } from '../repositories/interfaces';
 import { 
   MockImageGenerationProvider, 
   MockQualityGateProvider, 
@@ -35,6 +38,7 @@ const localArtifactRepo = new LocalArtifactRepository();
 const localSettingsRepo = new LocalSettingsRepository();
 const localRoleRepo = new LocalRoleRepository();
 const localProviderRepo = new LocalProviderRepository();
+const localApprovalRepo = new LocalApprovalRepository();
 
 const mockGen = new MockImageGenerationProvider();
 const mockQa = new MockQualityGateProvider();
@@ -64,6 +68,7 @@ const supabaseArtifactRepo = new SupabaseArtifactRepository();
 const supabaseSettingsRepo = new SupabaseSettingsRepository();
 const supabaseRoleRepo = new SupabaseRoleRepository();
 const supabaseProviderRepo = new SupabaseProviderRepository();
+const supabaseApprovalRepo = new SupabaseApprovalRepository();
 
 // Stub runner that matches the runner's PUBLIC surface but throws the explicit,
 // typed boundary error. AC-D-001a/b: outside DEMO_LOCAL the pipeline never runs
@@ -125,6 +130,18 @@ export const appServices = {
 
   get providers() {
     return selectDependency(localProviderRepo, supabaseProviderRepo);
+  },
+
+  // OQ-005: the approval store is the SOLE load-bearing money gate. In DEMO_LOCAL it is
+  // the durable LocalApprovalRepository; in EVERY other mode it is the throwing Supabase
+  // stub — so in production the store throws ⇒ the downstream dispatch gate fails CLOSED
+  // (no store ⇒ no consumable approval ⇒ no real POD dispatch). Wired through the SAME
+  // selectDependency() seam as every other repo (AC-D-001b: no Local* outside DEMO_LOCAL).
+  get approvals(): ApprovalRepository {
+    // Pin T to the interface: LocalApprovalRepository carries a test-only `reset()`
+    // convenience the Supabase stub does not, so inference off the first arg would over-
+    // constrain T. Both still satisfy the ApprovalRepository contract the facade exposes.
+    return selectDependency<ApprovalRepository>(localApprovalRepo, supabaseApprovalRepo);
   },
 
   get workflowRunner(): WorkflowRunner {
