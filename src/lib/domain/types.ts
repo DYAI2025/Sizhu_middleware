@@ -97,6 +97,9 @@ export interface GenerationConfig {
   fallbackModel: string;
   fallbackLLM: string;
   fallbackSecretRef: string;
+  // Hard cost cap for a live run (REQ-LGQ-004). Optional: absent → derived default.
+  maxImagesPerRun?: number;
+  maxUsdPerRun?: number;
 }
 
 // 10. quality_gate_configs
@@ -190,6 +193,9 @@ export interface ImageArtifact {
   rejectionReason?: string;
   qaResultJson: string;
   generatedAt: string;
+  // Provenance (REQ-LGQ-006, OQ-3): producing model + PII-safe provenance string.
+  modelUsed?: string;
+  promptVarsProvenance?: string;
 }
 
 // 16. workflow_logs
