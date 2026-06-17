@@ -18,8 +18,9 @@ import {
   AppRoleName, 
   Permission, 
   RolePermissions, 
-  GenerationConfig, 
-  PodProviderConfig 
+  GenerationConfig,
+  PodProviderConfig,
+  DispatchApproval
 } from '../domain/models';
 
 import {
@@ -29,7 +30,9 @@ import {
   WorkflowRepository,
   ArtifactRepository,
   RoleRepository,
-  SettingsRepository
+  SettingsRepository,
+  ApprovalRepository,
+  ConsumeApprovalResult
 } from './interfaces';
 
 import { SupabaseNotConfiguredError } from './errors';
@@ -105,6 +108,25 @@ export class SupabaseArtifactRepository implements ArtifactRepository {
     return notConfigured();
   }
   async saveImageArtifacts(): Promise<void> {
+    return notConfigured();
+  }
+}
+
+// AC (OQ-005): the approval store is the SOLE load-bearing money gate. Outside
+// DEMO_LOCAL every method MUST throw the explicit, typed boundary error — never a
+// fake-success / mock fallback. A throwing store makes the downstream dispatch gate
+// fail CLOSED: no readable/writable approval record ⇒ no consume ⇒ no real POD
+// dispatch. There is NO read carve-out here (unlike provider health / active role,
+// which are UX mirrors): a money gate that silently "reads" an approval would be a
+// fictional gate, so getApproval/consumeApproval throw too.
+export class SupabaseApprovalRepository implements ApprovalRepository {
+  async createApproval(): Promise<DispatchApproval> {
+    return notConfigured();
+  }
+  async getApproval(): Promise<DispatchApproval | null> {
+    return notConfigured();
+  }
+  async consumeApproval(): Promise<ConsumeApprovalResult> {
     return notConfigured();
   }
 }
