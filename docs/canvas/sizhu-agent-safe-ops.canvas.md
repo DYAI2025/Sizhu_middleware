@@ -24,6 +24,41 @@ Amendment note: Was user-confirmed at Phase 0.15 (2026-06-17, ben.poersch@gmail.
 | Allowed Scope | CAN-011 | `server/index.ts` (Dispatch/Validate/Read-Routen), `server/middleware/auth.ts` (SENSITIVE_API_ROUTES-Eintrag für `/dispatch`), neues Approval-Record-Modul + `ApprovalRepository` unter `src/lib/repositories/*` + `src/lib/workflow/stateMachine.ts` (assertDispatchAllowed-Aufrufstelle), `supabase-schema.sql` (`dispatch_approvals`-Tabelle, Contract-only/stub-werfend), Löschung von `server/mcp/*` + `package.json` (Script `mcp:stdio`/`test:mcp`), `mcp-server/*` (Single-Surface), zugehörige Tests unter `server/tests/*`, `src/tests/*`, `mcp-server/src/*`. Epic-C-Module NICHT in diesem Run. Keine `/api`-Routen außerhalb Fulfillment/Workflows/Gateway. | EXPLICIT (post-council) | SRC-005, Council 2026-06-17 |
 | Unresolved Questions | CAN-012 | **OQ-001 RESOLVED** (Council/User 2026-06-17): kein bespoke Signing-Key — Defense-in-Depth = aal2/sensitive + persistierter Single-Use-Approval-Record + assertDispatchAllowed-auf-Route. **OQ-002 RESOLVED**: stdio löschen. **OQ-003 RESOLVED**: NOT_IMPLEMENTED, kein Store. **OQ-004 RESOLVED**: H-1/H-2/H-4 out-of-scope (LGQ-gelöst). **OQ-005 NEW (zu bestätigen Phase 0.5)**: Approval-Store-Home — ASSUMPTION = mode-switched Repo-Seam (`ApprovalRepository`), DEMO_LOCAL=Local durable, Prod=Supabase-Stub→fail-closed. | EXPLICIT (post-council) | SRC-005, Council 2026-06-17 |
 
+## Allowed change scope
+
+Machine-readable rendering of CAN-011 (faithful, no code-scope broadening) + the P5 process/verification
+artifact classes this feature necessarily produces. Read by `plumbline-scope-check` / the PRIL Stop hook.
+
+- `docs/canvas/sizhu-agent-safe-ops.canvas.md`
+- `docs/prd/sizhu-agent-safe-ops.prd.md`
+- `docs/vision/sizhu-agent-safe-ops.vision.md`
+- `docs/traceability.md`
+- `docs/plans/**`
+- `docs/context/**`
+- `docs/reality/**`
+- `docs/verification/**`
+- `docs/decisions/**`
+- `server/index.ts`
+- `server/middleware/auth.ts`
+- `src/lib/repositories/**`
+- `src/lib/workflow/stateMachine.ts`
+- `supabase-schema.sql`
+- `server/mcp/**`
+- `mcp-server/**`
+- `server/tests/**`
+- `src/tests/**`
+- `mcp-server/src/**`
+- `mcp-server/tests/**`
+- `package.json`
+- `stryker.config.json`
+- `metrics/**`
+
+> NOTE (scope-clarification, surfaced to user 2026-06-17): the bullets above are CAN-011 verbatim + P5
+> process artifacts. The build will additionally need wiring files NOT in CAN-011's literal list
+> (`src/lib/app/**` facade, `src/lib/domain/**` / `src/types.ts` for the `ApprovalRecord` type,
+> `server/services/**` for the dispatch service). Those are pending explicit user scope-confirmation —
+> NOT added here silently; they are escalated at the USER GATE / point-of-need.
+
 ## User Confirmation
 
 The assistant must not confirm this canvas. Siehe Confirmation-Block im Chat / docs/traceability.md.
