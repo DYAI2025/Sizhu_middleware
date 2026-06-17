@@ -10,8 +10,6 @@
 | `npm run lint` | `tsc --noEmit` | Type-check only. No ESLint. |
 | `npm run test` | `vitest run` | No vitest.config — defaults apply. |
 | `npm run test:mutation` | `stryker run` | Opt-in on curated modules in `stryker.config.json` |
-| `npm run mcp:stdio` | Start embedded MCP server (stdio) | Entry in `server/mcp/server.ts` |
-| `npm run test:mcp` | `vitest run server/mcp/tests` | Focused MCP test run |
 | `npm run smoke:fufire` | `tsx scripts/smoke/fufire-live-smoke.ts` | Real-boundary FuFire smoke test |
 | `npm run probe:fufire-location` | `tsx scripts/smoke/fufire-location-probe.ts` | Adversarial location-probe |
 | `npm run smoke:openrouter` | `tsx scripts/smoke/openrouter-live-smoke.ts` | Real-boundary OpenRouter smoke |
@@ -23,11 +21,9 @@ Test shortcuts:
 ## Repo structure
 
 ```
-server/          — Express API (auth, services, MCP tools, tests)
+server/          — Express API (auth, services, tests)
   index.ts       — createApp() + startServer(); dotenv loaded here
-  tests/         — 24 route/service test files
-  mcp/           — Embedded MCP server (stdio transport, inside main process)
-  mcp/tests/     — 7 MCP tool + registry tests
+  tests/         — route/service test files (incl. aso.* agent-safe-ops suites)
 src/             — React 19 frontend (Vite, Tailwind v4, Motion)
   tests/         — 8 frontend tests
   lib/app/       — appMode, appServices facade, serviceFactory
@@ -44,11 +40,11 @@ scripts/smoke/   — Live real-boundary smoke tests (FuFire, OpenRouter)
 docs/            — Deployment, security, architecture, PRD, reality tracking
 ```
 
-## Two MCP servers (watch this)
+## MCP server (single canonical surface)
 
-**Internal (`server/mcp/`)** — embedded in main Express, stdio transport, reads config from main process env. Started via `npm run mcp:stdio`.
+The embedded stdio surface (`server/mcp/`) was **removed** (feature sizhu-agent-safe-ops, REQ-007 — zero production importers; ADR-0001 superseded). The standalone HTTP `mcp-server/` is now the **only** MCP surface.
 
-**Standalone (`mcp-server/`)** — separate npm package (`package.json` at `/mcp-server/`), HTTP streamable transport, proxies all tool calls to `SIZHU_BASE_URL/api`. Stateless per-request: creates a fresh client+server+transport for each POST to `/mcp`. Has its own `tsconfig.json` (Node16 resolution, not bundler).
+**`mcp-server/`** — separate npm package (`package.json` at `/mcp-server/`), HTTP streamable transport, proxies all tool calls to `SIZHU_BASE_URL/api` (auth enforced by `/api`'s `apiGuard` — the package holds no admin secret, forwards the caller's bearer). Stateless per-request: a fresh client+server+transport per POST to `/mcp`. Own `tsconfig.json` (Node16 resolution). `sizhu_pod_dispatch` is off by default (gated behind `MCP_ENABLE_DISPATCH=true`).
 
 ## Single-server model (non-obvious)
 
@@ -88,10 +84,9 @@ Imports mix `@/types` and `../domain/models`. Before adding/changing a field, ch
 ## Testing quirks
 
 - No vitest config — vitest uses defaults.
-- Frontend tests: `src/tests/`. API tests: `server/tests/`. MCP tests: `server/mcp/tests/`.
+- Frontend tests: `src/tests/`. API tests: `server/tests/`. The HTTP `mcp-server/` package has its own tests.
 - Auth security matrix: `server/tests/security.matrix.routes.test.ts` — asserts every route's auth classification.
-- MCP-specific: `npm run test:mcp` (runs `server/mcp/tests/`). Tests pass a `SizhuClient` to tools — the client can be backed by real or mock server.
-- Stryker mutation testing targets **pure** modules only: `server/lib/jwt.ts`, `server/services/fufire*.ts`, `server/services/podDispatchService.ts`, `server/services/birthInputNormalizer.ts`. Not adopted broadly — opt-in per module via `stryker.config.json:mutate`.
+- Stryker mutation testing targets **pure** modules only: `server/lib/jwt.ts`, `server/services/fufire*.ts`, `server/services/podDispatchService.ts`, `server/services/birthInputNormalizer.ts`, `src/lib/repositories/approvalRepository.ts`. Not adopted broadly — opt-in per module via `stryker.config.json:mutate`.
 
 ## Deployment
 
@@ -118,6 +113,6 @@ Imports mix `@/types` and `../domain/models`. Before adding/changing a field, ch
 | P8 | Never trust agent self-report — verify with `git status` / Stryker / importer grep |
 | P9 | Safety guarantee verified at the ENFORCING component, not assumed |
 
-## MCP dispatch payment path — KNOWN GAP
+## MCP dispatch payment path — gated (sizhu-agent-safe-ops)
 
-`pod_dispatch` is OFF by default (`MCP_ENABLE_DISPATCH=true` to enable). The backend dispatch route does NOT enforce `assertDispatchAllowed` server-side — an agent could craft a fabricated artifact and get through. Do not use against real money without a server-side approval gate.
+`pod_dispatch` is OFF by default (`MCP_ENABLE_DISPATCH=true` to enable). The backend route `POST /api/fulfillment/pod/dispatch` now enforces a server-side **single-use approval-record gate** (`consumeApproval`, `server/index.ts`) before any provider call — a fabricated `{status:'accepted'}` artifact is rejected `403 DISPATCH_NOT_ALLOWED`; `assertDispatchAllowed` is a secondary shape-check. **Caveat (CONCERN-1):** in production the approval store (Supabase) is a throwing stub, so prod dispatch is **fail-closed / non-functional** this iteration — a working prod dispatch awaits the Supabase approval-store slice + an approval-mint route. The safety invariant (no ungated money path) holds; the positive flow is DEMO_LOCAL-only.

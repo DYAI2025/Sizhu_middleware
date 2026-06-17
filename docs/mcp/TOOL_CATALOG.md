@@ -1,8 +1,8 @@
 # Sizhu MCP Tool Catalog
 
-> **Surface:** this catalog documents the **LOCAL stdio** surface (`server/mcp/`, run via `npm run mcp:stdio`). The **canonical remote** agent surface is the `sizhu-mcp-server` HTTP proxy under `mcp-server/` (see its README). Both surfaces share the unified `sizhu_*` tool naming; the stdio surface is an intentional **strict subset** (local-safe read/test tools only — no workflow listing, fulfillment, or dispatch). Authority decision: `docs/decisions/0001-canonical-mcp-surface.md`.
+> **Surface (updated 2026-06-17):** the LOCAL stdio surface (`server/mcp/`, `npm run mcp:stdio`) this file originally documented was **REMOVED** (feature `sizhu-agent-safe-ops`, REQ-006/007 — `docs/decisions/0001-canonical-mcp-surface.md` superseded in part). The **single canonical** agent surface is now the `sizhu-mcp-server` HTTP proxy under `mcp-server/` — see **`mcp-server/README.md` for the authoritative tool list**. The `sizhu_*` names/schemas below carried over to the HTTP surface, so they remain useful detail for those shared tools, but `mcp-server/README.md` is the source of truth.
 
-Status: MCP foundation with active read-only tools plus a policy-gated FuFire test-run tool. Workflow run and POD dispatch are intentionally not active MCP tools in this build.
+Status: MCP foundation with active read-only tools plus a policy-gated FuFire test-run tool. On the canonical HTTP surface, `sizhu_pod_dispatch` exists but is OFF by default (`MCP_ENABLE_DISPATCH=true`); the backend dispatch route now enforces a server-side single-use approval gate (prod fail-closed this iteration — see the ADR-0001 banner).
 
 ## Active tools
 
