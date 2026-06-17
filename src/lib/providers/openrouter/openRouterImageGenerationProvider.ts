@@ -1,6 +1,6 @@
 import type { ImageGenerationProvider } from '../interfaces';
 import { ContractDriftError, OpenRouterHttpError } from './errors';
-import { buildRedactedPrompt, buildProvenanceString } from './piiRedaction';
+import { buildProvenanceString } from './piiRedaction';
 import { DEFAULT_IMAGE_PRICE_USD } from '../../workflow/costCap';
 
 type EnvSource = Record<string, string | undefined>;
@@ -68,18 +68,15 @@ export class OpenRouterImageGenerationProvider implements ImageGenerationProvide
   > {
     const apiKey = this.resolveApiKey(secretRef);
 
-    // F2: the raw `prompt` (carrier of name/birth_date/birth_place) is DROPPED.
-    // The wire text is reconstructed from allowlisted non-PII derived vars only.
-    const redactedPrompt = buildRedactedPrompt(
-      customerData,
-      'Generate a personalized celestial totem image from the following non-PII derived attributes.',
-    );
+    // The `prompt` arrives ALREADY PII-redacted from the runner (REQ-LGQ-005,
+    // redactKnownPiiValues): the template art direction is intact, the raw birth
+    // fields are value-stripped. So it is forwarded faithfully — fidelity preserved.
     const provenance = buildProvenanceString(customerData);
 
     const body = {
       model,
       modalities: ['image', 'text'],
-      messages: [{ role: 'user', content: redactedPrompt }],
+      messages: [{ role: 'user', content: prompt }],
       n: numCandidates,
     };
 

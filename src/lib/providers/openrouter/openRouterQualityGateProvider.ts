@@ -1,6 +1,5 @@
 import type { QualityGateProvider } from '../interfaces';
 import { ContractDriftError, OpenRouterHttpError } from './errors';
-import { buildRedactedPrompt } from './piiRedaction';
 
 type EnvSource = Record<string, string | undefined>;
 
@@ -15,10 +14,11 @@ const DEFAULT_BASE_URL = 'https://openrouter.ai/api/v1';
  * Real OpenRouter vision quality-gate provider (REQ-LGQ-003/005/007).
  *
  * Guards:
- *  - PII redaction (F2): neither the incoming `qaPrompt` (which a misconfig could
- *    template with PII) nor the candidate's `metadata.promptUsed` is forwarded.
- *    The QA text is reconstructed from the non-PII derived-var allowlist + a static
- *    scoring instruction. Only the generated image (storagePath) crosses the wire.
+ *  - PII redaction (F2): the `qaPrompt` arrives ALREADY PII-redacted from the runner
+ *    (redactKnownPiiValues), so the operator's real scoring rubric is forwarded
+ *    faithfully (fidelity) with the literal birth PII value-stripped. The candidate's
+ *    `metadata.promptUsed` is NOT forwarded. Only the rubric + the generated image
+ *    (storagePath) cross the wire.
  *  - No-fake-success: a non-2xx status OR a response with no parseable score
  *    THROWS — the gate never silently default-passes a candidate.
  */
@@ -60,13 +60,12 @@ export class OpenRouterQualityGateProvider implements QualityGateProvider {
   > {
     const apiKey = this.resolveApiKey(secretRef);
 
-    // F2: drop the free-form qaPrompt (potential PII carrier) AND the candidate's
-    // promptUsed. Reconstruct the scoring text from the non-PII allowlist only.
-    const redactedQaText = buildRedactedPrompt(
-      resolvedVariables,
-      `Score how well this generated image matches the following non-PII derived attributes, ` +
-        `on a 0-100 scale (min acceptance ${minScore}). Respond ONLY with JSON {"score":<0-100>,"reason":"..."}.`,
-    );
+    // The qaPrompt is the operator's real scoring rubric, already PII-redacted by the
+    // runner — forwarded faithfully (fidelity). The candidate's promptUsed is NOT
+    // forwarded. A static JSON-format suffix ensures a parseable score.
+    const scoringText =
+      `${qaPrompt}\n\nRespond ONLY with JSON {"score":<0-100>,"reason":"..."} ` +
+      `(minimum acceptance score ${minScore}).`;
 
     const results = await Promise.all(
       candidates.map(async (candidate) => {
@@ -74,7 +73,7 @@ export class OpenRouterQualityGateProvider implements QualityGateProvider {
           {
             role: 'user' as const,
             content: [
-              { type: 'text' as const, text: redactedQaText },
+              { type: 'text' as const, text: scoringText },
               { type: 'image_url' as const, image_url: { url: candidate.storagePath } },
             ],
           },

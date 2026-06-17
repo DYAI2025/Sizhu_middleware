@@ -28,6 +28,7 @@ import {
 } from '../providers/interfaces';
 
 import { renderPrompt } from './promptRenderer';
+import { redactKnownPiiValues } from '../providers/openrouter/piiRedaction';
 import { CostCapError } from './costCap';
 import { WorkflowStateMachine } from './stateMachine';
 import { ArtifactService } from './artifactService';
@@ -221,6 +222,10 @@ export class WorkflowRunner {
     // escalation so a cap-stop is persisted distinguishably from quality exhaustion.
     let capStopReason: string | null = null;
 
+    // The run's literal birth PII — value-stripped from every outbound prompt/rubric
+    // (REQ-LGQ-005). The runner is the only layer that knows these exact values.
+    const piiValues = [customerName, birthDate, birthPlace, birthTimeKnown ? birthTime : undefined];
+
     while (currentIteration <= qualityConfig.maxRejectedBeforeEscalation) {
       newRun.currentIteration = currentIteration;
       const allLatestRuns = await this.workflowRepo.getWorkflowRuns();
@@ -254,6 +259,11 @@ export class WorkflowRunner {
       let compiledPrompt = '';
       try {
         compiledPrompt = renderPrompt(activeTemplate.content, templatePayload);
+        // PRIMARY PII redaction (REQ-LGQ-005): strip the run's literal birth PII from
+        // the compiled prompt while KEEPING the template art direction. The provider
+        // forwards this already-PII-free prompt, so fidelity is preserved AND no raw
+        // birth field reaches OpenRouter.
+        compiledPrompt = redactKnownPiiValues(compiledPrompt, piiValues);
       } catch (err: any) {
         await saveAndFireLog(`Compile Exception: ${err.message}`, 'GENERATE_CANDIDATES', 'error');
         newRun.status = 'failed';
@@ -313,10 +323,13 @@ export class WorkflowRunner {
         'quality_gate',
         qualityConfig.model
       );
+      // Redact any literal birth PII the operator may have templated into the QA
+      // rubric, keeping the real scoring criteria (fidelity). The provider forwards it.
+      const safeQaPrompt = redactKnownPiiValues(qualityConfig.qaPrompt, piiValues);
       const evaluations = await this.qaProvider.evaluate(
         generatedCandidates,
         qualityConfig.minAcceptanceScore,
-        qualityConfig.qaPrompt,
+        safeQaPrompt,
         qualityConfig.secretRef,
         qaModelUsed,
         personalizationVars,
