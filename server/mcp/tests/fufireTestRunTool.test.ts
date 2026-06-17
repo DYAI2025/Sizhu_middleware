@@ -36,16 +36,16 @@ afterEach(() => {
   previous.clear();
 });
 
-describe("sizhu.fufire_test_run", () => {
+describe("sizhu_run_fufire_test", () => {
   it("denies anonymous calls", async () => {
-    const result = await callRegisteredTool("sizhu.fufire_test_run", {}, anonymousMcpContext());
+    const result = await callRegisteredTool("sizhu_run_fufire_test", {}, anonymousMcpContext());
     expect(result.isError).toBe(true);
     expect(JSON.stringify(result)).toContain("MCP_AUTH_REQUIRED");
   });
 
   it("rejects client-controlled steering fields before service execution", async () => {
     const result = await callRegisteredTool(
-      "sizhu.fufire_test_run",
+      "sizhu_run_fufire_test",
       { baseUrl: "https://evil.example", operation: "bazi" },
       adminAal2,
     );
@@ -55,7 +55,7 @@ describe("sizhu.fufire_test_run", () => {
 
   it("rejects disallowed operations without an upstream call", async () => {
     const result = await callRegisteredTool(
-      "sizhu.fufire_test_run",
+      "sizhu_run_fufire_test",
       { operation: "stealSecrets" },
       adminAal2,
     );
@@ -65,7 +65,7 @@ describe("sizhu.fufire_test_run", () => {
 
   it("returns a controlled NOT_READY result when manual coordinates are missing", async () => {
     const result = await callRegisteredTool(
-      "sizhu.fufire_test_run",
+      "sizhu_run_fufire_test",
       { operation: "bazi", birthDate: "1990-01-01" },
       adminAal2,
     );
@@ -79,7 +79,7 @@ describe("sizhu.fufire_test_run", () => {
     process.env.SECRET_REF_FUFIRE_API_KEY = "test-fufire-key-do-not-log";
     process.env.FUFIRE_BASE_URL = "https://api.example.test";
     const result = await callRegisteredTool(
-      "sizhu.fufire_test_run",
+      "sizhu_run_fufire_test",
       { operation: "bazi", birthDate: "1990-01-01" },
       adminAal2,
     );

@@ -1,10 +1,12 @@
 # Sizhu MCP Tool Catalog
 
+> **Surface:** this catalog documents the **LOCAL stdio** surface (`server/mcp/`, run via `npm run mcp:stdio`). The **canonical remote** agent surface is the `sizhu-mcp-server` HTTP proxy under `mcp-server/` (see its README). Both surfaces share the unified `sizhu_*` tool naming; the stdio surface is an intentional **strict subset** (local-safe read/test tools only — no workflow listing, fulfillment, or dispatch). Authority decision: `docs/decisions/0001-canonical-mcp-surface.md`.
+
 Status: MCP foundation with active read-only tools plus a policy-gated FuFire test-run tool. Workflow run and POD dispatch are intentionally not active MCP tools in this build.
 
 ## Active tools
 
-### `sizhu.health_check`
+### `sizhu_get_health`
 
 - Description: Returns local MCP/service liveness.
 - Sensitivity: `public_read`
@@ -24,7 +26,7 @@ Status: MCP foundation with active read-only tools plus a policy-gated FuFire te
 {}
 ```
 
-### `sizhu.readiness_check`
+### `sizhu_get_readiness`
 
 - Description: Returns fail-closed readiness based on required FuFire and Supabase configuration.
 - Sensitivity: `session_read`
@@ -48,7 +50,7 @@ or:
   - `MCP_AUTH_REQUIRED` when called anonymously.
   - `NOT_READY` when required environment variables are missing.
 
-### `sizhu.fufire_test_run`
+### `sizhu_run_fufire_test`
 
 - Description: Executes server-owned FuFire test-run operations through the existing middleware validation and service layer.
 - Sensitivity: `sensitive_admin`
@@ -83,5 +85,5 @@ or:
 
 These are intentionally absent from `tools/list` until their own implementation sprint and tests are complete:
 
-- `sizhu.workflow_run`: blocked until the production workflow run route and OpenRouter provider wiring are green.
-- `sizhu.pod_dispatch`: dangerous external-effect tool; disabled until Gelato contract, idempotency, human approval, and live smoke tests exist.
+- `sizhu_list_workflows`: blocked until the production workflow run route and OpenRouter provider wiring are green.
+- `sizhu_pod_dispatch`: dangerous external-effect tool; disabled until Gelato contract, idempotency, human approval, and live smoke tests exist.

@@ -14,7 +14,7 @@ export function createSizhuMcpServer(): McpServer {
         tools: {},
       },
       instructions:
-        "Sizhu MCP exposes safe, policy-gated middleware tools. It never returns secret values and dangerous external-effect tools are disabled by default.",
+        "Sizhu MCP (LOCAL stdio surface — co-located dev/ops). The CANONICAL remote agent surface is the sizhu-mcp-server HTTP proxy under mcp-server/; both surfaces share the sizhu_* tool naming. This stdio surface intentionally exposes only the local-safe read/test tools (no workflow listing, no fulfillment/dispatch). It never returns secret values and dangerous external-effect tools are disabled by default. See docs/decisions/0001-canonical-mcp-surface.md.",
     },
   );
 

@@ -1,0 +1,55 @@
+name: middleware-project-orchestrator-harness
+version: 0.1.0
+runtime:
+  type: openai-skill
+required_tools: []
+optional_tools:
+- web
+- file_search
+- container
+- github
+- mcp
+- ci
+capabilities:
+- meta_decision_control_plane
+- decision_packet_builder
+- skill_tool_agent_routing
+- evidence_classification
+- ontology_state_update
+- middleware_api_architecture_reasoning
+- project_harness_governance
+- repo_architecture_visualization
+- goalforge_objective_compilation
+- output_artifact_composition
+- validation_runner
+- recalibration_loop
+- chatgpt_openai_skill_compatibility
+- codex_compatibility
+- claude_code_compatibility
+constraints:
+  destructive_actions: false
+  external_api_calls_without_user_authorization: false
+  secrets_required: false
+  no_phantom_tools: true
+notes:
+- Standards, security, platform features, and tool capabilities must be checked against
+  official sources before current behavior is asserted.
+- Optional tools are recommendations only until the runtime proves availability.
+- MCP is supported as an optional integration surface, not a prerequisite.
+policy:
+  products:
+  - chatgpt
+  - codex
+  - api
+  - atlas
+  allow_implicit_invocation: true
+interface:
+  display_name: middleware project orchestrator harness
+  short_description: meta-orchestrator for software projects, middleware and api architecture,
+    gpt or agent harnesses, repository architecture models, decision packets, evidence
+    ledgers, goalforge objectives, validation gates, coding-agent handoffs, and recalibration
+    loops. use when requests mention control plane, skill routing, api gateway, integration,
+    repo audit, project harness, codex, claude code, mcp, openapi, asyncapi, graphql,
+    grpc, webhooks, or agent-ready api wrappers.
+  icon_small: assets/icon.svg
+  icon_large: assets/icon.svg

@@ -62,9 +62,9 @@ Client-specific file locations and schema details vary. Verify them against your
 ## First calls
 
 1. List tools.
-2. Call `sizhu.health_check` with `{}`.
-3. Call `sizhu.readiness_check` with `{}` after configuring the service-agent context.
-4. Call `sizhu.fufire_test_run` only with an admin/operator policy context and safe test input.
+2. Call `sizhu_get_health` with `{}`.
+3. Call `sizhu_get_readiness` with `{}` after configuring the service-agent context.
+4. Call `sizhu_run_fufire_test` only with an admin/operator policy context and safe test input.
 
 ## Current limitations
 

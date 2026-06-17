@@ -38,7 +38,7 @@ afterEach(() => {
   previous.clear();
 });
 
-describe("sizhu.readiness_check", () => {
+describe("sizhu_get_readiness", () => {
   it("reports NOT_READY with missing reference names only", () => {
     const status = getReadinessStatus();
     expect(status.status).toBe("NOT_READY");
@@ -59,7 +59,7 @@ describe("sizhu.readiness_check", () => {
   });
 
   it("denies anonymous MCP calls by default", async () => {
-    const result = await callRegisteredTool("sizhu.readiness_check", {}, anonymousMcpContext());
+    const result = await callRegisteredTool("sizhu_get_readiness", {}, anonymousMcpContext());
     expect(result.isError).toBe(true);
     expect(JSON.stringify(result)).toContain("MCP_AUTH_REQUIRED");
   });
@@ -69,7 +69,7 @@ describe("sizhu.readiness_check", () => {
     process.env.SECRET_REF_SUPABASE_SERVICE_ROLE = "test-service-role-do-not-log";
     process.env.FUFIRE_BASE_URL = "https://api.example.test";
     process.env.SUPABASE_URL = "https://supabase.example.test";
-    const result = await callRegisteredTool("sizhu.readiness_check", {}, serviceContext);
+    const result = await callRegisteredTool("sizhu_get_readiness", {}, serviceContext);
     expect(result.isError).not.toBe(true);
     const serialized = JSON.stringify(result);
     expect(serialized).toContain("READY");
