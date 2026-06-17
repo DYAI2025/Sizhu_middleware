@@ -212,8 +212,16 @@ export interface AppUser {
 // T1 (this slice) defines the record SHAPE only; the atomic single-use consume
 // BEHAVIOUR lives in T2 (LocalApprovalRepository).
 export interface DispatchApproval {
-  /** Stable record identifier (the nonce). Lookups + consume are keyed on this. */
+  /** Stable record identifier. Lookups + consume are keyed on this. */
   id: string;
+  /**
+   * Secret, unguessable consume token, DISTINCT from `id`. consume() must be presented
+   * the exact nonce minted with the record; a forged OR MISSING nonce fails closed
+   * (APPROVAL_TOKEN_INVALID). Keeping it separate from `id` means knowing the record id
+   * (which may be logged / referenced) is not enough to consume — only the holder of the
+   * minted nonce can. This is the tamper guard (REQ-002 / AC-003).
+   */
+  nonce: string;
   /** The run this approval was minted for. consume() must match this exactly. */
   workflowRunId: string;
   /** The approved artifact. A dispatched artifactId MUST equal this one (no swap). */

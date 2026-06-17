@@ -70,6 +70,15 @@ async function mintValidRecord(repo: any) {
   });
 }
 
+// Test isolation: the LocalApprovalRepository backing store is MODULE-level (shared across
+// instances, by design for restart-survival). Reset it before EVERY test so a record minted
+// in one suite cannot bleed into another (code-review hygiene finding).
+beforeEach(async () => {
+  const mod = await loadRepo();
+  const r = new mod.LocalApprovalRepository();
+  if (typeof r.reset === "function") await r.reset();
+});
+
 describe("REQ-002 — approval record is the server-side decider (valid path consumes once)", () => {
   let repo: any;
 
@@ -176,6 +185,44 @@ describe("REQ-002 / AC-003 — tampered / expired / used / absent records are re
     expect(replay.ok).toBe(false);
     expect(["APPROVAL_TOKEN_INVALID", "DISPATCH_NOT_ALLOWED"]).toContain(replay.error_code);
     // Mutation RED: if consume does not flip status to `used`, the replay succeeds.
+  });
+
+  it("a MISSING nonce → APPROVAL_TOKEN_INVALID (a missing nonce must NOT bypass — P2 guard for the fail-closed clause)", async () => {
+    const mod = await loadRepo();
+    const repo = new mod.LocalApprovalRepository();
+    const rec = await mintValidRecord(repo);
+    const res = await repo.consumeApproval({
+      recordId: rec.id,
+      workflowRunId: RUN_ID,
+      artifactId: ARTIFACT_X,
+      // nonce intentionally OMITTED — must fail closed, not bypass
+    });
+    expect(res.ok).toBe(false);
+    expect(res.error_code).toBe("APPROVAL_TOKEN_INVALID");
+    // Mutation RED: changing `!input.nonce || input.nonce !== record.nonce` to
+    // `input.nonce && input.nonce !== record.nonce` (missing nonce skips the check)
+    // makes this go RED. This is the P2 guard test for the "missing nonce fails closed" claim.
+  });
+
+  it("a record with an UNPARSEABLE expiresAt → APPROVAL_TOKEN_INVALID (NaN must not no-op the expiry guard)", async () => {
+    const mod = await loadRepo();
+    const repo = new mod.LocalApprovalRepository();
+    const rec = await repo.createApproval({
+      workflowRunId: RUN_ID,
+      artifactId: ARTIFACT_X,
+      approver: APPROVER,
+      expiresAt: "not-a-real-date", // corrupted/garbage expiry
+    });
+    const res = await repo.consumeApproval({
+      recordId: rec.id,
+      workflowRunId: RUN_ID,
+      artifactId: ARTIFACT_X,
+      nonce: rec.nonce,
+    });
+    expect(res.ok).toBe(false);
+    expect(res.error_code).toBe("APPROVAL_TOKEN_INVALID");
+    // Mutation RED: without the Number.isFinite guard, Date.parse("not-a-real-date") is NaN,
+    // `NaN <= now` is false, the expiry guard no-ops, and this wrongly succeeds.
   });
 });
 
