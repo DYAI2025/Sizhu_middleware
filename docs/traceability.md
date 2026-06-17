@@ -99,3 +99,39 @@ Branch: feat/sizhu-secure-fufire-baseline
 - MISSING (deployment, non-blocking for code): Railway env values, Supabase first-owner
   user ID, final auth-key setup.
 - No open BLOCKER for this run (deferral resolved the samples blocker, not weakening).
+
+---
+
+# Traceability Matrix: sizhu-agent-safe-ops
+
+Status: ready-for-user-confirmation
+Confirmed by user: no
+Feature Slug: sizhu-agent-safe-ops
+PRD: docs/prd/sizhu-agent-safe-ops.prd.md
+Vision: docs/vision/sizhu-agent-safe-ops.vision.md
+Canvas: docs/canvas/sizhu-agent-safe-ops.canvas.md
+
+> Zweiter Feature-Block in dieser Datei (Umbrella-Intake A/B/C). Der obige
+> `sizhu-secure-fufire-baseline`-Block bleibt unverändert und bestätigt.
+
+| Trace ID | Vision Item ID | Canvas Item ID | Requirement ID | Acceptance Criteria ID | Evidence Needed | Status | Source Type |
+|---|---|---|---|---|---|---|---|
+| TRC-001 | VIS-002 | CAN-001 | REQ-001 | AC-001, AC-002, AC-004 | EV-001 | ready | EXPLICIT |
+| TRC-002 | VIS-006 | CAN-005 | REQ-002 | AC-003 | EV-002 | ready | EXPLICIT |
+| TRC-003 | VIS-006 | CAN-001 | REQ-003 | AC-005 | EV-003 | ready | EXPLICIT |
+| TRC-004 | VIS-002 | CAN-004 | REQ-004 | AC-006 | EV-004 | ready | EXPLICIT |
+| TRC-005 | VIS-004 | CAN-005 | REQ-005 | AC-007 | EV-005 | ready | EXPLICIT |
+| TRC-006 | VIS-006 | CAN-005 | REQ-006 | AC-008 | EV-006 | ready | EXPLICIT |
+| TRC-007 | VIS-003 | CAN-005 | REQ-007 | AC-009 | EV-007 | open-question | EXPLICIT |
+| TRC-008 | VIS-006 | CAN-010 | REQ-008 | AC-010 | EV-008 | ready | EXPLICIT |
+| TRC-009 | VIS-003 | CAN-005 | REQ-009 | AC-011 | EV-009 | ready | EXPLICIT |
+| TRC-010 | VIS-006 | CAN-005 | REQ-010 | AC-012 | EV-010 | ready | EXPLICIT |
+| TRC-011 | VIS-003 | CAN-005 | REQ-011 | AC-013 | EV-011 | ready | EXPLICIT |
+
+## Coverage (sizhu-agent-safe-ops)
+
+Alle 11 Requirements (REQ-001..011) sind an Vision, Canvas, Acceptance Criteria und Evidence gebunden — keine verwaiste Anforderung. `TRC-007` ist an OQ-002 (stdio entfernen vs. generieren) gekoppelt; das blockiert die Planung nicht, sondern wird im Run entschieden. Kein offener BLOCKER.
+
+## User Confirmation (sizhu-agent-safe-ops)
+
+The assistant must not confirm this matrix. Bestätigung erfolgt durch den Nutzer (Confirmation-Block im Chat).

@@ -17,10 +17,10 @@ describe("Sizhu MCP server", () => {
     await client.connect(clientTransport);
 
     const tools = await client.listTools();
-    expect(tools.tools.map((tool) => tool.name)).toContain("sizhu.health_check");
-    expect(tools.tools.map((tool) => tool.name)).toContain("sizhu.readiness_check");
+    expect(tools.tools.map((tool) => tool.name)).toContain("sizhu_get_health");
+    expect(tools.tools.map((tool) => tool.name)).toContain("sizhu_get_readiness");
 
-    const result = await client.callTool({ name: "sizhu.health_check", arguments: {} });
+    const result = await client.callTool({ name: "sizhu_get_health", arguments: {} });
     expect(JSON.stringify(result)).toContain("ok");
 
     await client.close();

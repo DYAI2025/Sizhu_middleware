@@ -30,7 +30,7 @@ function withPolicy(tool: McpToolDefinition): McpToolDefinition["handler"] {
 }
 
 const healthTool: McpToolDefinition = {
-  name: "sizhu.health_check",
+  name: "sizhu_get_health",
   title: "Sizhu Health Check",
   description: "Return the local Sizhu MCP/service liveness status. Public read-only; no secrets or external calls.",
   inputSchema: EmptyInputSchema.shape,
@@ -40,7 +40,7 @@ const healthTool: McpToolDefinition = {
 };
 
 const fufireTestRunTool: McpToolDefinition = {
-  name: "sizhu.fufire_test_run",
+  name: "sizhu_run_fufire_test",
   title: "Sizhu FuFire Test Run",
   description: "Execute server-owned FuFire test-run operations through existing middleware validation. Sensitive admin tool; no client-controlled URL/header/secret steering allowed.",
   inputSchema: FufireTestRunInputSchema.shape,
@@ -50,7 +50,7 @@ const fufireTestRunTool: McpToolDefinition = {
 };
 
 const readinessTool: McpToolDefinition = {
-  name: "sizhu.readiness_check",
+  name: "sizhu_get_readiness",
   title: "Sizhu Readiness Check",
   description: "Return fail-closed readiness based on required FuFire and Supabase configuration. Returns missing reference names only, never secret values.",
   inputSchema: EmptyInputSchema.shape,

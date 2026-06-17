@@ -4,16 +4,16 @@ import { listActiveMcpTools } from "../registry/tools";
 describe("Sizhu MCP tool registry", () => {
   it("lists active MCP tools", () => {
     const names = listActiveMcpTools().map((tool) => tool.name);
-    expect(names).toContain("sizhu.health_check");
-    expect(names).toContain("sizhu.readiness_check");
-    expect(names).toContain("sizhu.fufire_test_run");
-    expect(names).not.toContain("sizhu.workflow_run");
-    expect(names).not.toContain("sizhu.pod_dispatch");
+    expect(names).toContain("sizhu_get_health");
+    expect(names).toContain("sizhu_get_readiness");
+    expect(names).toContain("sizhu_run_fufire_test");
+    expect(names).not.toContain("sizhu_list_workflows");
+    expect(names).not.toContain("sizhu_pod_dispatch");
   });
 
   it("every active tool declares metadata, schema, sensitivity and handler", () => {
     for (const tool of listActiveMcpTools()) {
-      expect(tool.name).toMatch(/^sizhu\./);
+      expect(tool.name).toMatch(/^sizhu_/);
       expect(tool.title.length).toBeGreaterThan(0);
       expect(tool.description.length).toBeGreaterThan(0);
       expect(tool.inputSchema).toBeTruthy();

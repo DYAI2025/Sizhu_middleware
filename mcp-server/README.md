@@ -2,10 +2,17 @@
 
 An MCP server that lets an agent operate the Sizhu middleware (Bazzi console). It is a
 **thin, auth-forwarding proxy** over the Sizhu `/api` — it adds **no privilege**, holds
-**no static admin secret**, and can **bypass nothing**: every server-side guard
-(default-deny `apiGuard`, the `sensitive` role+MFA classification, and the
-human-approval-before-live-dispatch invariant `assertDispatchAllowed`) is enforced by
-`/api` exactly as for a direct caller.
+**no static admin secret**, and can **bypass nothing**: the server-side guards that DO
+exist (default-deny `apiGuard`, the `sensitive` role+MFA classification) are enforced by
+`/api` exactly as for a direct caller. **Caveat (security review C1):** the dispatch route
+does NOT yet enforce `assertDispatchAllowed` server-side, so there is no real approval gate
+on the money path — see the **Payment path — KNOWN GAP** section; the money tool is OFF by default.
+
+> **Canonical agent surface.** This HTTP proxy is the canonical MCP surface for remote agents
+> operating the deployed Sizhu instance (config / maintenance / emergencies). The in-repo
+> `server/mcp/` stdio server is a local co-located dev/ops surface and an intentional strict
+> subset; both share the `sizhu_*` tool naming. Authority decision:
+> `docs/decisions/0001-canonical-mcp-surface.md`.
 
 ## Security model (read first — this surface can reach real money)
 

@@ -1,20 +1,66 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# Middleware Project Orchestrator Harness
 
-# Run and deploy your AI Studio app
+Version: 0.1.0
 
-This contains everything you need to run your app locally.
+This installable Skill package defines a meta-orchestrator for software projects, middleware/API systems, GPT or agent harnesses, repositories, architecture models, GoalForge objectives, output artifacts, validation, and recalibration.
 
-View your app in AI Studio: https://ai.studio/apps/e63ae2ab-f680-4fd3-ab94-fd2cf47493cc
+## What it does
 
-## Run Locally
+The Skill operates as a control plane:
 
-**Prerequisites:**  Node.js
+`Input -> Intent Parsing -> Decision Packet -> Routing -> Evidence -> Ontology -> Architecture -> Governance -> GoalForge -> Output -> Validation -> Recalibration`
 
+It is suited for:
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+- Middleware and API architecture decisions.
+- Agent-ready API wrapper design.
+- GPT, Codex, Claude Code, and MCP-compatible harness planning.
+- Repository architecture modeling and drift analysis.
+- Evidence ledgers, gap matrices, and coding-agent handoffs.
+- Skill-package creation and validation.
+
+## Package layout
+
+```text
+middleware-project-orchestrator-harness/
+  SKILL.md
+  README.md
+  agents/openai.yaml
+  references/
+  examples/
+  scripts/
+```
+
+## Version placement
+
+The package version is recorded in `SKILL.md` under `metadata.version`, in this README, and in `agents/openai.yaml`. The top-level `version` field is intentionally not used in SKILL.md frontmatter because the available local validator accepts `name`, `description`, `license`, `allowed-tools`, and `metadata` only.
+
+## Local validation
+
+From the parent directory of the skill folder:
+
+```bash
+python middleware-project-orchestrator-harness/scripts/quick_validate.py middleware-project-orchestrator-harness
+python middleware-project-orchestrator-harness/scripts/validate_reference_integrity.py middleware-project-orchestrator-harness
+python middleware-project-orchestrator-harness/scripts/validate_subskill_contracts.py middleware-project-orchestrator-harness
+```
+
+Validate a Decision Packet:
+
+```bash
+python middleware-project-orchestrator-harness/scripts/validate_decision_packet.py decision_packet.yaml
+```
+
+## Packaging
+
+Use the platform packaging script when available:
+
+```bash
+python /home/oai/skills/skill-creator/scripts/package_skill.py middleware-project-orchestrator-harness ./dist
+```
+
+The resulting archive should contain one top-level folder and exactly one `SKILL.md` entrypoint.
+
+## Security and governance
+
+This Skill does not require secrets. It does not assume web, GitHub, MCP, CI, container, or browser access. Optional tools are represented as optional capabilities only and must be verified at runtime.
