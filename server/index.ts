@@ -124,12 +124,29 @@ export function createApp(): Express {
     });
   });
 
+  // REQ-003 (sizhu-agent-safe-ops) — truthful reads, no fabricated empty success.
+  //
+  // No real persistence source is wired (OQ-003 resolved: NOT_IMPLEMENTED, no
+  // in-memory store). An empty `issues:[]` / `workflows:[]` 200 would be a LYING
+  // SENSOR: an agent reading it concludes "all healthy / nothing to do" when in
+  // truth NOTHING is connected (CAN-001). So we answer the honest absence signal
+  // — 501 NOT_IMPLEMENTED, no array to mistake for data — never a 200 empty array.
   app.get("/api/gateway-issues", (_req, res) => {
-    res.json({ status: "OK", issues: [] });
+    res.status(501).json({
+      status: "NOT_IMPLEMENTED",
+      error_code: "NOT_IMPLEMENTED",
+      message:
+        "No gateway-issues source is configured. This endpoint does not fabricate empty success.",
+    });
   });
 
   app.get("/api/workflows/*", (_req, res) => {
-    res.json({ status: "OK", workflows: [] });
+    res.status(501).json({
+      status: "NOT_IMPLEMENTED",
+      error_code: "NOT_IMPLEMENTED",
+      message:
+        "No workflows source is configured. This endpoint does not fabricate empty success.",
+    });
   });
 
   // POST /api/workflows/:id/run — run the full generate→QA pipeline
@@ -223,12 +240,28 @@ export function createApp(): Express {
     res.json({ status: "READY" });
   });
 
+  // REQ-004 (sizhu-agent-safe-ops) — validate-dispatch is NOT an approval go-signal.
+  //
+  // This endpoint only checks request SHAPE; it does NOT consult the single-use
+  // approval store and does NOT inspect QA acceptance. A bare `READY_FOR_DISPATCH`
+  // here would be a green light over a cliff — a caller could mistake a well-formed
+  // body around a rejected/never-approved artifact for authorization to spend money.
+  // The REAL money gate is POST /api/fulfillment/pod/dispatch (consumeApproval +
+  // assertDispatchAllowed). So we label this verdict `VALIDATION_SHAPE_ONLY` and
+  // carry `shapeOnly: true` so no consumer can read it as an approval (REQ-004/AC-006).
   app.post("/api/fulfillment/pod/validate-dispatch", async (req, res) => {
     const { workflowRunId, artifact } = req.body;
     if (!workflowRunId || !artifact) {
       return res.status(400).json({ ok: false, error_code: "INVALID_REQUEST" });
     }
-    res.json({ ok: true, status: "READY_FOR_DISPATCH" });
+    res.json({
+      ok: true,
+      status: "SHAPE_VALID",
+      label: "VALIDATION_SHAPE_ONLY",
+      shapeOnly: true,
+      message:
+        "Request shape is well-formed. This is NOT dispatch authorization — the approval gate is POST /api/fulfillment/pod/dispatch.",
+    });
   });
 
   // REQ-001 (sizhu-agent-safe-ops) — THE load-bearing money gate.
