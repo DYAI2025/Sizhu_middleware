@@ -156,8 +156,21 @@ describe("sensitive route: Gelato/POD dispatch", () => {
       .post(path)
       .set(...bearer(token()))
       .send({});
+    // The auth LAYER (apiGuard) must clear an aal2 admin and hand off to the
+    // handler. After REQ-001 (sizhu-agent-safe-ops) the handler's own money gate
+    // legitimately rejects this bare, un-approved dispatch with 403
+    // DISPATCH_NOT_ALLOWED — that is a HANDLER decision, not an auth-layer block.
+    // So we assert the auth layer passed by the absence of any auth-layer code,
+    // not by a blanket "not 403".
     expect(res.status).not.toBe(401);
-    expect(res.status).not.toBe(403);
+    const AUTH_LAYER_CODES = [
+      "AUTH_REQUIRED",
+      "INVALID_AUTH_TOKEN",
+      "EMAIL_VERIFICATION_REQUIRED",
+      "ADMIN_ROLE_REQUIRED",
+      "MFA_REQUIRED_FOR_ACTION",
+    ];
+    expect(AUTH_LAYER_CODES).not.toContain(res.body?.error_code);
   });
 });
 
