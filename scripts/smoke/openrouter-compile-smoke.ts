@@ -75,6 +75,16 @@ function loadDotEnv(file = resolve(REPO_ROOT, ".env")): void {
 async function main(): Promise<void> {
   loadDotEnv();
 
+  // Free-model routing for this smoke: the prod prose model (gemini-2.5-flash) needs paid
+  // credits (a real call 402'd). Route to a FREE OpenRouter model so we can verify the model
+  // actually responds + AC-005 holds, without credits. The prose lane reads the text-op model
+  // OPENROUTER_MODEL_QUALITY_GATE. Overridable via SMOKE_PROSE_MODEL. Set BEFORE the gateway import.
+  const FREE_PROSE_MODEL =
+    process.env.SMOKE_PROSE_MODEL || "meta-llama/llama-3.3-70b-instruct:free";
+  if (!process.env.OPENROUTER_MODEL_QUALITY_GATE) {
+    process.env.OPENROUTER_MODEL_QUALITY_GATE = FREE_PROSE_MODEL;
+  }
+
   // Import AFTER env is populated (the gateway reads env at import-eval time).
   const { compileLane1, compileLane2, createOpenRouterProseClient } = await import(
     "../../server/services/promptCompilationService"
@@ -85,7 +95,7 @@ async function main(): Promise<void> {
 
   const creds = resolveOpenRouterCredentials();
   const resolvedKey = process.env[creds.secretRef];
-  const model = selectModelForOperation("image_generation");
+  const model = selectModelForOperation("quality_gate");
   const baseUrlHost = (() => {
     try {
       return new URL(creds.baseUrl).host;
@@ -98,7 +108,7 @@ async function main(): Promise<void> {
   console.log(`mode            : ${DRY_RUN ? "DRY-RUN (fake client)" : "REAL CALL"}`);
   console.log(`base URL host   : ${baseUrlHost}`);
   console.log(`secret-ref var  : ${creds.secretRef} (key ${creds.present ? "PRESENT" : "ABSENT"})`);
-  console.log(`image model     : ${model}`);
+  console.log(`prose model     : ${model}`);
   console.log(`templateId      : ${TEMPLATE_ID}`);
   console.log("─────────────────────────────────────────────────────────────");
 

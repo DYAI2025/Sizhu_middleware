@@ -303,8 +303,10 @@ export async function compileLane2(
 /**
  * Production default {@link LlmProseClient}: wraps the repo's existing OpenRouter
  * call path. Resolves the key SERVER-SIDE via the secret-ref indirection (never
- * logged), selects the image-generation model, and asks the model to write ONLY
- * the prose. Do NOT call this from unit tests — it hits the network.
+ * logged), selects a TEXT model (the quality-gate text model — the prose lane is a
+ * text task; an image model would be wrong), and asks it to write ONLY the prose.
+ * Override the model via OPENROUTER_MODEL_QUALITY_GATE (e.g. a `:free` model).
+ * Do NOT call this from unit tests — it hits the network.
  */
 export function createOpenRouterProseClient(): LlmProseClient {
   return {
@@ -316,7 +318,9 @@ export function createOpenRouterProseClient(): LlmProseClient {
           `OpenRouter API key not found for secret ref "${creds.secretRef}". Ensure the env var is set.`,
         );
       }
-      const model = selectModelForOperation("image_generation");
+      // The prose lane is a TEXT task → use the text-capable quality-gate model
+      // (cap ['vision','text']), NOT an image model. Overridable via OPENROUTER_MODEL_QUALITY_GATE.
+      const model = selectModelForOperation("quality_gate");
 
       const systemText =
         "You are a prompt writer for an image-generation model. Write ONLY the " +
