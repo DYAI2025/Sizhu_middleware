@@ -48,6 +48,11 @@
  * Downstream code (and the contract test) greps for this exact string, so it
  * MUST NOT be reworded.
  */
+import type {
+  FufireCompileFields,
+  FufireCompileProvenance,
+} from "../contracts/fufireContract";
+
 export const PROMPT_VARIABLE_SOURCE_MISSING = "PROMPT_VARIABLE_SOURCE_MISSING" as const;
 
 /** Claim-discipline marker: the data carried is a chart *calculation*, NOT an oracle. */
@@ -512,5 +517,80 @@ export function interpretFufireResponse(
     dayPillar: caveats,
     issues,
     note: CALCULATION_NOTE,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// readCompileFields — Year-Pillar raw tokens + provenance (read-side projection)
+// ---------------------------------------------------------------------------
+
+/**
+ * Unwrap the `{ data }` bazi envelope if present, else return the value as-is.
+ * The REAL captured response is `{ _note, data }`; callers may also pass the
+ * already-unwrapped inner object. We treat a record carrying a `data` object as
+ * the envelope; anything else is assumed already-unwrapped.
+ */
+function unwrapData(response: unknown): unknown {
+  if (isRecord(response) && isRecord(response.data)) {
+    return response.data;
+  }
+  return response;
+}
+
+/** A present-and-string value at `path`, else `undefined` (never throws). */
+function optionalString(root: unknown, path: string): string | undefined {
+  const { found, value } = readPath(root, path);
+  return found && typeof value === "string" ? value : undefined;
+}
+
+/** A present-and-finite-number value at `path`, else `undefined` (never throws). */
+function optionalNumber(root: unknown, path: string): number | undefined {
+  const { found, value } = readPath(root, path);
+  return found && typeof value === "number" && Number.isFinite(value)
+    ? value
+    : undefined;
+}
+
+/** A present-and-boolean value at `path`, else `undefined` (never throws). */
+function optionalBoolean(root: unknown, path: string): boolean | undefined {
+  const { found, value } = readPath(root, path);
+  return found && typeof value === "boolean" ? value : undefined;
+}
+
+/**
+ * Surface the Year-Pillar raw tokens, key dates, solar-year transition, and the
+ * engine provenance block from a REAL bazi response.
+ *
+ * Accepts either the wrapped `{ data }` envelope (the live capture shape) or an
+ * already-unwrapped inner object. This is a pure, no-invented-data projection: a
+ * source field that is absent (or the wrong type) is left `undefined` — it is
+ * never substituted, defaulted, or guessed, and a missing field never throws
+ * (mirrors the interpreter's "no invented data" boundary). `provenance` is always
+ * returned as an object so callers can read its (possibly-undefined) fields
+ * without a null-check.
+ */
+export function readCompileFields(response: unknown): FufireCompileFields {
+  const data = unwrapData(response);
+
+  const provenance: FufireCompileProvenance = {
+    engineVersion: optionalString(data, "provenance.engine_version"),
+    rulesetId: optionalString(data, "provenance.ruleset_id"),
+    parameterSetId: optionalString(data, "provenance.parameter_set_id"),
+    ephemerisId: optionalString(data, "provenance.ephemeris_id"),
+    computationTimestamp: optionalString(data, "provenance.computation_timestamp"),
+  };
+
+  return {
+    yearStem: optionalString(data, "pillars.year.stamm"),
+    yearBranch: optionalString(data, "pillars.year.zweig"),
+    animalDe: optionalString(data, "pillars.year.tier"),
+    animalEn: optionalString(data, "chinese.year.animal"),
+    elementDe: optionalString(data, "pillars.year.element"),
+    birthLocal: optionalString(data, "dates.birth_local"),
+    birthUtc: optionalString(data, "dates.birth_utc"),
+    lichunLocal: optionalString(data, "dates.lichun_local"),
+    isBeforeLichun: optionalBoolean(data, "transition.is_before_lichun"),
+    solarYear: optionalNumber(data, "transition.solar_year"),
+    provenance,
   };
 }

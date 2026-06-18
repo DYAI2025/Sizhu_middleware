@@ -81,6 +81,62 @@ export interface NormalizedBirthInput {
   birth_time_source?: string;
 }
 
+// ---------------------------------------------------------------------------
+// RESPONSE-side contract: Year-Pillar "compile fields" + provenance.
+//
+// The REAL captured bazi response is `{ _note, data }` (see
+// `docs/contracts/fufire-samples/bazi.live.response.json`). These types model the
+// small, value-critical projection that `readCompileFields()` surfaces: the raw
+// Year-Pillar tokens (stem/branch/animal/element), the key dates, the solar-year
+// transition, and the engine provenance block. Every field is OPTIONAL — a source
+// absent in the response is left `undefined`, never invented (mirrors the
+// interpreter's "no invented data" boundary). Read-side only; no I/O, no secrets.
+// ---------------------------------------------------------------------------
+
+/** Engine provenance, projected from `data.provenance` (all fields optional). */
+export interface FufireCompileProvenance {
+  /** ← provenance.engine_version, e.g. "1.0.0-rc1-20260220". */
+  engineVersion?: string;
+  /** ← provenance.ruleset_id, e.g. "traditional_bazi_2026". */
+  rulesetId?: string;
+  /** ← provenance.parameter_set_id, e.g. "default_v1". */
+  parameterSetId?: string;
+  /** ← provenance.ephemeris_id, e.g. "swieph_sepl18". */
+  ephemerisId?: string;
+  /** ← provenance.computation_timestamp (ISO datetime). */
+  computationTimestamp?: string;
+}
+
+/**
+ * Year-Pillar raw tokens + provenance surfaced by `readCompileFields()`. Distinct
+ * from the prompt-variable mapping (`PromptVariables`): this exposes the RAW
+ * provider tokens and computation provenance, not render-ready prompt variables.
+ */
+export interface FufireCompileFields {
+  /** ← pillars.year.stamm (Heavenly Stem), e.g. "Geng". */
+  yearStem?: string;
+  /** ← pillars.year.zweig (Earthly Branch), e.g. "Wu". */
+  yearBranch?: string;
+  /** ← pillars.year.tier (German animal), e.g. "Pferd". */
+  animalDe?: string;
+  /** ← chinese.year.animal (English animal), e.g. "Horse". */
+  animalEn?: string;
+  /** ← pillars.year.element (German element), e.g. "Metall". */
+  elementDe?: string;
+  /** ← dates.birth_local (ISO datetime with local offset). */
+  birthLocal?: string;
+  /** ← dates.birth_utc (ISO datetime, UTC). */
+  birthUtc?: string;
+  /** ← dates.lichun_local (ISO datetime, local Lichun for the solar year). */
+  lichunLocal?: string;
+  /** ← transition.is_before_lichun. */
+  isBeforeLichun?: boolean;
+  /** ← transition.solar_year, e.g. 1990. */
+  solarYear?: number;
+  /** Provenance block (always present as an object; its fields may be undefined). */
+  provenance: FufireCompileProvenance;
+}
+
 /** POST /v1/chronometry/resolve — the ONLY nested-shape request. */
 export interface ChronometryResolveRequest {
   birth: {
