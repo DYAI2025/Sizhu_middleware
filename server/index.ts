@@ -86,10 +86,15 @@ export function createApp(deps: CreateAppDeps = {}): Express {
   // carries the quality gates + blockers so the admin SEES a BLOCKED result, never a fake pass.
   app.post("/api/v1/compile-template", async (req, res) => {
     const { templateId, rawFuFireResponse, locale } = req.body ?? {};
-    if (typeof templateId !== "string" || rawFuFireResponse == null) {
-      return res
-        .status(400)
-        .json({ error: "BAD_REQUEST", message: "templateId and rawFuFireResponse are required" });
+    if (
+      typeof templateId !== "string" ||
+      typeof rawFuFireResponse !== "object" ||
+      rawFuFireResponse === null
+    ) {
+      return res.status(400).json({
+        error: "BAD_REQUEST",
+        message: "templateId (string) and rawFuFireResponse (object) are required",
+      });
     }
     let lane1: CompiledTemplate;
     try {

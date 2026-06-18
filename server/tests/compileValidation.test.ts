@@ -184,6 +184,28 @@ describe("validateCompiled — post-compile quality gates (§5 + §12)", () => {
     expect(result.blockers).toContain("claim_safety");
   });
 
+  it("(f2) claim_safety uses WORD BOUNDARIES — benign words containing a claim word as a substring PASS", () => {
+    const input = validInput();
+    // "glove" contains "love", "careers" contains "career", "enriched" contains "rich" —
+    // a substring match would false-positive; word boundaries must NOT.
+    input.templatePlaceholders.tagline = "Soft glove texture, enriched paper, for careers in calm spaces.";
+
+    const result = validateCompiled(input);
+
+    expect(gate(result, "claim_safety")?.status).toBe("PASS");
+    expect(result.verdict).toBe("PASS");
+  });
+
+  it("(f3) claim_safety still FAILs on the standalone claim word 'love' (word boundary catches the real word)", () => {
+    const input = validInput();
+    input.templatePlaceholders.tagline = "This poster brings you love.";
+
+    const result = validateCompiled(input);
+
+    expect(gate(result, "claim_safety")?.status).toBe("FAIL");
+    expect(result.blockers).toContain("claim_safety");
+  });
+
   it("collects MULTIPLE failing gate names in blockers when several gates FAIL", () => {
     const input = validInput();
     input.regionPolicy = "INTL_LATIN"; // region_policy

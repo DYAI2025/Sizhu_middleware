@@ -16,35 +16,23 @@
  * server/tests/compileValidation.test.ts — that is the proof this validator detects a real defect.
  */
 
-/** Minimal view of a compiled template — only the fields this validator reads. */
-export interface CompiledForValidation {
-  variantId: string;
-  regionPolicy: string;
-  templatePlaceholders: Record<string, string>;
-  imageGenerationPrompt?: string;
-  negativeConstraints?: string;
-  sourceStatus?: Record<string, string>;
-  /** Earthly-Branch hanzi (e.g. 午, 申) — the §5 branch slot. */
-  yearBranchHanzi?: string;
-  /** Zodiac-animal hanzi (e.g. 马, 猴) — the §5 animal slot. */
-  yearAnimalHanzi?: string;
-}
-
-export type GateStatus = "PASS" | "FAIL";
-
-export interface GateResult {
-  gate: string;
-  required: string;
-  status: GateStatus;
-}
-
-export type Verdict = "PASS" | "BLOCKED";
-
-export interface ValidationResult {
-  gates: GateResult[];
-  verdict: Verdict;
-  blockers: string[];
-}
+// Validation/gate/result types live in the shared compile contract so the server validator
+// and the UI panel (CompileResultPanel) cannot drift apart. Imported for local use AND
+// re-exported here so existing importers of this module keep working.
+import type {
+  GateStatus,
+  GateResult,
+  Verdict,
+  ValidationResult,
+  CompiledForValidation,
+} from "../../src/lib/compile/compileContract";
+export type {
+  GateStatus,
+  GateResult,
+  Verdict,
+  ValidationResult,
+  CompiledForValidation,
+} from "../../src/lib/compile/compileContract";
 
 const REQUIRED_REGION_POLICY = "CN_SIMPLIFIED";
 const SOURCE_NEEDED_SENTINEL = "SOURCE_NEEDED";
@@ -99,9 +87,19 @@ function check(gate: string, required: string, ok: boolean): GateResult {
   return { gate, required, status: ok ? "PASS" : "FAIL" };
 }
 
+/** Escape a string for safe literal use inside a RegExp. */
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Whole-word / bounded-phrase match (case-insensitive). Word boundaries so a claim word like
+ * "love" or "career" does NOT false-positive inside a longer word ("glove", "careers") — a
+ * plain substring match would. Multi-word phrases ("render the hanzi") are matched as a
+ * bounded unit too.
+ */
 function containsAny(haystack: string, needles: readonly string[]): boolean {
-  const lower = haystack.toLowerCase();
-  return needles.some((n) => lower.includes(n));
+  return needles.some((n) => new RegExp(`\\b${escapeRegExp(n)}\\b`, "i").test(haystack));
 }
 
 /**
@@ -138,9 +136,7 @@ export function validateCompiled(input: CompiledForValidation): ValidationResult
   const branch = input.yearBranchHanzi;
   const animal = input.yearAnimalHanzi;
   const separationOk =
-    branch === undefined ||
-    animal === undefined ||
-    (branch !== animal && animal !== branch);
+    branch === undefined || animal === undefined || branch !== animal;
   gates.push(
     check(
       "branch_vs_animal_separation",
