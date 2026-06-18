@@ -1,5 +1,6 @@
 import React from 'react';
 import { getAuthSnapshot } from '../lib/auth/authState';
+import type { GateResult, ValidationResult } from '../lib/compile/compileContract';
 
 /**
  * CompileResultPanel — renders the result of `POST /api/v1/compile-template`.
@@ -15,20 +16,14 @@ import { getAuthSnapshot } from '../lib/auth/authState';
 
 // --- Response contract (mirrors server/index.ts POST /api/v1/compile-template) -------
 
-export type GateStatus = 'PASS' | 'FAIL';
-export type Verdict = 'PASS' | 'BLOCKED';
-
-export interface CompileGate {
-  gate: string;
-  required: string;
-  status: GateStatus;
-}
-
-export interface CompileValidation {
-  gates: CompileGate[];
-  verdict: Verdict;
-  blockers: string[];
-}
+// Validation/gate types come from the shared compile contract (single source of truth with
+// server/services/compileValidationService) so the API and UI cannot drift. Re-exported +
+// aliased here so existing local references keep working.
+export type { GateStatus, Verdict, GateResult, ValidationResult } from '../lib/compile/compileContract';
+/** Alias of the shared {@link GateResult}. */
+export type CompileGate = GateResult;
+/** Alias of the shared {@link ValidationResult}. */
+export type CompileValidation = ValidationResult;
 
 export interface CompileCompiled {
   variantId: string;
