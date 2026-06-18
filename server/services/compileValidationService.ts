@@ -136,9 +136,7 @@ export function validateCompiled(input: CompiledForValidation): ValidationResult
   const branch = input.yearBranchHanzi;
   const animal = input.yearAnimalHanzi;
   const separationOk =
-    branch === undefined ||
-    animal === undefined ||
-    (branch !== animal && animal !== branch);
+    branch === undefined || animal === undefined || branch !== animal;
   gates.push(
     check(
       "branch_vs_animal_separation",

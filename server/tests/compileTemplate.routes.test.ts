@@ -73,6 +73,14 @@ describe("POST /api/v1/compile-template", () => {
     expect(res.body.validation.verdict).toBe("PASS");
   });
 
+  it("returns 400 when rawFuFireResponse is not an object", async () => {
+    const res = await request(app)
+      .post("/api/v1/compile-template")
+      .set("Authorization", `Bearer ${token()}`)
+      .send({ templateId: "bazi_solo_beijing_modern_v1", rawFuFireResponse: "not-an-object" });
+    expect(res.status).toBe(400);
+  });
+
   it("returns 400 for an unknown templateId", async () => {
     const res = await request(app)
       .post("/api/v1/compile-template")
