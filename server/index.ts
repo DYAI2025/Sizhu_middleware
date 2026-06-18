@@ -15,6 +15,14 @@ import { runWorkflow, RunWorkflowInput } from "./services/workflowRunService";
 import { appServices } from "../src/lib/app/appServices";
 import { WorkflowStateMachine } from "../src/lib/workflow/stateMachine";
 import type { WorkflowRun, ImageArtifact } from "../src/types";
+import {
+  compileLane1,
+  compileLane2,
+  createOpenRouterProseClient,
+  type LlmProseClient,
+  type CompiledTemplate,
+} from "./services/promptCompilationService";
+import { validateCompiled } from "./services/compileValidationService";
 
 dotenv.config();
 
@@ -23,7 +31,12 @@ dotenv.config();
  * layer wired in. Static/SPA serving and the Vite dev middleware are added
  * separately in {@link startServer} so this factory stays import-safe for tests.
  */
-export function createApp(): Express {
+export interface CreateAppDeps {
+  /** Injected LLM prose client (Lane 2). Defaults to the real OpenRouter client. */
+  proseClient?: LlmProseClient;
+}
+
+export function createApp(deps: CreateAppDeps = {}): Express {
   const app = express();
   const PORT = Number(process.env.PORT || 8080);
 
@@ -66,6 +79,47 @@ export function createApp(): Express {
   // Supabase session; sensitive routes additionally require admin role + MFA.
   // ---------------------------------------------------------------------------
   app.use("/api", apiGuard);
+
+  // --- Compile Preview (REQ-001): deterministic Lane-1 + LLM-prose Lane-2 + post-validation.
+  // Session-protected by the default-deny apiGuard above. The symbol values are deterministic
+  // (Lane 1, no LLM); the LLM only formulates the image-prompt prose (Lane 2); the response
+  // carries the quality gates + blockers so the admin SEES a BLOCKED result, never a fake pass.
+  app.post("/api/v1/compile-template", async (req, res) => {
+    const { templateId, rawFuFireResponse, locale } = req.body ?? {};
+    if (typeof templateId !== "string" || rawFuFireResponse == null) {
+      return res
+        .status(400)
+        .json({ error: "BAD_REQUEST", message: "templateId and rawFuFireResponse are required" });
+    }
+    let lane1: CompiledTemplate;
+    try {
+      lane1 = compileLane1({ templateId, rawFuFireResponse, locale });
+    } catch (e) {
+      return res
+        .status(400)
+        .json({ error: "UNKNOWN_TEMPLATE", message: e instanceof Error ? e.message : String(e) });
+    }
+    const client = deps.proseClient ?? createOpenRouterProseClient();
+    let compiled: CompiledTemplate;
+    try {
+      compiled = await compileLane2(lane1, templateId, client);
+    } catch (e) {
+      return res
+        .status(502)
+        .json({ error: "LLM_PROSE_FAILED", message: e instanceof Error ? e.message : String(e) });
+    }
+    const validation = validateCompiled({
+      variantId: compiled.variantId,
+      regionPolicy: compiled.regionPolicy,
+      templatePlaceholders: compiled.templatePlaceholders,
+      imageGenerationPrompt: compiled.imageGenerationPrompt,
+      negativeConstraints: compiled.negativeConstraints,
+      sourceStatus: compiled.sourceStatus,
+      yearBranchHanzi: compiled.templatePlaceholders["{{year_branch_hanzi}}"],
+      yearAnimalHanzi: compiled.templatePlaceholders["{{year_animal_hanzi}}"],
+    });
+    return res.status(200).json({ compiled, validation });
+  });
 
   // --- Protected read routes (valid session required) ------------------------
 

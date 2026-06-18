@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { appServices } from '../lib/app/appServices';
 import {
+  CompileResultPanel,
+  compileTemplate,
+  type CompileTemplateResponse
+} from './CompileResultPanel';
+import {
   PromptTemplate,
   ShopProduct,
   VisualWorkflow,
@@ -37,7 +42,13 @@ export default function WorkflowBuilderView() {
   const [role, setRole] = useState<AppRoleName>('Owner');
   const [notification, setNotification] = useState<string | null>(null);
   const [isDraggingNodeId, setIsDraggingNodeId] = useState<string | null>(null);
-  
+
+  // COMPILE PREVIEW (POST /api/v1/compile-template) state for the template node.
+  const [compileRawInput, setCompileRawInput] = useState<string>('');
+  const [compileLoading, setCompileLoading] = useState<boolean>(false);
+  const [compileError, setCompileError] = useState<string | null>(null);
+  const [compileResult, setCompileResult] = useState<CompileTemplateResponse | null>(null);
+
   // DRAG AND DROP OFFSET IN NODE DRAG
   const dragStartOffset = useRef({ x: 0, y: 0 });
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -327,6 +338,39 @@ export default function WorkflowBuilderView() {
       nodes: updatedNodes,
       updatedAt: new Date().toISOString()
     });
+  };
+
+  // COMPILE PREVIEW — POST /api/v1/compile-template with the selected templateId and the
+  // raw FuFire response the operator pastes in. On a result we ALWAYS render the panel,
+  // including a BLOCKED verdict (a blocked preview is shown, never a fake success).
+  const handleCompilePreview = async (templateId: string) => {
+    if (!templateId) {
+      setCompileError('Select a prompt template first.');
+      setCompileResult(null);
+      return;
+    }
+
+    let rawFuFireResponse: unknown;
+    const trimmed = compileRawInput.trim();
+    try {
+      rawFuFireResponse = trimmed ? JSON.parse(trimmed) : {};
+    } catch {
+      setCompileError('Raw FuFire response must be valid JSON.');
+      setCompileResult(null);
+      return;
+    }
+
+    setCompileLoading(true);
+    setCompileError(null);
+    setCompileResult(null);
+    try {
+      const result = await compileTemplate(templateId, rawFuFireResponse);
+      setCompileResult(result);
+    } catch (err: any) {
+      setCompileError(err?.message || 'COMPILE_FAILED');
+    } finally {
+      setCompileLoading(false);
+    }
   };
 
   // PROPAGATE AND CRITICAL SAVE TO CLOUD CORE STORAGE (Bridge to active databases!)
@@ -896,11 +940,38 @@ export default function WorkflowBuilderView() {
                         <strong>Pipeline Variable Injector:</strong> Mapped templates receive dynamic tokens (<code>{"{{fufire.animal}}"}, {"{{personalization.birth_place}}"}</code>) when orders materialize.
                       </div>
 
-                      <div className="text-[10px] text-nt font-mono">
-                        <span className="font-bold">Backend Trigger:</span><br />
-                        <code className="text-nt block bg-b1 p-1 border rounded text-[9.5px] mt-1">
-                          TODO: REST POST /api/v1/compile-template
-                        </code>
+                      {/* Compile Preview — real POST /api/v1/compile-template */}
+                      <div className="space-y-2">
+                        <label className="block text-[9.5px] font-bold font-mono text-nt uppercase">
+                          Raw FuFire Response (JSON)
+                        </label>
+                        <textarea
+                          disabled={isObserver || compileLoading}
+                          value={compileRawInput}
+                          onChange={(e) => setCompileRawInput(e.target.value)}
+                          rows={4}
+                          placeholder='{ "data": { "pillars": { ... } } }'
+                          className="w-full border border-nt bg-b1 rounded-sm p-2 outline-none font-mono text-[10px] text-da"
+                        />
+                        <button
+                          type="button"
+                          disabled={isObserver || compileLoading || !activeNode.config.templateId}
+                          onClick={() => handleCompilePreview(activeNode.config.templateId || '')}
+                          className="bg-b2 hover:opacity-90 text-da font-bold font-mono p-2 px-6 rounded-sm text-[10px] uppercase tracking-wider border border-da disabled:opacity-50"
+                        >
+                          {compileLoading ? 'Compiling…' : 'Compile Preview'}
+                        </button>
+
+                        {compileError && (
+                          <div
+                            data-testid="compile-error"
+                            className="p-3 border border-ac bg-b1 text-ac text-[10px] font-mono rounded-sm"
+                          >
+                            <strong>Error:</strong> {compileError}
+                          </div>
+                        )}
+
+                        {compileResult && <CompileResultPanel response={compileResult} />}
                       </div>
                     </div>
                   )}

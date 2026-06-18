@@ -1,0 +1,223 @@
+{
+  "_note": "REAL live /v1/calculate/wuxing response (smoke live). Synthetic subject 1990-06-15T14:30 @ 52.52,13.405 Europe/Berlin — no real customer PII.",
+  "data": {
+    "input": {
+      "date": "1990-06-15T14:30:00",
+      "tz": "Europe/Berlin",
+      "lon": 13.405,
+      "lat": 52.52
+    },
+    "wu_xing_vector": {
+      "Holz": 0.6101955043925309,
+      "Feuer": 0.43774894880333737,
+      "Erde": 0.30509775219626545,
+      "Metall": 0.13265119660707195,
+      "Wasser": 0.5704001454104093
+    },
+    "dominant_element": "Holz",
+    "equation_of_time": -0.027,
+    "true_solar_time": 14.4995,
+    "contribution_ledger": {
+      "western": [
+        {
+          "planet": "Sun",
+          "element": "Feuer",
+          "weight": 1,
+          "is_retrograde": false,
+          "rationale": "Classical rulership",
+          "category": "traditional"
+        },
+        {
+          "planet": "Moon",
+          "element": "Wasser",
+          "weight": 1,
+          "is_retrograde": false,
+          "rationale": "Classical rulership",
+          "category": "traditional"
+        },
+        {
+          "planet": "Mercury",
+          "element": "Erde",
+          "weight": 1,
+          "is_retrograde": false,
+          "rationale": "Dual element — Erde (day chart)",
+          "category": "traditional",
+          "chart_type_quality": "exact"
+        },
+        {
+          "planet": "Venus",
+          "element": "Metall",
+          "weight": 1,
+          "is_retrograde": false,
+          "rationale": "Classical rulership",
+          "category": "traditional"
+        },
+        {
+          "planet": "Mars",
+          "element": "Feuer",
+          "weight": 1,
+          "is_retrograde": false,
+          "rationale": "Classical rulership",
+          "category": "traditional"
+        },
+        {
+          "planet": "Jupiter",
+          "element": "Holz",
+          "weight": 1,
+          "is_retrograde": false,
+          "rationale": "Classical rulership",
+          "category": "traditional"
+        },
+        {
+          "planet": "Saturn",
+          "element": "Erde",
+          "weight": 1.3,
+          "is_retrograde": true,
+          "rationale": "Classical rulership",
+          "category": "traditional"
+        },
+        {
+          "planet": "Uranus",
+          "element": "Holz",
+          "weight": 1.3,
+          "is_retrograde": true,
+          "rationale": "Classical rulership",
+          "category": "modern_heuristic"
+        },
+        {
+          "planet": "Neptune",
+          "element": "Wasser",
+          "weight": 1.3,
+          "is_retrograde": true,
+          "rationale": "Classical rulership",
+          "category": "modern_heuristic"
+        },
+        {
+          "planet": "Pluto",
+          "element": "Feuer",
+          "weight": 1.3,
+          "is_retrograde": true,
+          "rationale": "Classical rulership",
+          "category": "modern_heuristic"
+        },
+        {
+          "planet": "Chiron",
+          "element": "Wasser",
+          "weight": 1,
+          "is_retrograde": false,
+          "rationale": "Classical rulership",
+          "category": "experimental"
+        },
+        {
+          "planet": "Lilith",
+          "element": "Wasser",
+          "weight": 1,
+          "is_retrograde": false,
+          "rationale": "Classical rulership",
+          "category": "experimental"
+        },
+        {
+          "planet": "NorthNode",
+          "element": "Holz",
+          "weight": 1.3,
+          "is_retrograde": true,
+          "rationale": "Classical rulership",
+          "category": "experimental"
+        },
+        {
+          "planet": "TrueNorthNode",
+          "element": "Holz",
+          "weight": 1,
+          "is_retrograde": false,
+          "rationale": "Classical rulership",
+          "category": "experimental"
+        }
+      ]
+    },
+    "provenance": {
+      "engine_version": "1.0.0-rc1-20260220",
+      "parameter_set_id": "default_v1",
+      "ruleset_id": "traditional_bazi_2026",
+      "ephemeris_id": "swieph_sepl18",
+      "tzdb_version_id": "unknown",
+      "house_system": "placidus",
+      "zodiac_mode": "tropical",
+      "computation_timestamp": "2026-06-18T03:04:38.706273+00:00",
+      "parameter_set": {
+        "version": "1.1.0",
+        "retrograde_weight": 1.3,
+        "hidden_stem_main_qi": 1,
+        "hidden_stem_middle_qi": 0.5,
+        "hidden_stem_residual_qi": 0.3,
+        "stem_weight": 1,
+        "mercury_dual_rule": "earth_day_metal_night",
+        "harmony_method": "dot_product",
+        "aspect_orb_model": "differentiated_v1",
+        "aspect_base_orbs": {
+          "Sun": 10,
+          "Moon": 10,
+          "Mercury": 7,
+          "Venus": 7,
+          "Mars": 7,
+          "Jupiter": 8,
+          "Saturn": 8,
+          "Uranus": 5,
+          "Neptune": 5,
+          "Pluto": 5,
+          "Chiron": 3,
+          "Lilith": 2,
+          "NorthNode": 3,
+          "TrueNorthNode": 3
+        },
+        "aspect_factors": {
+          "conjunction": 1,
+          "sextile": 0.75,
+          "square": 0.875,
+          "trine": 1,
+          "opposition": 1
+        },
+        "soulprint_weights": {
+          "sun": 1,
+          "moon": 0.8,
+          "ascendant": 0.6,
+          "personal_planet": 0.4,
+          "wuxing_sector": 0.5
+        },
+        "wuxing_sector_mapping": {
+          "Holz": [
+            3,
+            4
+          ],
+          "Feuer": [
+            4,
+            5
+          ],
+          "Erde": [
+            1,
+            7
+          ],
+          "Metall": [
+            6,
+            9
+          ],
+          "Wasser": [
+            8,
+            11
+          ]
+        },
+        "transit_planet_weights": {
+          "sun": 1,
+          "moon": 0.5,
+          "mercury": 0.6,
+          "venus": 0.7,
+          "mars": 0.8,
+          "jupiter": 1.2,
+          "saturn": 1.5,
+          "uranus": 1.5,
+          "neptune": 1.8,
+          "pluto": 2
+        }
+      }
+    }
+  }
+}

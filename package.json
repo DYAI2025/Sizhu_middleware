@@ -18,7 +18,9 @@
     "smoke:fufire": "tsx scripts/smoke/fufire-live-smoke.ts",
     "probe:fufire-location": "tsx scripts/smoke/fufire-location-probe.ts",
     "smoke:openrouter": "tsx scripts/smoke/openrouter-live-smoke.ts",
-    "smoke:lgq": "tsx scripts/smoke/lgq-live-smoke.ts"
+    "smoke:lgq": "tsx scripts/smoke/lgq-live-smoke.ts",
+    "smoke:compile-fufire": "tsx scripts/smoke/fufire-compile-shape-smoke.ts",
+    "smoke:compile-openrouter": "tsx scripts/smoke/openrouter-compile-smoke.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

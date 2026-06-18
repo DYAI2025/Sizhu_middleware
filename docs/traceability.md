@@ -310,3 +310,36 @@ approval-mint route + prod store land, (c) doc-cleanup of stale server/mcp refer
 ## User Confirmation (sizhu-agent-safe-ops)
 
 The assistant must not confirm this matrix. Bestätigung erfolgt durch den Nutzer (Confirmation-Block im Chat).
+
+---
+
+# Traceability Matrix: prompt-compile-preview
+
+Status: user-confirmed
+Confirmed by user: yes
+Confirmation date: 2026-06-18
+Owner: requirements-analyst
+PRD: docs/prd/prompt-compile-preview.prd.md
+Canvas: docs/canvas/prompt-compile-preview.canvas.md (user-confirmed 2026-06-18)
+Vision: docs/vision/prompt-compile-preview.vision.md
+
+Mandatory Canvas fields (apply to every top-level REQ below): canvas-link = docs/canvas/prompt-compile-preview.canvas.md;
+canvas-problem = CAN-001 (fill path not technically verifiable); canvas-target-user = CAN-002 (Admin/Operator + Dev-Team);
+canvas-value-claim = CAN-003 (deterministic symbol truth, LLM never authority); canvas-success-signal = CAN-009
+(filled compiledPrompt + visible gates + blockers); canvas-risk-status = aligned (CONTRA-001/002 resolved).
+
+| REQ | Task | Test (planned) | Evidence-class (target) | wired-in-prod? (proof) | true-line-status |
+|---|---|---|---|---|---|
+| REQ-001 route | T7 | server/tests/compileTemplate.routes.test.ts (supertest 200 + apiGuard 401) | integration | route mounted in server/index.ts + importer-grep | pass |
+| REQ-002 templates | T3 | server/tests/templateRegistry.test.ts | unit | imported by promptCompilationService (prod) | pass |
+| REQ-003 fufire fields | T1 | server/tests/fufire.responseInterpreter.test.ts (+ new fields) | integration | interpreter on the compile path | pass |
+| REQ-004 symbol mapper | T2 | server/tests/baziSymbolMapper.test.ts (Geng→庚; branch≠animal) | unit | imported by Lane-1 (prod) | pass |
+| REQ-005 Lane1 deterministic | T5 | server/tests/promptCompilation.lane1.test.ts (no unresolved placeholder) | unit | called by route (prod) | pass |
+| REQ-006 Lane2 LLM prose | T6 | server/tests/promptCompilation.lane2.test.ts (injected client; symbol-diff=0) | real-boundary-smoke | OpenRouter client wired in prod compile path | pass |
+| REQ-007 validation gates | T4 | server/tests/compileValidation.test.ts (§5/§12 incl. branch≠animal, RED-on-revert) | unit | called by route before returning | pass |
+| REQ-008 UI button+panel | T8 | src/tests/WorkflowBuilderView.compile.test.tsx | integration | rendered in WorkflowBuilderView (prod) | pass |
+| REQ-009 real-boundary evidence | T9 | scripts/smoke/{openrouter,fufire}-compile-smoke (flag-gated) | real-boundary-smoke | opt-in smoke (not CI); FuFire shape already verified SRC-004 | pass |
+
+Note: evidence-class values are TARGETS; the Reality Ledger (Gate C) records the achieved class. REQ-009 / SRC-004
+already verified the live FuFire shape (real-boundary). LLM prose lane (REQ-006) reaches real-boundary only via the
+flag-gated OpenRouter smoke; unit tests inject a fake client.
