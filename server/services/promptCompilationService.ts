@@ -43,6 +43,10 @@ import {
   getTemplate,
   type RegionPolicy,
 } from "./templateRegistryService";
+import {
+  resolveOpenRouterCredentials,
+  selectModelForOperation,
+} from "../../src/lib/modelGateway/openRouterGateway";
 
 /** A resolved per-field source status. */
 export type SourceStatus = "VERIFIED" | "SOURCE_NEEDED" | "API_VERIFIED_REQUIRED";
@@ -71,6 +75,13 @@ export interface CompiledTemplate {
   negativeConstraints: string;
   /** Per logical field: VERIFIED | SOURCE_NEEDED | API_VERIFIED_REQUIRED. */
   sourceStatus: Record<string, SourceStatus>;
+  /**
+   * The LLM-formulated `image_generation_prompt` prose (Lane 2 only). Absent on a
+   * pure Lane-1 result; populated by {@link compileLane2}. It is PROSE ONLY — the
+   * LLM never sets a symbol value (those live in {@link templatePlaceholders} and
+   * are produced deterministically by Lane 1).
+   */
+  imageGenerationPrompt?: string;
 }
 
 export interface CompileLane1Input {
@@ -229,6 +240,135 @@ const FILLABLE_KEYS: readonly string[] = [
   "year_stem_label_hanzi",
   "year_branch_label_hanzi",
 ];
+
+// =============================================================================
+// Lane 2 — LLM PROSE formulation
+// =============================================================================
+
+/**
+ * The LLM seam for Lane 2. The implementation formulates ONLY the
+ * `image_generation_prompt` prose text. The placeholders are passed as READ-ONLY
+ * context (so the prose can reference the blank symbol zones) — an implementation
+ * must NOT echo them back as values; Lane 2 discards everything but the prose.
+ */
+export interface LlmProseClient {
+  formulateImagePrompt(input: {
+    seed: string;
+    visualDirection: unknown;
+    placeholders: Record<string, string>;
+  }): Promise<string>;
+}
+
+/**
+ * Lane 2 — let an injected LLM formulate the `imageGenerationPrompt` prose.
+ *
+ * Returns a NEW {@link CompiledTemplate} that is `{ ...lane1 }` with ONLY:
+ *   - `imageGenerationPrompt` set to the LLM's prose output, and
+ *   - `negativeConstraints` (re-)set to the template's DETERMINISTIC value — never
+ *     the LLM output.
+ *
+ * Every symbol surface — `templatePlaceholders`, `deterministicOverlayPlan`,
+ * `rawDataBindings`, `sourceStatus` — is carried through UNCHANGED from Lane 1.
+ * The LLM receives the placeholders as read-only context but cannot alter a symbol
+ * value: its return is funnelled into `imageGenerationPrompt` alone (AC-005).
+ *
+ * @throws {Error} when `templateId` is not registered (fail-closed, like Lane 1).
+ */
+export async function compileLane2(
+  lane1: CompiledTemplate,
+  templateId: string,
+  client: LlmProseClient,
+): Promise<CompiledTemplate> {
+  const template = getTemplate(templateId);
+  if ("status" in template) {
+    throw new Error(`UNKNOWN_TEMPLATE: no registered template "${templateId}"`);
+  }
+
+  // The LLM gets the placeholders as READ-ONLY context only. We never read a
+  // symbol value back from its output — the prose is the sole thing it produces.
+  const prose = await client.formulateImagePrompt({
+    seed: template.imageGenerationPromptSeed,
+    visualDirection: template.visualDirection,
+    placeholders: lane1.templatePlaceholders,
+  });
+
+  return {
+    ...lane1,
+    imageGenerationPrompt: prose,
+    // Deterministic — the §10 constraints come from the template, NOT the LLM.
+    negativeConstraints: template.negativeConstraints,
+  };
+}
+
+/**
+ * Production default {@link LlmProseClient}: wraps the repo's existing OpenRouter
+ * call path. Resolves the key SERVER-SIDE via the secret-ref indirection (never
+ * logged), selects the image-generation model, and asks the model to write ONLY
+ * the prose. Do NOT call this from unit tests — it hits the network.
+ */
+export function createOpenRouterProseClient(): LlmProseClient {
+  return {
+    async formulateImagePrompt(input): Promise<string> {
+      const creds = resolveOpenRouterCredentials();
+      const apiKey = process.env[creds.secretRef];
+      if (!apiKey || apiKey.trim().length === 0) {
+        throw new Error(
+          `OpenRouter API key not found for secret ref "${creds.secretRef}". Ensure the env var is set.`,
+        );
+      }
+      const model = selectModelForOperation("image_generation");
+
+      const systemText =
+        "You are a prompt writer for an image-generation model. Write ONLY the " +
+        "`image_generation_prompt` prose for a personalized BaZi poster BACKGROUND. " +
+        "The {{...}} placeholders below mark deterministic blank zones that are filled " +
+        "downstream — reference them as blank zones, but NEVER substitute, translate, or " +
+        "invent any Chinese character, Pinyin, label, date, or number for them. Reply with " +
+        "the prompt prose only, no preamble.";
+      const userText = JSON.stringify({
+        seed: input.seed,
+        visualDirection: input.visualDirection,
+        placeholders: input.placeholders,
+      });
+
+      const baseUrl = creds.baseUrl.replace(/\/$/, "");
+      const response = await fetch(`${baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey.trim()}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: "system", content: systemText },
+            { role: "user", content: userText },
+          ],
+        }),
+        signal: AbortSignal.timeout(30_000),
+      });
+
+      if (!response.ok) {
+        const errText = await response.text().catch(() => "unknown error");
+        // Never include the key — only status + truncated body.
+        throw new Error(
+          `OpenRouter prose formulation failed (HTTP ${response.status}): ${errText.slice(0, 300)}`,
+        );
+      }
+
+      const data: unknown = await response.json();
+      const prose = (data as { choices?: { message?: { content?: unknown } }[] })
+        ?.choices?.[0]?.message?.content;
+      if (typeof prose !== "string" || prose.trim().length === 0) {
+        // Fail loud — never fabricate a prompt.
+        throw new Error(
+          "OpenRouter prose formulation returned no usable text — refusing to fabricate a prompt.",
+        );
+      }
+      return prose;
+    },
+  };
+}
 
 /**
  * Build the §11 deterministic overlay plan from the resolved placeholders. The
