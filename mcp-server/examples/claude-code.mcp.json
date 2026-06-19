@@ -2,7 +2,7 @@
   "mcpServers": {
     "sizhu": {
       "type": "http",
-      "url": "http://localhost:3399/mcp",
+      "url": "https://talented-victory-production.up.railway.app/mcp",
       "headers": {
         "Authorization": "Bearer ${SIZHU_TOKEN}"
       }
