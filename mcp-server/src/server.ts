@@ -162,5 +162,20 @@ Args: workflowRunId, input, artifact. Returns { ok, error_code?, message?, idemp
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   }, (args) => runTool(() => client.post("/secret-references/check", args)));
 
+  // ---- Compile preview: deterministic BaZi symbols + LLM prose --------------
+  server.registerTool("sizhu_compile_template", {
+    title: "Compile a BaZi Year-Pillar poster-prompt preview",
+    description: `POST /api/v1/compile-template — compile a poster-prompt preview from a real FuFire response. The Hanzi/Pinyin SYMBOL values are filled DETERMINISTICALLY from a verified mapping table (NOT the LLM); a real OpenRouter call formulates ONLY the image-prompt prose; then deterministic quality gates run. A BLOCKED verdict is a SHOWN result with blockers — never a fake pass; inspect validation.gates/blockers, do not treat BLOCKED as success. Session-protected (your admin token is forwarded). No money/fulfillment.
+Args: templateId ('bazi_solo_beijing_modern_v1' | 'bazi_solo_sichuan_classical_v1'); rawFuFireResponse (a FuFire bazi response object — the { _note?, data } envelope or its inner object); locale 'de'|'en' (optional).
+Returns: { compiled: { variantId, regionPolicy, templatePlaceholders, rawDataBindings, deterministicOverlayPlan, sourceStatus, negativeConstraints, imageGenerationPrompt }, validation: { gates[], verdict:'PASS'|'BLOCKED', blockers[] } }.`,
+    inputSchema: {
+      templateId: z.string().min(1).describe("bazi_solo_beijing_modern_v1 | bazi_solo_sichuan_classical_v1"),
+      rawFuFireResponse: z.record(z.unknown()).describe("FuFire bazi response object ({ _note?, data } envelope or inner object)"),
+      locale: z.enum(["de", "en"]).optional().describe("Render locale (de→Tier, en→animal)"),
+    },
+    // Not idempotent: the Lane-2 prose comes from a live LLM call (non-deterministic).
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+  }, (args) => runTool(() => client.post("/v1/compile-template", args)));
+
   return server;
 }
