@@ -1,0 +1,6 @@
+# Codex CLI — sizhu-mcp-server via the mcp-remote stdio↔HTTP bridge (universal, every Codex version).
+# Place under ~/.codex/config.toml. Export SIZHU_TOKEN (admin + aal2 Sizhu access token) first.
+# Swap the URL for your deployed MCP host when not running locally.
+[mcp_servers.sizhu]
+command = "npx"
+args = ["-y", "mcp-remote", "http://localhost:3399/mcp", "--header", "Authorization: Bearer ${SIZHU_TOKEN}"]

@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "sizhu": {
+      "type": "http",
+      "url": "http://localhost:3399/mcp",
+      "headers": {
+        "Authorization": "Bearer ${SIZHU_TOKEN}"
+      }
+    }
+  }
+}
