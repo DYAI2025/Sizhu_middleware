@@ -5,6 +5,11 @@ must carry **your own Sizhu admin access token** (admin account, MFA/aal2) as
 `Authorization: Bearer <token>` — it is forwarded verbatim to the Sizhu `/api`, which enforces all
 guards. The MCP server holds no secret and grants no extra privilege. No bearer → 401.
 
+> **Deployed endpoint:** `https://talented-victory-production.up.railway.app/mcp` (Railway).
+> The config files `claude-code.mcp.json` / `codex-config.toml` point at it. The shell snippets
+> below show `localhost:3399` for a self-run local server (§0) — swap in the deployed URL to use
+> the hosted one.
+
 ## 0. Prerequisites
 
 ```bash
