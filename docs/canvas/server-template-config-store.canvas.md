@@ -43,6 +43,7 @@ Confirmation note: Confirmed at Phase 0.15, returned to draft for the Phase 0.16
 - `server/index.ts`
 - `server/middleware/auth.ts`
 - `server/lib/jwt.ts`
+- `server/services/authUserService.ts`
 - `mcp-server/src/**`
 - `supabase-schema.sql`
 - `server/tests/**`
