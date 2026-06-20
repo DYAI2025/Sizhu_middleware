@@ -23,6 +23,11 @@ import {
   type CompiledTemplate,
 } from "./services/promptCompilationService";
 import { validateCompiled } from "./services/compileValidationService";
+import {
+  TemplateStoreService,
+  InMemoryAuditSink,
+} from "./services/templateStoreService";
+import { registerTemplateRoutes } from "./routes/templates";
 
 dotenv.config();
 
@@ -34,6 +39,18 @@ dotenv.config();
 export interface CreateAppDeps {
   /** Injected LLM prose client (Lane 2). Defaults to the real OpenRouter client. */
   proseClient?: LlmProseClient;
+  /**
+   * Injected template config store (server-template-config-store, REQ-002).
+   * Defaults to one built on the mode-switched template repo (appServices.templates)
+   * + a fresh in-memory audit sink. Tests inject a store on an in-memory repo double
+   * so no Supabase / network is touched.
+   *
+   * NOTE: the real Supabase-backed audit sink/repo is gated on CONTRA-SB-1, so the
+   * DEMO_LOCAL / Local repo is the default path now. In non-DEMO_LOCAL modes the
+   * Supabase template repo stub throws — the route surfaces that as an error rather
+   * than fabricating success.
+   */
+  templateStore?: TemplateStoreService;
 }
 
 export function createApp(deps: CreateAppDeps = {}): Express {
@@ -79,6 +96,16 @@ export function createApp(deps: CreateAppDeps = {}): Express {
   // Supabase session; sensitive routes additionally require admin role + MFA.
   // ---------------------------------------------------------------------------
   app.use("/api", apiGuard);
+
+  // --- Template config store CRUD (REQ-002) ---------------------------------
+  // Mounted BELOW apiGuard so every route inherits default-deny session auth;
+  // the write routes additionally enforce requireScope("templates:write").
+  // The store is a single SHARED instance (read-after-write works), built here
+  // from the mode-switched template repo unless one is injected (tests).
+  const templateStore =
+    deps.templateStore ??
+    new TemplateStoreService(appServices.templates, new InMemoryAuditSink());
+  registerTemplateRoutes(app, templateStore);
 
   // --- Compile Preview (REQ-001): deterministic Lane-1 + LLM-prose Lane-2 + post-validation.
   // Session-protected by the default-deny apiGuard above. The symbol values are deterministic
