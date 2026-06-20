@@ -175,5 +175,47 @@ Returns: { compiled: { variantId, regionPolicy, templatePlaceholders, rawDataBin
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   }, (args) => runTool(() => client.post("/v1/compile-template", args)));
 
+  // ---- Template config store (REQ-007): list / get / save / set-active ------
+  // Thin proxies over /api/v1/templates. They forward the caller's admin token;
+  // writes require the `templates:write` scope on that forwarded token. The server
+  // validates server-side — a BLOCKED/422 is surfaced as an error, never a fake success.
+  server.registerTool("sizhu_list_templates", {
+    title: "List stored prompt templates",
+    description: "GET /api/v1/templates — list the stored prompt templates as an array of template records. Thin proxy; forwards your admin token. Read-only.",
+    inputSchema: {}, annotations: READ_ONLY,
+  }, () => runTool(() => client.get("/v1/templates")));
+
+  server.registerTool("sizhu_get_template", {
+    title: "Get a stored prompt template by id",
+    description: "GET /api/v1/templates/:id — fetch one stored prompt template by id. 404 if no such template. Thin proxy; forwards your admin token. Read-only. Args: id.",
+    inputSchema: { id: z.string().min(1).describe("The template id") },
+    annotations: READ_ONLY,
+  }, ({ id }) => runTool(() => client.get(`/v1/templates/${encodeURIComponent(id)}`)));
+
+  server.registerTool("sizhu_save_template", {
+    title: "Create or update a prompt template (upsert)",
+    description: "POST /api/v1/templates — create or update a prompt template (upsert). The server VALIDATES the template server-side and returns 422 on an invalid template; the 422 is surfaced as an error, never a fake success. Requires the `templates:write` scope on the forwarded admin token. Thin proxy. Args: template { id?, name, content, version, status }.",
+    inputSchema: {
+      template: z.object({
+        id: z.string().min(1).optional().describe("Template id (omit to create a new one)"),
+        name: z.string().min(1).describe("Human-readable template name"),
+        content: z.string().describe("The template body (e.g. {{var}} prompt text)"),
+        version: z.string().min(1).describe("Template version"),
+        status: z.string().min(1).describe("Template status (e.g. draft|active|archived)"),
+      }).describe("The template to create or update (upsert)"),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+  }, ({ template }) => runTool(() => client.post("/v1/templates", template)));
+
+  server.registerTool("sizhu_set_template_active", {
+    title: "Activate or deactivate (archive) a template",
+    description: "POST /api/v1/templates/:id/active — soft activate or deactivate (archive) a template. NEVER deletes a template — deactivation archives it. The server validates server-side; a BLOCKED/422 is surfaced as an error, never a fake success. Requires the `templates:write` scope on the forwarded admin token. Thin proxy. Args: id, active (boolean).",
+    inputSchema: {
+      id: z.string().min(1).describe("The template id"),
+      active: z.boolean().describe("true → activate; false → deactivate (archive, never delete)"),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+  }, ({ id, active }) => runTool(() => client.post(`/v1/templates/${encodeURIComponent(id)}/active`, { active })));
+
   return server;
 }
