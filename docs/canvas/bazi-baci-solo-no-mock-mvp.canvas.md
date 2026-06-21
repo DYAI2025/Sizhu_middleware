@@ -1,6 +1,6 @@
 # Product Canvas — BaZi/Baci Solo No-Mock MVP
 Feature-slug: bazi-baci-solo-no-mock-mvp
-Status: draft (council SHARPEN amendment 2026-06-21 — re-confirmation pending)
+Status: user-confirmed (2026-06-21, ben.poersch@gmail.com; post-council)
 Source: Plumbline AgileTeam-Intake handover 2026-06-20 (SRC-H1); spec-sanity verified in-repo 2026-06-21.
 
 ## CAN-001 Problem — EXPLICIT

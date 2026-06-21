@@ -1,5 +1,5 @@
 # PRD — BaZi/Baci Solo No-Mock MVP
-Status: draft (NOT user-confirmed)
+Status: user-confirmed (2026-06-21, ben.poersch@gmail.com; post-council)
 Feature-slug: bazi-baci-solo-no-mock-mvp
 Canvas: docs/canvas/bazi-baci-solo-no-mock-mvp.canvas.md
 Vision: docs/vision/bazi-baci-solo-no-mock-mvp.vision.md
