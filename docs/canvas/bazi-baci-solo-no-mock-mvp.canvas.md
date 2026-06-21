@@ -24,7 +24,7 @@ Codepoint-Manifest, NEU) → QA-Gates → Ready/Blocked.
 ## CAN-008 Risks / Contradictions
 - BLK-003 (BLOCKER) Kern-AC deterministischer CJK-Renderer hängt an ungebauter Komponente (verifiziert: kein SVG/codepoint-Overlay-Renderer im Tree); D-3 in-scope, höchstes Bau-Risiko.
 - BLK-002 (BLOCKER) Persistenz für Runs/Artefakte fehlt (verifiziert: keine RunRepository/saveRun) → "survives restart" unbewiesen.
-- BLK-001 (BLOCKER→pending-verify) echter FuFire-Key: Service real (fufireDataService.ts:409 fetch), Key-Auflösung in Sizhu-Staging noch ungeprüft.
+- BLK-001 (VERIFIED lokal): echter FuFire-Key löst auf + Real-Call funktioniert — `smoke:fufire` PASS (bazi/wuxing/fusion ok, kein contract-drift, secret-hygiene ✓; fufireDataService.ts:409 fetch). **Konfabulation-Korrektur (P6):** autoritativer Key-Var ist `SECRET_REF_FUFIRE_API_KEY` (via `FUFIRE_API_KEY_SECRET_REF`-Indirektion, index.ts:134/176), NICHT der bare `FUFIRE_API_KEY` aus dem Handover; base-url via `FUFIRE_BASE_URL` (gesetzt), nicht hardcoded `api.fufire.space`. Lokale .env setzt beide Pfade → löst. **Railway/Staging-Restrisiko:** Key MUSS unter `SECRET_REF_FUFIRE_API_KEY` liegen (P6-Deploy-Falle).
 - BLK-004 (BLOCKER) Shipping-Artefakt-Schema nicht definiert → "Ready" hat kein Ziel-Schema.
 ## CAN-009 Evidence Needed
 Echter FuFire-Key (Staging-Auflösung) · durable Persistenz-Config (Supabase) · lizenzierte CJK-Font
