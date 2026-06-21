@@ -271,6 +271,69 @@ export class LocalTemplateRepository implements TemplateRepository {
   async saveTemplates(templates: PromptTemplate[]): Promise<void> {
     setStorageItem('templates', templates);
   }
+
+  // ── Granular ops (REQ-001, Slice-1) — soft-delete / versioning only ─────────
+  // Revision history is stored per-id under a separate `template_versions` key,
+  // shaped as `Record<id, PromptTemplate[]>` with newest-first ordering. The
+  // history accessor is a module-level helper (not a class member) so this class
+  // stays structurally assignable to the `TemplateRepository` interface.
+
+  /**
+   * UPSERT by id. On an UPDATE the previous snapshot is pushed to the front of
+   * the per-id revision history. Idempotent: re-saving an identical row neither
+   * duplicates the live row nor records a spurious revision.
+   */
+  async saveTemplate(template: PromptTemplate): Promise<PromptTemplate> {
+    const list = await this.getTemplates();
+    const index = list.findIndex(t => t.id === template.id);
+
+    if (index !== -1) {
+      const previous = list[index];
+      // Idempotent no-op: identical input → no live change, no new revision.
+      const unchanged = JSON.stringify(previous) === JSON.stringify(template);
+      if (!unchanged) {
+        const history = getTemplateVersionHistory();
+        const revisions = history[template.id] ?? [];
+        // newest-first: prepend the prior snapshot.
+        history[template.id] = [previous, ...revisions];
+        setStorageItem('template_versions', history);
+        list[index] = template;
+        setStorageItem('templates', list);
+      }
+    } else {
+      list.push(template);
+      setStorageItem('templates', list);
+    }
+
+    return template;
+  }
+
+  /**
+   * Soft activate/deactivate. Flips status to `active`/`archived` in place;
+   * never deletes the row and never touches the revision history. No-op if the
+   * id is unknown (no physical create/delete side effects).
+   */
+  async setActive(id: string, active: boolean): Promise<void> {
+    const list = await this.getTemplates();
+    const index = list.findIndex(t => t.id === id);
+    if (index === -1) return;
+    list[index] = { ...list[index], status: active ? 'active' : 'archived' };
+    setStorageItem('templates', list);
+  }
+
+  /** Prior revisions of a template, newest first. */
+  async listVersions(id: string): Promise<PromptTemplate[]> {
+    const history = getTemplateVersionHistory();
+    return history[id] ?? [];
+  }
+}
+
+/**
+ * Per-id template revision history (REQ-001, Slice-1). Stored under a separate
+ * `template_versions` key as `Record<id, PromptTemplate[]>`, newest-first.
+ */
+function getTemplateVersionHistory(): Record<string, PromptTemplate[]> {
+  return getStorageItem<Record<string, PromptTemplate[]>>('template_versions', {});
 }
 
 export class LocalProviderRepository implements ProviderRepository {

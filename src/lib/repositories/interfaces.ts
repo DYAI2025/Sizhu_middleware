@@ -29,6 +29,22 @@ export interface ProductRepository {
 export interface TemplateRepository {
   getTemplates(): Promise<PromptTemplate[]>;
   saveTemplates(templates: PromptTemplate[]): Promise<void>;
+  // ── Granular template ops (REQ-001, Slice-1) ──────────────────────────────
+  // Slice-1 is soft-delete / versioning only: NO method physically removes a
+  // template or loses a revision.
+  /**
+   * UPSERT a template by id (create or update). On an UPDATE the prior snapshot
+   * is pushed into the template's revision history (see `listVersions`). Idempotent
+   * by id. Returns the saved template.
+   */
+  saveTemplate(template: PromptTemplate): Promise<PromptTemplate>;
+  /**
+   * Soft activate/deactivate a template: flips its status to `active`/`archived`.
+   * Archived ≠ deleted — the template stays in the list and keeps its versions.
+   */
+  setActive(id: string, active: boolean): Promise<void>;
+  /** Prior revisions of a template, newest first (never physically lost). */
+  listVersions(id: string): Promise<PromptTemplate[]>;
 }
 
 export interface ProviderRepository {

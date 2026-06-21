@@ -343,3 +343,35 @@ canvas-value-claim = CAN-003 (deterministic symbol truth, LLM never authority); 
 Note: evidence-class values are TARGETS; the Reality Ledger (Gate C) records the achieved class. REQ-009 / SRC-004
 already verified the live FuFire shape (real-boundary). LLM prose lane (REQ-006) reaches real-boundary only via the
 flag-gated OpenRouter smoke; unit tests inject a fake client.
+
+---
+
+# Traceability Matrix: server-template-config-store (Slice-1)
+
+Status: user-confirmed
+Confirmed by user: yes
+Confirmation date: 2026-06-20
+Owner: requirements-analyst
+PRD: docs/prd/server-template-config-store.prd.md
+Canvas: docs/canvas/server-template-config-store.canvas.md (user-confirmed 2026-06-20, post-council)
+Vision: docs/vision/server-template-config-store.vision.md
+
+Mandatory Canvas fields (every top-level REQ): canvas-link = docs/canvas/server-template-config-store.canvas.md;
+canvas-problem = CAN-001 (no shared server-side store); canvas-target-user = CAN-002 (admins + autonomous agents);
+canvas-value-claim = CAN-003 (full agent access, robust not naive); canvas-success-signal = CAN-009
+(2nd-session read-after-write + audit + validation reject); canvas-risk-status = aligned (council bundle adopted).
+
+| REQ | Task | Test (planned) | Evidence-class (target) | wired-in-prod? | true-line-status |
+|---|---|---|---|---|---|
+| REQ-001 SupabaseTemplateRepository | T2 | server/tests/templateRepository.supabase.test.ts (double) + live persist smoke | real-boundary-smoke (gated CONTRA-SB-1) | appServices seam → route | pass |
+| REQ-002 /api/v1/templates routes | T5 | server/tests/templates.routes.test.ts (supertest) | integration | createApp composition root | pass |
+| REQ-003 save-validation | T3 | server/tests/templateValidation.test.ts (malformed→422, RED-on-revert) | unit | called by route before persist | pass |
+| REQ-004 audit-log | T3 | server/tests/templateAudit.test.ts (write→row, append-only) | integration | every write path | pass |
+| REQ-005 soft-delete/versioning | T3 | server/tests/templateVersioning.test.ts (prior revision readable) | integration | store service | pass |
+| REQ-006 token-scope auth | T4 | server/tests/templates.authscope.test.ts (no scope→403, RED-on-revert) | integration | apiGuard/route | pass (OQ-DESIGN-1) |
+| REQ-007 MCP tools | T6 | mcp-server tools/list shows 4 tools + roundtrip | integration | mcp-server registration | pass |
+| REQ-008 P9 money-field check | T7 | server/tests/templateMoneyGate.test.ts (money-field→set-active gated) | integration | conditional route gate | pass |
+
+Note: CONTRA-SB-1 (live Supabase schema/service-role) is a user-owned pre-build verification; the
+assistant cannot reach the Sizhu Supabase from here. REQ-001 real-boundary evidence is gated on it.
+OQ-DESIGN-1 (token-scope representation) resolved by the Phase-1 planner with an explicit fallback.
