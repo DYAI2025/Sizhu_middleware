@@ -20,7 +20,8 @@
     "smoke:openrouter": "tsx scripts/smoke/openrouter-live-smoke.ts",
     "smoke:lgq": "tsx scripts/smoke/lgq-live-smoke.ts",
     "smoke:compile-fufire": "tsx scripts/smoke/fufire-compile-shape-smoke.ts",
-    "smoke:compile-openrouter": "tsx scripts/smoke/openrouter-compile-smoke.ts"
+    "smoke:compile-openrouter": "tsx scripts/smoke/openrouter-compile-smoke.ts",
+    "spike:cjk": "tsx scripts/smoke/cjk-render-spike.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
@@ -31,6 +32,7 @@
     "cors": "^2.8.6",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
+    "fontkit": "^2.0.4",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
     "react": "^19.0.1",
@@ -42,6 +44,7 @@
     "@stryker-mutator/core": "^9.6.1",
     "@stryker-mutator/vitest-runner": "^9.6.1",
     "@types/cors": "^2.8.19",
+    "@types/fontkit": "^2.0.9",
     "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
     "@types/supertest": "^7.2.0",

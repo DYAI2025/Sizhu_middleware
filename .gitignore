@@ -16,3 +16,9 @@ config/claude/
 # Stryker mutation report output (transient)
 reports/mutation/
 .stryker-tmp/
+
+# Font binaries (AM-4 CJK render spike) — large, redistributable under OFL but not
+# committed; commit only assets/fonts/OFL.txt + the README note. Fetched by the
+# spike per scripts/smoke/cjk-render-spike.ts header.
+assets/fonts/*.ttf
+assets/fonts/*.otf

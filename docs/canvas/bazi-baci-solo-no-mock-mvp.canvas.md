@@ -56,6 +56,8 @@ Renderer · BLK-004 Shipping-Artefakt-Definition · BLK-005 (entfällt) Image/QA
 - `src/tests/**`
 - `scripts/smoke/**`
 - `package.json`
+- `package-lock.json`
+- `.gitignore`
 - `metrics/**`
 
 (Additiv: bestehende Workflow-Routen NICHT entfernen bis Staging-Smoke grün.)
