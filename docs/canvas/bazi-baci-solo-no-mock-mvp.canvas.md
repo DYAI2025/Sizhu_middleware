@@ -1,6 +1,6 @@
 # Product Canvas — BaZi/Baci Solo No-Mock MVP
 Feature-slug: bazi-baci-solo-no-mock-mvp
-Status: user-confirmed (2026-06-21, ben.poersch@gmail.com)
+Status: draft (council SHARPEN amendment 2026-06-21 — re-confirmation pending)
 Source: Plumbline AgileTeam-Intake handover 2026-06-20 (SRC-H1); spec-sanity verified in-repo 2026-06-21.
 
 ## CAN-001 Problem — EXPLICIT
@@ -64,3 +64,28 @@ Renderer · BLK-004 Shipping-Artefakt-Definition · BLK-005 (entfällt) Image/QA
 Der Assistant darf diesen Canvas NICHT selbst bestätigen (Status bleibt `draft`). Erst nach dem
 expliziten User-Satz wird er `user-confirmed`:
 `Ich bestätige, dass Product Canvas und Product Vision meine Absicht korrekt wiedergeben und als Grundlage für AgileTeam Planning verwendet werden dürfen.`
+
+## Council SHARPEN amendments (adopted by user 2026-06-21, re-confirm pending)
+Phase-0.16 council verdict = SHARPEN (3/3). User adopted the full bundle + spike-first. Goal unchanged
+(full no-mock bazi-solo MVP); APPROACH sharpened so the no-mock guarantee is real AT THE PIXEL, not
+just at the API boundary.
+
+- **AM-1 Renderer approach (REQ-F-006 reframe):** do NOT hand-roll a CJK/SVG renderer. Hanzi already
+  exist as typed data (compileContract.ts:34-41). Use an off-the-shelf font lib (fontkit / resvg) to
+  OUTLINE glyphs to paths; assert codepoint→path fidelity. Off-the-shelf strictly safer than hand-rolled.
+- **AM-2 Two NON-DEFERRABLE hard-gates** (truth lives at the pixel):
+  - (a) Render-back glyph integrity: after render, extract each CJK codepoint from the OUTPUT, byte-equal
+    vs expected; FAIL on Tofu/substitution. NFC-normalize all CJK at the plan boundary + idempotence assert.
+  - (b) Lichun→pillar DERIVATION (not label): assert the printed year-pillar is recomputed from
+    is_before_lichun + solar year (fufireResponseInterpreter.ts:592), NOT copied from a label; a
+    Feb-3 / Feb-4 fixture pair MUST produce DIFFERENT year-pillars.
+- **AM-3 Slice-1 (thinner):** sim-order → real bazi (✓ verified) → persist raw (Supabase) → existing
+  compile-lane → SVG via off-the-shelf lib (paths outlined) → ONE load-bearing gate (codepoint→path
+  golden-hash). DEFER to slice-2: PNG raster, A4@300dpi exactness, manifest versioning, the other QA
+  gates. NEVER defer: AM-2 (a)+(b).
+- **AM-4 Spike FIRST:** isolated 1-file proof on ALREADY-captured FuFireTestRunResult data — does Noto
+  Sans CJK SC render every codepoint at print resolution without Tofu? Success = render-back byte-equality
+  on the 戊/午 collision + a lichun boundary pair. If NO → whole MVP blocked, no persistence/gate effort wasted.
+- **AM-5 Blind-spot:** persistence is ALSO a real unknown (the Supabase template-store stub throws today);
+  prove raw-response durability across the boundary, don't assume the renderer is the only risk. Hand to
+  the builder only when AM-2 (a)+(b) exist AND go RED on revert.

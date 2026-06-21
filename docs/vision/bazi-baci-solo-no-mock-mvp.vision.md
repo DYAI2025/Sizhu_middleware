@@ -1,6 +1,6 @@
 # Product Vision — BaZi/Baci Solo No-Mock MVP
 Feature-slug: bazi-baci-solo-no-mock-mvp
-Status: user-confirmed (2026-06-21, ben.poersch@gmail.com)
+Status: draft (council SHARPEN amendment 2026-06-21 — re-confirmation pending)
 Canvas: docs/canvas/bazi-baci-solo-no-mock-mvp.canvas.md
 Source: Plumbline AgileTeam-Intake handover 2026-06-20 (SRC-H1); spec-sanity verified in-repo 2026-06-21.
 

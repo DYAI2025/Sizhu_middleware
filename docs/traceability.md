@@ -364,3 +364,12 @@ Canvas: docs/canvas/bazi-baci-solo-no-mock-mvp.canvas.md · Vision: docs/vision/
 
 Coverage: 8/8 REQ verlinkt (Vision+Canvas+AC+Evidence), keine Waisen. 5/8 P0 BLOCKED auf BLK-001..004.
 Reality-Ledger-Spalten (wired-in-prod?, evidence-class) + die 6 Canvas-Pflichtfelder bei Build-Start ergänzen.
+
+### bazi-baci-solo-no-mock-mvp — council amendments (2026-06-21)
+| REQ | Vision | Canvas | AC | Evidence | Prio | Status |
+|---|---|---|---|---|---|---|
+| REQ-F-006 (reframed) | VIS-001 | AM-1 | AC-006 | codepoint→path golden-hash (off-the-shelf lib) | P0 | BLOCKED (BLK-003) |
+| REQ-F-009 (new) | VIS-005,007 | AM-2a | AC-009 | render-back byte-equality (戊/午 collision) | P0 | NON-DEFERRABLE |
+| REQ-F-010 (new) | VIS-001,005 | AM-2b | AC-010 | Feb-3/Feb-4 fixture pair → different pillars (RED-on-revert) | P0 | NON-DEFERRABLE |
+
+Slice-1 = REQ-F-001/002(✓)/003/004/005 + reframed F-006 + F-009 + F-010 + ONE gate. Spike F-006 first.

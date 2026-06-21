@@ -50,3 +50,24 @@ Etsy-Prod · POD-Dispatch · Workflow-Redesign · Four-Pillars-Vollprodukt · Bi
 5/8 P0 BLOCKED auf BLK-001..004. Werte vom User geliefert (2026-06-21: FuFire-Key in .env, Supabase,
 Noto Sans CJK SC OFL, SVG+PNG A4@300dpi) aber `provided`/`ungeprüft` bis in Sizhu-Repo/-Staging
 verifiziert. BLOCKED bleibt sichtbar — nie als Mock/Stub/known-limitation getarnt.
+
+## Council SHARPEN amendments (adopted by user 2026-06-21)
+
+REQ-F-006 (REFRAMED) — Render CJK overlay via off-the-shelf glyph-outlining (fontkit/resvg), NOT hand-rolled.
+  AC-006: SVG with glyphs OUTLINED to paths from the deterministicOverlayPlan; codepoint→path fidelity asserted.
+
+REQ-F-009 (NEW, P0, NON-DEFERRABLE) — Render-back glyph integrity.
+  AC-009: After render, every CJK codepoint extracted from the OUTPUT is byte-equal to the expected
+          codepoint; FAIL on Tofu/substitution. All CJK NFC-normalized at the plan boundary (idempotent).
+  Verifikation: golden-hash render-back test incl. the 戊/午 (stem-vs-branch) collision.
+
+REQ-F-010 (NEW, P0, NON-DEFERRABLE) — Lichun→pillar derivation (not label).
+  AC-010: Printed year-pillar is recomputed from is_before_lichun + solar year (interpreter:592), not
+          copied from a label; a Feb-3 / Feb-4 fixture pair produces DIFFERENT year-pillars.
+  Verifikation: boundary fixture-pair test (RED on revert to label-copy).
+
+## Slice plan (adopted)
+- Slice-1 (this iteration): sim-order → real bazi → persist raw (Supabase) → existing compile-lane →
+  SVG via off-the-shelf lib (outlined) → ONE load-bearing gate (codepoint→path golden-hash) + the two
+  non-deferrable hard-gates REQ-F-009/010. SPIKE the renderer FIRST (gate the MVP on it).
+- Slice-2 (deferred): PNG raster, A4@300dpi exactness, manifest versioning, remaining QA gates (REQ-F-008 full set).
