@@ -28,6 +28,11 @@ import {
   InMemoryAuditSink,
 } from "./services/templateStoreService";
 import { registerTemplateRoutes } from "./routes/templates";
+import { createClient } from "@supabase/supabase-js";
+import {
+  SupabaseTemplateRepository,
+  SupabaseAuditSink,
+} from "../src/lib/repositories/supabaseTemplateRepository";
 
 dotenv.config();
 
@@ -51,6 +56,41 @@ export interface CreateAppDeps {
    * than fabricating success.
    */
   templateStore?: TemplateStoreService;
+}
+
+/**
+ * SERVER-ONLY: build the template store from real Supabase persistence when the
+ * project URL AND the service-role key are both present in the environment;
+ * otherwise return `null` so the caller falls back to the mode-switched repo +
+ * in-memory audit sink (the DEMO_LOCAL / test path).
+ *
+ * SECURITY: the service-role client is constructed HERE (server), never in
+ * `appServices` (which is shared with the browser bundle). The key is read by
+ * indirection — `process.env[ process.env.SUPABASE_SERVICE_ROLE_SECRET_REF ||
+ * "SECRET_REF_SUPABASE_SERVICE_ROLE" ]` — and is NEVER logged.
+ */
+function buildSupabaseTemplateStore(): TemplateStoreService | null {
+  const url =
+    process.env.SUPABASE_URL ||
+    process.env.SUPABASE_PROJECT_URL ||
+    process.env.VITE_SUPABASE_URL ||
+    "";
+  const serviceRoleRef =
+    process.env.SUPABASE_SERVICE_ROLE_SECRET_REF ||
+    "SECRET_REF_SUPABASE_SERVICE_ROLE";
+  const serviceRoleKey = process.env[serviceRoleRef] || "";
+
+  if (!url || !serviceRoleKey) {
+    return null;
+  }
+
+  const client = createClient(url, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  return new TemplateStoreService(
+    new SupabaseTemplateRepository(client),
+    new SupabaseAuditSink(client),
+  );
 }
 
 export function createApp(deps: CreateAppDeps = {}): Express {
@@ -104,6 +144,7 @@ export function createApp(deps: CreateAppDeps = {}): Express {
   // from the mode-switched template repo unless one is injected (tests).
   const templateStore =
     deps.templateStore ??
+    buildSupabaseTemplateStore() ??
     new TemplateStoreService(appServices.templates, new InMemoryAuditSink());
   registerTemplateRoutes(app, templateStore);
 
