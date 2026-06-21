@@ -4,6 +4,8 @@ import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 import cors from "cors";
 import { FuFireDataService } from "./services/fufireDataService";
+import { registerBaziSoloRoutes, type BaziSoloRouteDeps } from "./routes/baziSolo";
+import { InMemoryBaZiSoloStore } from "./services/baziSoloPipeline";
 import { PodDispatchService } from "./services/podDispatchService";
 import {
   sanitizeTestRunBody,
@@ -34,6 +36,11 @@ dotenv.config();
 export interface CreateAppDeps {
   /** Injected LLM prose client (Lane 2). Defaults to the real OpenRouter client. */
   proseClient?: LlmProseClient;
+  /**
+   * Injected bazi-solo pipeline deps (DI for tests). Defaults: the real
+   * FuFireDataService + an in-memory store (the durable Supabase store is ST-2/BLK-002).
+   */
+  baziSolo?: Partial<BaziSoloRouteDeps>;
 }
 
 export function createApp(deps: CreateAppDeps = {}): Express {
@@ -245,6 +252,18 @@ export function createApp(deps: CreateAppDeps = {}): Express {
   // --- Sensitive routes (session + admin role + MFA) -------------------------
 
   const fufireDataService = new FuFireDataService();
+
+  // --- BaZi-solo no-mock vertical (REQ-F-001 wiring, P1) — session-protected by the
+  // default-deny apiGuard above. Real FuFireDataService + in-memory store by default;
+  // the durable Supabase store (ST-2/BLK-002) implements the same BaZiSoloStore seam.
+  registerBaziSoloRoutes(app, {
+    fufire: deps.baziSolo?.fufire ?? fufireDataService,
+    store: deps.baziSolo?.store ?? new InMemoryBaZiSoloStore(),
+    generateRunId: deps.baziSolo?.generateRunId,
+    fontPath: deps.baziSolo?.fontPath,
+    templateId: deps.baziSolo?.templateId,
+    now: deps.baziSolo?.now,
+  });
 
   app.post("/api/data-requests/fufire/test-run", async (req, res) => {
     try {
