@@ -194,15 +194,17 @@ Returns: { compiled: { variantId, regionPolicy, templatePlaceholders, rawDataBin
 
   server.registerTool("sizhu_save_template", {
     title: "Create or update a prompt template (upsert)",
-    description: "POST /api/v1/templates — create or update a prompt template (upsert). The server VALIDATES the template server-side and returns 422 on an invalid template; the 422 is surfaced as an error, never a fake success. Requires the `templates:write` scope on the forwarded admin token. Thin proxy. Args: template { id?, name, content, version, status }.",
+    description: "POST /api/v1/templates — create or update a prompt template (upsert). The server VALIDATES the template server-side and returns 422 on an invalid template; the 422 is surfaced as an error, never a fake success. Requires the `templates:write` scope on the forwarded admin token. Thin proxy. Args: template { id, name, content, version, status, createdAt, createdBy }.",
     inputSchema: {
       template: z.object({
-        id: z.string().min(1).optional().describe("Template id (omit to create a new one)"),
+        id: z.string().min(1).describe("Required template id"),
         name: z.string().min(1).describe("Human-readable template name"),
         content: z.string().describe("The template body (e.g. {{var}} prompt text)"),
-        version: z.string().min(1).describe("Template version"),
-        status: z.string().min(1).describe("Template status (e.g. draft|active|archived)"),
-      }).describe("The template to create or update (upsert)"),
+        version: z.number().int().min(1).describe("Positive integer template version"),
+        status: z.enum(["draft", "active", "archived"]).describe("Template status"),
+        createdAt: z.string().min(1).describe("Creation timestamp (ISO-8601 string preferred)"),
+        createdBy: z.string().min(1).describe("Creator identifier/email"),
+      }).strict().describe("The full PromptTemplate to create or update (upsert)"),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   }, ({ template }) => runTool(() => client.post("/v1/templates", template)));
