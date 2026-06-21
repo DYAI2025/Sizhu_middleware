@@ -343,3 +343,24 @@ canvas-value-claim = CAN-003 (deterministic symbol truth, LLM never authority); 
 Note: evidence-class values are TARGETS; the Reality Ledger (Gate C) records the achieved class. REQ-009 / SRC-004
 already verified the live FuFire shape (real-boundary). LLM prose lane (REQ-006) reaches real-boundary only via the
 flag-gated OpenRouter smoke; unit tests inject a fake client.
+
+---
+
+# Traceability — bazi-baci-solo-no-mock-mvp
+
+Status: draft (NOT user-confirmed)
+Canvas: docs/canvas/bazi-baci-solo-no-mock-mvp.canvas.md · Vision: docs/vision/bazi-baci-solo-no-mock-mvp.vision.md · PRD: docs/prd/bazi-baci-solo-no-mock-mvp.prd.md
+
+| REQ | Vision | Canvas | AC | Evidence | Prio | Status |
+|---|---|---|---|---|---|---|
+| REQ-F-001 | VIS-002 | CAN-006 | AC-001 | API-Test Run-ID | P0 | coverable |
+| REQ-F-002 | VIS-001,003 | CAN-004 | AC-002 | Integration-Smoke echter Key (fufireDataService.ts:184/409 belegt) | P0 | BLOCKED (BLK-001 pending-verify) |
+| REQ-F-003 | VIS-002,006 | CAN-006 | AC-003 | Storage-Assertion restart | P0 | BLOCKED (BLK-002) |
+| REQ-F-004 | VIS-001,004 | CAN-004 | AC-004 | Unit+Integration (compileLane1 index.ts:101 belegt) | P0 | coverable |
+| REQ-F-005 | VIS-001 | CAN-008 | AC-005 | Negative-Tests | P0 | coverable |
+| REQ-F-006 | VIS-001 | CAN-004 | AC-006 | SVG/Codepoint-Snapshot (renderer ungebaut, verifiziert) | P0 | BLOCKED (BLK-003) |
+| REQ-F-007 | VIS-002,006 | CAN-006 | AC-007 | Storage-Assertion | P0 | BLOCKED (BLK-002) |
+| REQ-F-008 | VIS-003,007 | CAN-005 | AC-008 | State-Machine-Test | P0 | BLOCKED (BLK-004) |
+
+Coverage: 8/8 REQ verlinkt (Vision+Canvas+AC+Evidence), keine Waisen. 5/8 P0 BLOCKED auf BLK-001..004.
+Reality-Ledger-Spalten (wired-in-prod?, evidence-class) + die 6 Canvas-Pflichtfelder bei Build-Start ergänzen.
