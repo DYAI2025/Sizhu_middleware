@@ -59,6 +59,13 @@ export interface CreateAppDeps {
    * than fabricating success.
    */
   templateStore?: TemplateStoreService;
+  /**
+   * Injected bazi-solo pipeline deps (DI for tests). Defaults: the real
+   * FuFireDataService + the durable Supabase store when the service-role key is present,
+   * else an in-memory store. (Restored — the #23/#24 merge dropped this ST-8 field while
+   * the bazi-solo route below still references deps.baziSolo.)
+   */
+  baziSolo?: Partial<BaziSoloRouteDeps>;
 }
 
 /**
