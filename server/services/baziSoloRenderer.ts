@@ -31,13 +31,16 @@
  */
 
 import { existsSync, statSync } from "node:fs";
-import { resolve, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 
 import * as fontkit from "fontkit";
 import type { Font, FontCollection, Glyph } from "fontkit";
 
-const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+// CJS-safe repo root. The prod server is bundled to CJS by esbuild, where `import.meta`
+// is EMPTY — `fileURLToPath(import.meta.url)` threw at IMPORT time and crashed the server
+// before /api/health could answer (Railway healthcheck failure). `npm start` / tsx-dev /
+// vitest all run from the project root, so cwd is the repo root.
+const REPO_ROOT = process.cwd();
 
 /** Default location of the (git-ignored) Noto Sans SC font binary. */
 export const DEFAULT_FONT_PATH = resolve(REPO_ROOT, "assets/fonts/NotoSansSC.ttf");

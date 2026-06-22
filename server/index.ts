@@ -58,6 +58,12 @@ export interface CreateAppDeps {
    * than fabricating success.
    */
   templateStore?: TemplateStoreService;
+  /**
+   * Injected bazi-solo pipeline deps (DI for tests). Restored — the #23/#24 merge dropped
+   * this field while the bazi-solo route below still references deps.baziSolo (a latent tsc
+   * error on main; the route's tests inject it).
+   */
+  baziSolo?: Partial<BaziSoloRouteDeps>;
 }
 
 /**
