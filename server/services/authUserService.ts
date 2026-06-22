@@ -22,6 +22,15 @@ export interface AuthUser {
   aal: string;
   /** Resolved application role, or null for non-admin authenticated users. */
   role: AdminRole | null;
+  /**
+   * Capability scopes carried by the token (e.g. "templates:write").
+   *
+   * OQ-DESIGN-1 decision: Supabase access tokens carry `app_metadata` inside the
+   * signed JWT, so scopes are read from `app_metadata.scopes`. That claim may be
+   * either a JSON string[] or a single space-delimited string; both are
+   * normalized here into a string[]. Defaults to [] when the claim is absent.
+   */
+  scopes: string[];
 }
 
 export class AuthTokenError extends Error {
@@ -90,6 +99,25 @@ function deriveEmailVerified(payload: JwtPayload): boolean {
 }
 
 /**
+ * Read capability scopes from the verified token's `app_metadata.scopes` claim
+ * (OQ-DESIGN-1). Accepts either a string[] or a space-delimited string; anything
+ * else (or a missing claim) yields []. Entries are trimmed and blanks dropped.
+ */
+export function deriveScopes(payload: JwtPayload): string[] {
+  const appMeta = payload.app_metadata as Record<string, unknown> | undefined;
+  const raw = appMeta?.scopes;
+  let parts: string[];
+  if (Array.isArray(raw)) {
+    parts = raw.filter((entry): entry is string => typeof entry === "string");
+  } else if (typeof raw === "string") {
+    parts = raw.split(/\s+/);
+  } else {
+    return [];
+  }
+  return parts.map((entry) => entry.trim()).filter((entry) => entry.length > 0);
+}
+
+/**
  * Verify a Supabase access token and map it to an {@link AuthUser}.
  * Throws {@link AuthTokenError} when the token is missing, malformed, expired
  * or signed with the wrong secret.
@@ -127,5 +155,6 @@ export function verifyAccessToken(token: string | null): AuthUser {
     emailVerified: deriveEmailVerified(payload),
     aal: typeof payload.aal === "string" ? payload.aal : "aal1",
     role: resolveRole(email),
+    scopes: deriveScopes(payload),
   };
 }

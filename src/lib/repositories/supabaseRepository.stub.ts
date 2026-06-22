@@ -60,6 +60,17 @@ export class SupabaseTemplateRepository implements TemplateRepository {
   async saveTemplates(): Promise<void> {
     return notConfigured();
   }
+  // Granular ops (REQ-001, Slice-1): contract present; real Supabase persistence
+  // is a later gated task. Until then they fail closed like every other write.
+  async saveTemplate(): Promise<PromptTemplate> {
+    return notConfigured();
+  }
+  async setActive(): Promise<void> {
+    return notConfigured();
+  }
+  async listVersions(): Promise<PromptTemplate[]> {
+    return notConfigured();
+  }
 }
 
 export class SupabaseProviderRepository implements ProviderRepository {

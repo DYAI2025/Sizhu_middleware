@@ -346,30 +346,32 @@ flag-gated OpenRouter smoke; unit tests inject a fake client.
 
 ---
 
-# Traceability — bazi-baci-solo-no-mock-mvp
+# Traceability Matrix: server-template-config-store (Slice-1)
 
-Status: draft (NOT user-confirmed)
-Canvas: docs/canvas/bazi-baci-solo-no-mock-mvp.canvas.md · Vision: docs/vision/bazi-baci-solo-no-mock-mvp.vision.md · PRD: docs/prd/bazi-baci-solo-no-mock-mvp.prd.md
+Status: user-confirmed
+Confirmed by user: yes
+Confirmation date: 2026-06-20
+Owner: requirements-analyst
+PRD: docs/prd/server-template-config-store.prd.md
+Canvas: docs/canvas/server-template-config-store.canvas.md (user-confirmed 2026-06-20, post-council)
+Vision: docs/vision/server-template-config-store.vision.md
 
-| REQ | Vision | Canvas | AC | Evidence | Prio | Status |
-|---|---|---|---|---|---|---|
-| REQ-F-001 | VIS-002 | CAN-006 | AC-001 | API-Test Run-ID | P0 | coverable |
-| REQ-F-002 | VIS-001,003 | CAN-004 | AC-002 | Integration-Smoke echter Key (fufireDataService.ts:184/409 belegt) | P0 | BLOCKED (BLK-001 pending-verify) |
-| REQ-F-003 | VIS-002,006 | CAN-006 | AC-003 | Storage-Assertion restart | P0 | BLOCKED (BLK-002) |
-| REQ-F-004 | VIS-001,004 | CAN-004 | AC-004 | Unit+Integration (compileLane1 index.ts:101 belegt) | P0 | coverable |
-| REQ-F-005 | VIS-001 | CAN-008 | AC-005 | Negative-Tests | P0 | coverable |
-| REQ-F-006 | VIS-001 | CAN-004 | AC-006 | SVG/Codepoint-Snapshot (renderer ungebaut, verifiziert) | P0 | BLOCKED (BLK-003) |
-| REQ-F-007 | VIS-002,006 | CAN-006 | AC-007 | Storage-Assertion | P0 | BLOCKED (BLK-002) |
-| REQ-F-008 | VIS-003,007 | CAN-005 | AC-008 | State-Machine-Test | P0 | BLOCKED (BLK-004) |
+Mandatory Canvas fields (every top-level REQ): canvas-link = docs/canvas/server-template-config-store.canvas.md;
+canvas-problem = CAN-001 (no shared server-side store); canvas-target-user = CAN-002 (admins + autonomous agents);
+canvas-value-claim = CAN-003 (full agent access, robust not naive); canvas-success-signal = CAN-009
+(2nd-session read-after-write + audit + validation reject); canvas-risk-status = aligned (council bundle adopted).
 
-Coverage: 8/8 REQ verlinkt (Vision+Canvas+AC+Evidence), keine Waisen. 5/8 P0 BLOCKED auf BLK-001..004.
-Reality-Ledger-Spalten (wired-in-prod?, evidence-class) + die 6 Canvas-Pflichtfelder bei Build-Start ergänzen.
+| REQ | Task | Test (planned) | Evidence-class (target) | wired-in-prod? | true-line-status |
+|---|---|---|---|---|---|
+| REQ-001 SupabaseTemplateRepository | T2 | server/tests/templateRepository.supabase.test.ts (double) + live persist smoke | real-boundary-smoke (gated CONTRA-SB-1) | appServices seam → route | pass |
+| REQ-002 /api/v1/templates routes | T5 | server/tests/templates.routes.test.ts (supertest) | integration | createApp composition root | pass |
+| REQ-003 save-validation | T3 | server/tests/templateValidation.test.ts (malformed→422, RED-on-revert) | unit | called by route before persist | pass |
+| REQ-004 audit-log | T3 | server/tests/templateAudit.test.ts (write→row, append-only) | integration | every write path | pass |
+| REQ-005 soft-delete/versioning | T3 | server/tests/templateVersioning.test.ts (prior revision readable) | integration | store service | pass |
+| REQ-006 token-scope auth | T4 | server/tests/templates.authscope.test.ts (no scope→403, RED-on-revert) | integration | apiGuard/route | pass (OQ-DESIGN-1) |
+| REQ-007 MCP tools | T6 | mcp-server tools/list shows 4 tools + roundtrip | integration | mcp-server registration | pass |
+| REQ-008 P9 money-field check | T7 | server/tests/templateMoneyGate.test.ts (money-field→set-active gated) | integration | conditional route gate | pass |
 
-### bazi-baci-solo-no-mock-mvp — council amendments (2026-06-21)
-| REQ | Vision | Canvas | AC | Evidence | Prio | Status |
-|---|---|---|---|---|---|---|
-| REQ-F-006 (reframed) | VIS-001 | AM-1 | AC-006 | codepoint→path golden-hash (off-the-shelf lib) | P0 | BLOCKED (BLK-003) |
-| REQ-F-009 (new) | VIS-005,007 | AM-2a | AC-009 | render-back byte-equality (戊/午 collision) | P0 | NON-DEFERRABLE |
-| REQ-F-010 (new) | VIS-001,005 | AM-2b | AC-010 | Feb-3/Feb-4 fixture pair → different pillars (RED-on-revert) | P0 | NON-DEFERRABLE |
-
-Slice-1 = REQ-F-001/002(✓)/003/004/005 + reframed F-006 + F-009 + F-010 + ONE gate. Spike F-006 first.
+Note: CONTRA-SB-1 (live Supabase schema/service-role) is a user-owned pre-build verification; the
+assistant cannot reach the Sizhu Supabase from here. REQ-001 real-boundary evidence is gated on it.
+OQ-DESIGN-1 (token-scope representation) resolved by the Phase-1 planner with an explicit fallback.

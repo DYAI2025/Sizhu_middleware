@@ -48,6 +48,19 @@ export function isMfaRequired(): boolean {
   return flagEnabled(process.env.MFA_REQUIRED_FOR_SENSITIVE_ACTIONS, true);
 }
 
+/**
+ * Whether template-write capability requires the `templates:write` scope on the
+ * token (OQ-DESIGN-1). Defaults to enabled (fail closed).
+ *
+ * Documented fallback: a deployment that cannot yet mint scoped Supabase tokens
+ * may set TEMPLATE_WRITE_REQUIRE_SCOPE=false to downgrade `requireScope` to an
+ * admin-role-only check (still no MFA). This is an EXPLICIT, env-gated downgrade
+ * — never a silent bypass — and is covered by a test.
+ */
+export function isTemplateWriteScopeRequired(): boolean {
+  return flagEnabled(process.env.TEMPLATE_WRITE_REQUIRE_SCOPE, true);
+}
+
 // ---------------------------------------------------------------------------
 // Canonical error responses
 // ---------------------------------------------------------------------------
@@ -112,6 +125,17 @@ export const AuthErrors = {
         color: "blue",
         error_code: "MFA_REQUIRED_FOR_ACTION",
         message: "This action requires a verified second factor.",
+      },
+    };
+  },
+  missingScope(scope: string): { http: number; body: AuthErrorBody } {
+    return {
+      http: 403,
+      body: {
+        status: "FORBIDDEN",
+        color: "red",
+        error_code: "MISSING_SCOPE",
+        message: `This action requires the "${scope}" capability.`,
       },
     };
   },
@@ -240,6 +264,22 @@ export function checkMfa(req: Request): CheckResult {
   return { ok: true };
 }
 
+/**
+ * Verify the authenticated user carries a named capability scope. Honors the
+ * TEMPLATE_WRITE_REQUIRE_SCOPE downgrade for `templates:write` only (the
+ * scope this slice introduces); any other scope is always enforced.
+ */
+export function checkScope(req: Request, scope: string): CheckResult {
+  if (scope === "templates:write" && !isTemplateWriteScopeRequired()) {
+    return { ok: true };
+  }
+  const scopes = req.auth?.scopes ?? [];
+  if (!scopes.includes(scope)) {
+    return { ok: false, error: AuthErrors.missingScope(scope) };
+  }
+  return { ok: true };
+}
+
 // ---------------------------------------------------------------------------
 // apiGuard: single default-deny gate mounted on /api
 // ---------------------------------------------------------------------------
@@ -287,4 +327,57 @@ export function apiGuard(req: Request, res: Response, next: NextFunction): void 
   }
 
   return next();
+}
+
+// ---------------------------------------------------------------------------
+// requireScope: capability/scope gate (REQ-006 / OQ-DESIGN-1)
+// ---------------------------------------------------------------------------
+
+/**
+ * Express middleware enforcing a capability scope for an admin action.
+ *
+ * Policy (deliberately distinct from `sensitive`): valid session + verified
+ * email + admin role + the named scope, but **NO aal2/MFA** — per the user's
+ * decision that template writes are scope-gated, not MFA-gated. For the
+ * `templates:write` scope, TEMPLATE_WRITE_REQUIRE_SCOPE=false downgrades the
+ * scope requirement to admin-role-only (documented fallback, see
+ * {@link isTemplateWriteScopeRequired}); the session + email + role checks still
+ * apply.
+ *
+ * Self-sufficient: it runs the auth chain itself so it is correct even if mounted
+ * standalone. When `apiGuard` has already attached `req.auth`, re-verification is
+ * cheap (local HMAC, no network) and idempotent.
+ */
+export function requireScope(scope: string) {
+  return function requireScopeMiddleware(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): void {
+    if (!isAuthRequired()) {
+      // Mirror apiGuard's escape hatch: attach context if present, don't block.
+      const auth = authenticateRequest(req);
+      void auth;
+      return next();
+    }
+
+    const auth = authenticateRequest(req);
+    if (!auth.ok && auth.error) {
+      return sendAuthError(res, auth.error);
+    }
+
+    const role = checkAdminRole(req);
+    if (!role.ok && role.error) {
+      return sendAuthError(res, role.error);
+    }
+
+    // Note: no MFA/aal2 check here by design.
+
+    const scopeCheck = checkScope(req, scope);
+    if (!scopeCheck.ok && scopeCheck.error) {
+      return sendAuthError(res, scopeCheck.error);
+    }
+
+    return next();
+  };
 }
