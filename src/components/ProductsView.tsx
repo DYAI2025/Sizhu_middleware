@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { appServices } from '../lib/app/appServices';
+import { getPersistenceStatus, isSupabaseNotConfigured } from '../lib/app/persistenceStatus';
+import PersistenceOfflineBanner from './PersistenceOfflineBanner';
 import { ShopProduct, PromptTemplate, GenerationConfig } from '../types';
 import { Plus, Edit2, ToggleLeft, ToggleRight, Settings, Loader2, Save, Trash, HelpCircle, X } from 'lucide-react';
 
@@ -36,6 +38,12 @@ export default function ProductsView() {
 
   const [notification, setNotification] = useState<string | null>(null);
 
+  // True once the persistence boundary throws SUPABASE_NOT_CONFIGURED (any
+  // non-DEMO_LOCAL mode). Surfaces the previously-swallowed fail-closed error so
+  // the catalog isn't a silent empty list and create/edit aren't dead buttons.
+  const [persistenceBlocked, setPersistenceBlocked] = useState(false);
+  const persistenceStatus = getPersistenceStatus();
+
   useEffect(() => {
     const init = async () => {
       const activeRole = await appServices.roles.getActiveRole();
@@ -56,6 +64,10 @@ export default function ProductsView() {
       setTemplates(allTemplates.filter(t => t.status === 'active'));
       setGenConfigs(allConfigs);
     } catch (e) {
+      // STOP swallowing silently: when the persistence boundary fails closed
+      // (SUPABASE_NOT_CONFIGURED outside DEMO_LOCAL), surface it as state so the
+      // UI can explain the empty catalog + disabled actions. The dev log stays.
+      if (isSupabaseNotConfigured(e)) setPersistenceBlocked(true);
       console.error(e);
     }
   };
@@ -219,6 +231,11 @@ export default function ProductsView() {
         </div>
       )}
 
+      {/* Persistence boundary surfaced (was previously swallowed silently) */}
+      {persistenceBlocked && (
+        <PersistenceOfflineBanner mode={persistenceStatus.mode} reason={persistenceStatus.reason} />
+      )}
+
       {/* Title bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-nt pb-4">
         <div>
@@ -228,8 +245,10 @@ export default function ProductsView() {
         {!isObserver && (
           <button
             id="btn-create-product"
+            disabled={persistenceBlocked}
             onClick={handleCreateNew}
-            className="bg-b2 hover:opacity-90 border border-da text-da text-[10px] font-mono font-bold px-4 py-2 rounded-sm flex items-center gap-1 cursor-pointer uppercase tracking-wider"
+            title={persistenceBlocked ? persistenceStatus.reason : undefined}
+            className="bg-b2 hover:opacity-90 border border-da disabled:bg-b2 disabled:text-nt disabled:border-nt disabled:cursor-not-allowed text-da text-[10px] font-mono font-bold px-4 py-2 rounded-sm flex items-center gap-1 cursor-pointer uppercase tracking-wider"
           >
             <Plus className="w-3.5 h-3.5 text-ac" /> NEW PRODUCT
           </button>
@@ -253,6 +272,18 @@ export default function ProductsView() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-150">
+                {products.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={isObserver ? 4 : 5}
+                      className="py-16 text-center text-nt text-xs font-mono"
+                    >
+                      {persistenceBlocked
+                        ? `Katalog mangels DB nicht ladbar (Modus ${persistenceStatus.mode}). ${persistenceStatus.reason}`
+                        : 'Keine Produkte im Katalog. Lege oben ein neues Produkt an.'}
+                    </td>
+                  </tr>
+                )}
                 {products.map((p) => {
                   const boundTemplate = templates.find(t => t.id === p.activeTemplateId);
                   return (
@@ -287,9 +318,10 @@ export default function ProductsView() {
                       </td>
                       <td className="py-3 px-4 text-center border-l border-nt/80">
                         <button
-                          disabled={isObserver}
+                          disabled={isObserver || persistenceBlocked}
                           onClick={() => toggleProductActive(p)}
-                          className={`inline-flex items-center gap-1 justify-center disabled:opacity-50 ${isObserver ? 'cursor-default' : 'cursor-pointer'}`}
+                          title={persistenceBlocked ? persistenceStatus.reason : undefined}
+                          className={`inline-flex items-center gap-1 justify-center disabled:opacity-50 disabled:cursor-not-allowed ${isObserver ? 'cursor-default' : 'cursor-pointer'}`}
                         >
                           {p.isActive ? (
                             <span className="bg-b1 text-ac text-[9px] uppercase font-bold py-0.5 px-2 rounded-sm border border-ac flex items-center gap-1">
@@ -308,9 +340,10 @@ export default function ProductsView() {
                         <td className="py-3 px-4 text-right border-l border-nt/80">
                           <button
                             id={`btn-edit-${p.id}`}
+                            disabled={persistenceBlocked}
                             onClick={() => handleEdit(p)}
-                            className="text-da hover:bg-b2 bg-b2 p-1.5 rounded-sm border border-nt transition cursor-pointer"
-                            title="Configure Settings"
+                            className="text-da hover:bg-b2 bg-b2 p-1.5 rounded-sm border border-nt transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            title={persistenceBlocked ? persistenceStatus.reason : 'Configure Settings'}
                           >
                             <Settings className="w-3.5 h-3.5" />
                           </button>
@@ -581,8 +614,10 @@ export default function ProductsView() {
               </button>
               <button
                 id="btn-save-product-config"
+                disabled={persistenceBlocked}
                 onClick={handleSave}
-                className="bg-b2 hover:opacity-90 border border-da text-da text-[10px] font-mono font-bold px-4 py-2 rounded-sm flex items-center gap-1 cursor-pointer uppercase tracking-wider transition"
+                title={persistenceBlocked ? persistenceStatus.reason : undefined}
+                className="bg-b2 hover:opacity-90 border border-da disabled:bg-b2 disabled:text-nt disabled:border-nt disabled:cursor-not-allowed text-da text-[10px] font-mono font-bold px-4 py-2 rounded-sm flex items-center gap-1 cursor-pointer uppercase tracking-wider transition"
               >
                 <Save className="w-3.5 h-3.5 text-ac" /> SAVE CONFIG
               </button>

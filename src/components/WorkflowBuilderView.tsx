@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { appServices } from '../lib/app/appServices';
+import { getPersistenceStatus, isSupabaseNotConfigured } from '../lib/app/persistenceStatus';
+import PersistenceOfflineBanner from './PersistenceOfflineBanner';
 import {
   CompileResultPanel,
   compileTemplate,
@@ -49,6 +51,14 @@ export default function WorkflowBuilderView() {
   const [compileError, setCompileError] = useState<string | null>(null);
   const [compileResult, setCompileResult] = useState<CompileTemplateResponse | null>(null);
 
+  // True once the persistence boundary throws SUPABASE_NOT_CONFIGURED (any
+  // non-DEMO_LOCAL mode). Surfaces the previously-swallowed fail-closed error so
+  // the builder isn't a silent dead board (empty catalog, no-op Save & Deploy).
+  // ONLY gates persistence-dependent parts; the compile-template preview hits a
+  // separate /api boundary and stays usable.
+  const [persistenceBlocked, setPersistenceBlocked] = useState(false);
+  const persistenceStatus = getPersistenceStatus();
+
   // DRAG AND DROP OFFSET IN NODE DRAG
   const dragStartOffset = useRef({ x: 0, y: 0 });
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -72,6 +82,10 @@ export default function WorkflowBuilderView() {
           await loadWorkflowForProduct(pid);
         }
       } catch (e) {
+        // STOP swallowing silently: when the persistence boundary fails closed
+        // (SUPABASE_NOT_CONFIGURED outside DEMO_LOCAL), surface it as state so the
+        // UI can explain the dead board. The dev log stays for diagnostics.
+        if (isSupabaseNotConfigured(e)) setPersistenceBlocked(true);
         console.error(e);
       }
     };
@@ -109,6 +123,9 @@ export default function WorkflowBuilderView() {
         setSelectedNodeId(null);
       }
     } catch (e) {
+      // Same fail-closed surfacing as the initial load: classify the boundary
+      // error into state instead of swallowing it into a silent broken canvas.
+      if (isSupabaseNotConfigured(e)) setPersistenceBlocked(true);
       console.error(e);
     }
   };
@@ -514,10 +531,13 @@ export default function WorkflowBuilderView() {
       // F. Persist visual schematic itself
       await appServices.workflows.saveVisualWorkflow(selectedProductId, activeWorkflow);
       showNotification('Visual pipeline states deployed & mapped to Core API Services');
-      
+
       // Broadcast updates to rest of console context
       window.dispatchEvent(new Event('bazzi_role_changed'));
     } catch (e) {
+      // A save that hits the fail-closed boundary is no longer a silent throw:
+      // record the blocked state so the banner + disabled controls explain why.
+      if (isSupabaseNotConfigured(e)) setPersistenceBlocked(true);
       alert((e as Error).message);
     }
   };
@@ -539,6 +559,7 @@ export default function WorkflowBuilderView() {
         }
         showNotification('Reverted to sequential print workflow preset.');
       } catch (e) {
+        if (isSupabaseNotConfigured(e)) setPersistenceBlocked(true);
         console.error(e);
       }
     }
@@ -561,7 +582,12 @@ export default function WorkflowBuilderView() {
 
   return (
     <div className="space-y-6 animate-fade-in text-da" id="workflow-builder-view-root">
-      
+
+      {/* Persistence boundary surfaced (was previously swallowed silently) */}
+      {persistenceBlocked && (
+        <PersistenceOfflineBanner mode={persistenceStatus.mode} reason={persistenceStatus.reason} />
+      )}
+
       {/* Toast Alert */}
       {notification && (
         <div className="fixed bottom-4 right-4 bg-b2 border border-nt text-da px-4 py-3 rounded-sm shadow-sm flex items-center gap-2.5 z-50">
@@ -582,13 +608,23 @@ export default function WorkflowBuilderView() {
           <select
             value={selectedProductId}
             onChange={(e) => handleProductChange(e.target.value)}
-            className="border border-nt bg-b1 rounded-sm p-1.5 text-xs text-da outline-none font-mono font-bold font-semibold"
+            disabled={products.length === 0}
+            title={persistenceBlocked ? persistenceStatus.reason : undefined}
+            className="border border-nt bg-b1 rounded-sm p-1.5 text-xs text-da outline-none font-mono font-bold font-semibold disabled:text-nt disabled:cursor-not-allowed"
           >
-            {products.map(p => (
-              <option key={p.id} value={p.id}>
-                {p.title.length > 28 ? p.title.substring(0, 28) + '...' : p.title} ({p.shopProvider})
+            {products.length === 0 ? (
+              <option value="">
+                {persistenceBlocked
+                  ? `-- Katalog mangels DB nicht ladbar (Modus ${persistenceStatus.mode}) --`
+                  : '-- No Products Configured in Catalog --'}
               </option>
-            ))}
+            ) : (
+              products.map(p => (
+                <option key={p.id} value={p.id}>
+                  {p.title.length > 28 ? p.title.substring(0, 28) + '...' : p.title} ({p.shopProvider})
+                </option>
+              ))
+            )}
           </select>
         </div>
       </div>
@@ -643,7 +679,9 @@ export default function WorkflowBuilderView() {
               <div className="border-t border-nt pt-3">
                 <button
                   onClick={resetToPresetSequential}
-                  className="w-full text-center py-1.5 border border-nt hover:bg-b1 text-[9px] font-bold font-mono tracking-wider uppercase rounded-sm flex items-center justify-center gap-1 cursor-pointer"
+                  disabled={persistenceBlocked}
+                  title={persistenceBlocked ? persistenceStatus.reason : undefined}
+                  className="w-full text-center py-1.5 border border-nt hover:bg-b1 text-[9px] font-bold font-mono tracking-wider uppercase rounded-sm flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <RotateCcw className="w-3 h-3 text-nt" /> Sequential Preset
                 </button>
@@ -678,7 +716,9 @@ export default function WorkflowBuilderView() {
                 {!isObserver && (
                   <button
                     onClick={handleSaveAll}
-                    className="bg-b2 hover:opacity-90 border border-da text-da text-[9.5px] font-mono font-black py-1 px-3.5 rounded-sm flex items-center gap-1 cursor-pointer uppercase tracking-wider"
+                    disabled={persistenceBlocked}
+                    title={persistenceBlocked ? persistenceStatus.reason : undefined}
+                    className="bg-b2 hover:opacity-90 border border-da text-da text-[9.5px] font-mono font-black py-1 px-3.5 rounded-sm flex items-center gap-1 cursor-pointer uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Save className="w-3.5 h-3.5 text-ac" /> Save & Deploy Live
                   </button>
@@ -846,6 +886,18 @@ export default function WorkflowBuilderView() {
                   </div>
                 );
               })}
+
+              {/* Blocked zero-state: no workflow could load because the
+                  persistence boundary failed closed (activeWorkflow stays null). */}
+              {persistenceBlocked && !activeWorkflow && (
+                <div className="h-full flex flex-col items-center justify-center p-8 text-center text-ac pointer-events-none select-none">
+                  <AlertTriangle className="w-8 h-8 text-ac stroke-[1.2] mb-2" />
+                  <span className="text-xs font-mono font-bold uppercase text-ac">Canvas mangels DB nicht ladbar</span>
+                  <span className="p-3 text-[11px] max-w-sm leading-relaxed block text-nt font-mono">
+                    {persistenceStatus.reason}
+                  </span>
+                </div>
+              )}
 
               {/* Empty state instruction on blank canvas */}
               {activeWorkflow?.nodes.length === 0 && (

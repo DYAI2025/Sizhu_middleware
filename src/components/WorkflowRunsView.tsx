@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { appServices } from '../lib/app/appServices';
+import { getPersistenceStatus, isSupabaseNotConfigured } from '../lib/app/persistenceStatus';
+import PersistenceOfflineBanner from './PersistenceOfflineBanner';
 import { ShopProduct, WorkflowRun, WorkflowLog, ImageArtifact } from '../types';
 import { Play, Clipboard, Filter, Trash, User, Calendar, MapPin, Clock, Loader2, AlertCircle, RefreshCw, Layers, CheckCircle2, AlertTriangle, Eye, Download } from 'lucide-react';
 
@@ -28,6 +30,12 @@ export default function WorkflowRunsView() {
   const [simLogStream, setSimLogStream] = useState<WorkflowLog[]>([]);
   const [escalationTemplateOutput, setEscalationTemplateOutput] = useState<string | null>(null);
 
+  // True once the persistence boundary throws SUPABASE_NOT_CONFIGURED (any
+  // non-DEMO_LOCAL mode). Surfaces the previously-swallowed fail-closed error so
+  // the simulator isn't a silent dead button.
+  const [persistenceBlocked, setPersistenceBlocked] = useState(false);
+  const persistenceStatus = getPersistenceStatus();
+
   useEffect(() => {
     loadData();
     // Generate prefilled order templates
@@ -52,6 +60,10 @@ export default function WorkflowRunsView() {
       setLogs(logsData);
       setArtifacts(artifactsData);
     } catch (e) {
+      // STOP swallowing silently: when the persistence boundary fails closed
+      // (SUPABASE_NOT_CONFIGURED outside DEMO_LOCAL), surface it as state so the
+      // UI can explain the dead simulator. The dev log stays for diagnostics.
+      if (isSupabaseNotConfigured(e)) setPersistenceBlocked(true);
       console.error(e);
     }
   };
@@ -213,7 +225,12 @@ export default function WorkflowRunsView() {
 
   return (
     <div className="space-y-6 animate-fade-in text-da" id="simulation-runs-container">
-      
+
+      {/* Persistence boundary surfaced (was previously swallowed silently) */}
+      {persistenceBlocked && (
+        <PersistenceOfflineBanner mode={persistenceStatus.mode} reason={persistenceStatus.reason} />
+      )}
+
       {/* Visual Title Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-nt pb-4">
         <div>
@@ -322,7 +339,11 @@ export default function WorkflowRunsView() {
                 className="mt-1 w-full border border-nt bg-b1 rounded-sm p-2 outline-none text-xs font-mono font-bold"
               >
                 {products.length === 0 ? (
-                  <option value="">-- No Active Products Configured in Catalog --</option>
+                  <option value="">
+                    {persistenceBlocked
+                      ? `-- Katalog mangels DB nicht ladbar (Modus ${persistenceStatus.mode}) --`
+                      : '-- No Active Products Configured in Catalog --'}
+                  </option>
                 ) : (
                   products.map(p => (
                     <option key={p.id} value={p.id}>{p.title} ({p.shopProvider})</option>
@@ -392,8 +413,9 @@ export default function WorkflowRunsView() {
 
             <button
               id="btn-simulate-order"
-              disabled={isSimulating || products.length === 0}
+              disabled={isSimulating || persistenceBlocked || products.length === 0}
               onClick={executeSimulation}
+              title={persistenceBlocked ? persistenceStatus.reason : undefined}
               className="w-full bg-b2 hover:opacity-90 border border-da disabled:bg-b2 disabled:text-nt disabled:border-nt disabled:cursor-not-allowed text-da font-mono font-bold p-3 rounded-sm text-xs flex items-center justify-center gap-2 cursor-pointer tracking-wider uppercase transition shadow-sm"
             >
               {isSimulating ? (

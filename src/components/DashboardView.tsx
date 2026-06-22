@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { appServices } from '../lib/app/appServices';
+import { getPersistenceStatus, isSupabaseNotConfigured } from '../lib/app/persistenceStatus';
+import PersistenceOfflineBanner from './PersistenceOfflineBanner';
 import { WorkflowRun, ImageArtifact } from '../types';
 import { LayoutDashboard, Target, AlertTriangle, Image as ImageIcon, CheckCircle, TrendingUp, Clock, ShieldCheck } from 'lucide-react';
 
@@ -7,6 +9,12 @@ export default function DashboardView({ onNavigate }: { onNavigate: (view: strin
   const [runs, setRuns] = useState<WorkflowRun[]>([]);
   const [artifacts, setArtifacts] = useState<ImageArtifact[]>([]);
   const [currentRole, setCurrentRole] = useState<string>('Owner');
+
+  // True once the persistence boundary throws SUPABASE_NOT_CONFIGURED (any
+  // non-DEMO_LOCAL mode). Surfaces the previously-swallowed fail-closed error so
+  // the dashboard isn't a silent dead state (empty metrics + dead CTA, no reason).
+  const [persistenceBlocked, setPersistenceBlocked] = useState(false);
+  const persistenceStatus = getPersistenceStatus();
 
   useEffect(() => {
     const load = async () => {
@@ -20,6 +28,10 @@ export default function DashboardView({ onNavigate }: { onNavigate: (view: strin
         setArtifacts(artifactsData);
         setCurrentRole(roleData);
       } catch (e) {
+        // STOP swallowing silently: when the persistence boundary fails closed
+        // (SUPABASE_NOT_CONFIGURED outside DEMO_LOCAL), surface it as state so the
+        // UI can explain the dead dashboard. The dev log stays for diagnostics.
+        if (isSupabaseNotConfigured(e)) setPersistenceBlocked(true);
         console.error(e);
       }
     };
@@ -45,6 +57,11 @@ export default function DashboardView({ onNavigate }: { onNavigate: (view: strin
 
   return (
     <div className="space-y-6 animate-fade-in" id="dashboard-view-container">
+      {/* Persistence boundary surfaced (was previously swallowed silently) */}
+      {persistenceBlocked && (
+        <PersistenceOfflineBanner mode={persistenceStatus.mode} reason={persistenceStatus.reason} />
+      )}
+
       {/* Top Welcome Panel */}
       <div className="bg-b2 border border-da text-da p-6 rounded-sm flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm">
         <div>
@@ -56,10 +73,12 @@ export default function DashboardView({ onNavigate }: { onNavigate: (view: strin
           </p>
         </div>
         <div className="flex gap-2 shrink-0">
-          <button 
+          <button
             id="simulate-order-cta"
+            disabled={persistenceBlocked}
             onClick={() => onNavigate('Workflow Runs')}
-            className="bg-ac hover:bg-ac text-da font-mono font-bold px-4 py-2 rounded-sm text-xs transition-all flex items-center gap-2 cursor-pointer uppercase tracking-wider"
+            title={persistenceBlocked ? persistenceStatus.reason : undefined}
+            className="bg-ac hover:bg-ac disabled:bg-b2 disabled:text-nt disabled:cursor-not-allowed text-da font-mono font-bold px-4 py-2 rounded-sm text-xs transition-all flex items-center gap-2 cursor-pointer uppercase tracking-wider"
           >
             <Clock className="w-3.5 h-3.5" />
             Launch Test Simulator
@@ -140,16 +159,26 @@ export default function DashboardView({ onNavigate }: { onNavigate: (view: strin
           </div>
 
           {runs.length === 0 ? (
-            <div className="py-12 text-center text-nt text-xs">
-              <Clock className="w-6 h-6 mx-auto text-nt stroke-[1.5] mb-2" />
-              No active workflow runs registered.
-              <button 
-                onClick={() => onNavigate('Workflow Runs')}
-                className="block mx-auto mt-2 text-ac font-bold hover:underline text-xs uppercase tracking-wider font-mono"
-              >
-                Go to Simulator &rarr;
-              </button>
-            </div>
+            persistenceBlocked ? (
+              <div className="py-12 text-center text-nt text-xs">
+                <AlertTriangle className="w-6 h-6 mx-auto text-ac stroke-[1.5] mb-2" />
+                Keine Daten ladbar — Persistenz offline (Modus {persistenceStatus.mode}).
+                <span className="block mx-auto mt-2 max-w-md text-[11px] text-nt font-mono normal-case leading-relaxed">
+                  {persistenceStatus.reason}
+                </span>
+              </div>
+            ) : (
+              <div className="py-12 text-center text-nt text-xs">
+                <Clock className="w-6 h-6 mx-auto text-nt stroke-[1.5] mb-2" />
+                No active workflow runs registered.
+                <button
+                  onClick={() => onNavigate('Workflow Runs')}
+                  className="block mx-auto mt-2 text-ac font-bold hover:underline text-xs uppercase tracking-wider font-mono"
+                >
+                  Go to Simulator &rarr;
+                </button>
+              </div>
+            )
           ) : (
             <div className="divide-y divide-slate-100 max-h-[380px] overflow-y-auto pr-1">
               {runs.map((run) => (
