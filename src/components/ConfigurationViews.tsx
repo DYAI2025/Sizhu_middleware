@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { appServices } from '../lib/app/appServices';
+import { getPersistenceStatus, isSupabaseNotConfigured } from '../lib/app/persistenceStatus';
+import PersistenceOfflineBanner from './PersistenceOfflineBanner';
 import { PromptTemplate, ShopProduct, GenerationConfig, QualityGate1Config, PersonalizationConfig, PodProviderConfig } from '../types';
 import { Save, AlertTriangle, HelpCircle, Key, RefreshCw, Layers, CheckCircle, Info, Mail, Target } from 'lucide-react';
 import { FuFireTestConsole } from './FuFireTestConsole';
@@ -17,6 +19,12 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
   const [podConfig, setPodConfig] = useState<PodProviderConfig | null>(null);
   const [role, setRole] = useState<string>('Owner');
   const [notification, setNotification] = useState<string | null>(null);
+
+  // True once the persistence boundary throws SUPABASE_NOT_CONFIGURED (any
+  // non-DEMO_LOCAL mode). Surfaces the previously-swallowed fail-closed error so
+  // the config views aren't a silent empty form with dead save buttons.
+  const [persistenceBlocked, setPersistenceBlocked] = useState(false);
+  const persistenceStatus = getPersistenceStatus();
 
   useEffect(() => {
     const init = async () => {
@@ -51,6 +59,11 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
       setPersonalization(allPersonalization);
       setPodConfig(allPodConfig);
     } catch (e) {
+      // STOP swallowing silently: when the persistence boundary fails closed
+      // (SUPABASE_NOT_CONFIGURED outside DEMO_LOCAL), surface it as state so the
+      // UI can explain the empty config + dead save buttons. The dev log stays
+      // for diagnostics.
+      if (isSupabaseNotConfigured(e)) setPersistenceBlocked(true);
       console.error(e);
     }
   };
@@ -66,7 +79,7 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
   // Section A: Product-Template Mappings Binding
   // ==========================================
   const handleBindTemplate = async (productId: string, templateId: string) => {
-    if (isObserver) return;
+    if (isObserver || persistenceBlocked) return;
     const list = [...products];
     const index = list.findIndex(p => p.id === productId);
     if (index !== -1) {
@@ -103,7 +116,7 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
   };
 
   const saveGateConfig = async (updated: QualityGate1Config) => {
-    if (isObserver) return;
+    if (isObserver || persistenceBlocked) return;
     let list = [...qualityConfigs];
     const index = list.findIndex(q => q.productId === updated.productId);
     if (index !== -1) {
@@ -124,7 +137,7 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
   // Section C: Personalization (FuFire) Save
   // ==========================================
   const handleSavePersonalization = async () => {
-    if (isObserver || !personalization) return;
+    if (isObserver || persistenceBlocked || !personalization) return;
     try {
       await appServices.settings.savePersonalizationConfig(personalization);
       triggerNotification('FuFire core endpoint config stored.');
@@ -137,7 +150,7 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
   // Section D: POD Provider Configuration (Gelato)
   // ==========================================
   const handleSavePod = async () => {
-    if (isObserver || !podConfig) return;
+    if (isObserver || persistenceBlocked || !podConfig) return;
     try {
       await appServices.settings.savePodConfig(podConfig);
       triggerNotification('POD Fulfillment dispatch mode written.');
@@ -167,6 +180,11 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
         </div>
       )}
 
+      {/* Persistence boundary surfaced (was previously swallowed silently) */}
+      {persistenceBlocked && (
+        <PersistenceOfflineBanner mode={persistenceStatus.mode} reason={persistenceStatus.reason} />
+      )}
+
       {/* Header bar mapping */}
       <div className="border-b border-nt pb-4">
         <h1 className="text-xl font-bold text-da tracking-tight font-sans capitalize">{activeSection} Control</h1>
@@ -182,6 +200,13 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
           </div>
 
           <div className="divide-y divide-slate-150 border border-nt rounded-sm overflow-hidden">
+            {products.length === 0 && (
+              <div className="p-6 text-center text-nt text-[11px] font-mono">
+                {persistenceBlocked
+                  ? `Katalog mangels DB nicht ladbar (Modus ${persistenceStatus.mode} · SUPABASE STUB). Product-Template-Bindings sind erst nach konfigurierter Persistenz verfügbar.`
+                  : 'No shop products configured in the catalog yet.'}
+              </div>
+            )}
             {products.map((p) => (
               <div key={p.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs hover:bg-b1/50 transition">
                 <div>
@@ -198,10 +223,11 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-bold font-mono text-nt uppercase">BIND TEMPLATE</span>
                   <select
-                    disabled={isObserver}
+                    disabled={isObserver || persistenceBlocked}
+                    title={persistenceBlocked ? persistenceStatus.reason : undefined}
                     value={p.activeTemplateId || ''}
                     onChange={(e) => handleBindTemplate(p.id, e.target.value)}
-                    className="border border-nt bg-b1 rounded-sm p-1.5 text-xs text-da outline-none max-w-[240px] font-mono"
+                    className="border border-nt bg-b1 rounded-sm p-1.5 text-xs text-da outline-none max-w-[240px] font-mono disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <option value="">-- NO ACTIVE BIND (SUSPEND STATE) --</option>
                     {templates.filter(t => t.status === 'active').map(t => (
@@ -287,6 +313,13 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
           <div className="lg:col-span-4 bg-b1 border border-nt p-4 rounded-sm space-y-3">
             <span className="text-[10px] font-bold font-mono text-nt uppercase tracking-widest block">Target Register</span>
             <div className="space-y-2">
+              {products.length === 0 && (
+                <div className="p-4 text-center text-nt text-[10px] font-mono border border-dashed border-nt rounded-sm">
+                  {persistenceBlocked
+                    ? `Keine Targets ladbar — Persistenz offline (Modus ${persistenceStatus.mode}).`
+                    : 'No products configured.'}
+                </div>
+              )}
               {products.map(p => (
                 <button
                   key={p.id}
@@ -322,7 +355,7 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
                 <div>
                   <label className="block text-[10px] font-bold text-nt uppercase font-mono tracking-wider">Model Gateway / LLM Vision Provider</label>
                   <select
-                    disabled={isObserver}
+                    disabled={isObserver || persistenceBlocked}
                     value={activeGateConfig.llmProvider}
                     onChange={(e) => saveGateConfig({ ...activeGateConfig, llmProvider: e.target.value as any })}
                     className="mt-1 w-full border border-nt bg-b1 rounded-sm p-1.5 font-mono text-xs outline-none"
@@ -338,7 +371,7 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
                   <label className="block text-[10px] font-bold text-nt uppercase font-mono tracking-wider">Inspection Model</label>
                   <input
                     type="text"
-                    disabled={isObserver}
+                    disabled={isObserver || persistenceBlocked}
                     value={activeGateConfig.model}
                     onChange={(e) => saveGateConfig({ ...activeGateConfig, model: e.target.value })}
                     placeholder="gemini-2.5-pro"
@@ -350,7 +383,7 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
                   <label className="block text-[10px] font-bold text-nt uppercase font-mono tracking-wider">Credentials Key Vault Secret Reference</label>
                   <input
                     type="text"
-                    disabled={isObserver}
+                    disabled={isObserver || persistenceBlocked}
                     value={activeGateConfig.secretRef}
                     onChange={(e) => saveGateConfig({ ...activeGateConfig, secretRef: e.target.value })}
                     placeholder="SECRET_REF_GEMINI_QA"
@@ -366,7 +399,7 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
                   <div>
                     <label className="block text-[10px] font-bold text-nt font-mono uppercase">Fault Tolerance</label>
                     <select
-                      disabled={isObserver}
+                      disabled={isObserver || persistenceBlocked}
                       value={activeGateConfig.faultTolerance}
                       onChange={(e) => saveGateConfig({ ...activeGateConfig, faultTolerance: e.target.value as any })}
                       className="mt-1 w-full border border-nt bg-b1 rounded-sm p-1.5 font-mono text-xs outline-none"
@@ -381,7 +414,7 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
                     <label className="block text-[10px] font-bold text-nt font-mono uppercase">Min Score (10-100)</label>
                     <input
                       type="number"
-                      disabled={isObserver}
+                      disabled={isObserver || persistenceBlocked}
                       min={10}
                       max={100}
                       value={activeGateConfig.minAcceptanceScore}
@@ -394,7 +427,7 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
                     <label className="block text-[10px] font-bold text-nt font-mono uppercase">Max Iterations</label>
                     <input
                       type="number"
-                      disabled={isObserver}
+                      disabled={isObserver || persistenceBlocked}
                       min={1}
                       max={5}
                       value={activeGateConfig.maxRejectedBeforeEscalation}
@@ -409,7 +442,7 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
               <div className="border-t border-nt pt-3 space-y-2">
                 <label className="block text-[10px] font-bold text-nt uppercase font-mono tracking-wider">Vision Engine System Instructions / Rules</label>
                 <textarea
-                  disabled={isObserver}
+                  disabled={isObserver || persistenceBlocked}
                   rows={2}
                   value={activeGateConfig.qaPrompt}
                   onChange={(e) => saveGateConfig({ ...activeGateConfig, qaPrompt: e.target.value })}
@@ -445,7 +478,7 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
                   Fires automatically to dispatcher. Dynamic keys: <code>{"{{order_number}}"}, {"{{product_title}}"}, {"{{iteration_count}}"}, {"{{rejection_reasons}}"}</code>
                 </p>
                 <textarea
-                  disabled={isObserver}
+                  disabled={isObserver || persistenceBlocked}
                   rows={4}
                   value={activeGateConfig.escalationEmailTemplate}
                   onChange={(e) => saveGateConfig({ ...activeGateConfig, escalationEmailTemplate: e.target.value })}
@@ -470,7 +503,7 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
                 <span className="text-[10px] font-mono uppercase tracking-wider font-bold">Enabled</span>
                 <input
                   type="checkbox"
-                  disabled={isObserver}
+                  disabled={isObserver || persistenceBlocked}
                   checked={personalization.enabled}
                   onChange={(e) => setPersonalization({ ...personalization, enabled: e.target.checked })}
                   className="w-3.5 h-3.5"
@@ -483,7 +516,7 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
                 <label className="block text-[10px] font-bold text-nt font-mono uppercase tracking-wider">Service Adapter Identifier</label>
                 <input
                   type="text"
-                  disabled={isObserver}
+                  disabled={isObserver || persistenceBlocked}
                   value={personalization.name}
                   onChange={(e) => setPersonalization({ ...personalization, name: e.target.value })}
                   className="w-full border border-nt rounded-sm p-2 font-mono font-bold mt-1 text-xs"
@@ -494,7 +527,7 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
                 <label className="block text-[10px] font-bold text-nt font-mono uppercase tracking-wider">Base URL</label>
                 <input
                   type="text"
-                  disabled={isObserver}
+                  disabled={isObserver || persistenceBlocked}
                   value={personalization.baseUrl}
                   onChange={(e) => setPersonalization({ ...personalization, baseUrl: e.target.value })}
                   className="w-full border border-nt rounded-sm p-2 font-mono mt-1 text-xs"
@@ -505,7 +538,7 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
                 <label className="block text-[10px] font-bold text-nt font-mono uppercase tracking-wider">Auth Credentials Secret Ref</label>
                 <input
                   type="text"
-                  disabled={isObserver}
+                  disabled={isObserver || persistenceBlocked}
                   value={personalization.apiKeySecretRef}
                   onChange={(e) => setPersonalization({ ...personalization, apiKeySecretRef: e.target.value })}
                   className="w-full border border-nt bg-b2 rounded-sm p-2 font-mono text-ac font-bold mt-1 text-xs"
@@ -516,7 +549,7 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
                 <label className="block text-[10px] font-bold text-nt font-mono uppercase tracking-wider">Chronometry Resolve Path</label>
                 <input
                   type="text"
-                  disabled={isObserver}
+                  disabled={isObserver || persistenceBlocked}
                   value={personalization.endpointPaths.chronometryResolve}
                   onChange={(e) => setPersonalization({ ...personalization, endpointPaths: { ...personalization.endpointPaths, chronometryResolve: e.target.value } })}
                   className="w-full border border-nt rounded-sm p-2 font-mono mt-1 text-xs"
@@ -527,7 +560,7 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
                 <label className="block text-[10px] font-bold text-nt font-mono uppercase tracking-wider">BaZi Path</label>
                 <input
                   type="text"
-                  disabled={isObserver}
+                  disabled={isObserver || persistenceBlocked}
                   value={personalization.endpointPaths.bazi}
                   onChange={(e) => setPersonalization({ ...personalization, endpointPaths: { ...personalization.endpointPaths, bazi: e.target.value } })}
                   className="w-full border border-nt rounded-sm p-2 font-mono mt-1 text-xs"
@@ -538,7 +571,7 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
                 <label className="block text-[10px] font-bold text-nt font-mono uppercase tracking-wider">BaZi Trace Path</label>
                 <input
                   type="text"
-                  disabled={isObserver}
+                  disabled={isObserver || persistenceBlocked}
                   value={personalization.endpointPaths.baziTrace}
                   onChange={(e) => setPersonalization({ ...personalization, endpointPaths: { ...personalization.endpointPaths, baziTrace: e.target.value } })}
                   className="w-full border border-nt rounded-sm p-2 font-mono mt-1 text-xs"
@@ -549,7 +582,7 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
                 <label className="block text-[10px] font-bold text-nt font-mono uppercase tracking-wider">WuXing Path</label>
                 <input
                   type="text"
-                  disabled={isObserver}
+                  disabled={isObserver || persistenceBlocked}
                   value={personalization.endpointPaths.wuxing}
                   onChange={(e) => setPersonalization({ ...personalization, endpointPaths: { ...personalization.endpointPaths, wuxing: e.target.value } })}
                   className="w-full border border-nt rounded-sm p-2 font-mono mt-1 text-xs"
@@ -559,7 +592,7 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
               <div>
                 <label className="block text-[10px] font-bold text-nt font-mono uppercase tracking-wider">Default Standard</label>
                 <select
-                  disabled={isObserver}
+                  disabled={isObserver || persistenceBlocked}
                   value={personalization.defaultStandard}
                   onChange={(e) => setPersonalization({ ...personalization, defaultStandard: e.target.value })}
                   className="w-full border border-nt rounded-sm p-2 font-mono mt-1 text-xs bg-b1 cursor-pointer"
@@ -573,7 +606,7 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
               <div>
                 <label className="block text-[10px] font-bold text-nt font-mono uppercase tracking-wider">Default Boundary</label>
                 <select
-                  disabled={isObserver}
+                  disabled={isObserver || persistenceBlocked}
                   value={personalization.defaultBoundary}
                   onChange={(e) => setPersonalization({ ...personalization, defaultBoundary: e.target.value })}
                   className="w-full border border-nt rounded-sm p-2 font-mono mt-1 text-xs bg-b1 cursor-pointer"
@@ -586,7 +619,7 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
               <div>
                 <label className="block text-[10px] font-bold text-nt font-mono uppercase tracking-wider">Ambiguous Time Policy</label>
                 <select
-                  disabled={isObserver}
+                  disabled={isObserver || persistenceBlocked}
                   value={personalization.ambiguousTimePolicy}
                   onChange={(e) => setPersonalization({ ...personalization, ambiguousTimePolicy: e.target.value as any })}
                   className="w-full border border-nt rounded-sm p-2 font-mono mt-1 text-xs bg-b1 cursor-pointer"
@@ -600,7 +633,7 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
               <div>
                 <label className="block text-[10px] font-bold text-nt font-mono uppercase tracking-wider">Nonexistent Time Policy</label>
                 <select
-                  disabled={isObserver}
+                  disabled={isObserver || persistenceBlocked}
                   value={personalization.nonexistentTimePolicy}
                   onChange={(e) => setPersonalization({ ...personalization, nonexistentTimePolicy: e.target.value as any })}
                   className="w-full border border-nt rounded-sm p-2 font-mono mt-1 text-xs bg-b1 cursor-pointer"
@@ -614,7 +647,7 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
                 <label className="block text-[10px] font-bold text-nt font-mono uppercase tracking-wider">Timeout (ms)</label>
                 <input
                   type="number"
-                  disabled={isObserver}
+                  disabled={isObserver || persistenceBlocked}
                   value={personalization.timeoutMs}
                   onChange={(e) => setPersonalization({ ...personalization, timeoutMs: parseInt(e.target.value, 10) || 10000 })}
                   className="w-full border border-nt rounded-sm p-2 font-mono mt-1 text-xs"
@@ -625,7 +658,7 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
                 <label className="block text-[10px] font-bold text-nt font-mono uppercase tracking-wider">Retry Count</label>
                 <input
                   type="number"
-                  disabled={isObserver}
+                  disabled={isObserver || persistenceBlocked}
                   value={personalization.retryCount}
                   onChange={(e) => setPersonalization({ ...personalization, retryCount: parseInt(e.target.value, 10) || 3 })}
                   className="w-full border border-nt rounded-sm p-2 font-mono mt-1 text-xs"
@@ -638,7 +671,9 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
                 <button
                   id="btn-save-personalization"
                   onClick={handleSavePersonalization}
-                  className="bg-b2 hover:opacity-90 text-da font-bold font-mono p-2 px-6 rounded-sm text-xs flex items-center gap-1.5 cursor-pointer uppercase tracking-wider border border-da"
+                  disabled={persistenceBlocked}
+                  title={persistenceBlocked ? persistenceStatus.reason : undefined}
+                  className="bg-b2 hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed text-da font-bold font-mono p-2 px-6 rounded-sm text-xs flex items-center gap-1.5 cursor-pointer uppercase tracking-wider border border-da"
                 >
                   <Save className="w-3.5 h-3.5 text-ac" /> Save Coordinates
                 </button>
@@ -646,6 +681,14 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
             )}
           </div>
           <FuFireTestConsole personalization={personalization} />
+        </div>
+      )}
+
+      {/* 4b. PERSONALIZATION zero-state — config unavailable because persistence is offline */}
+      {activeSection === 'Personalization API' && !personalization && persistenceBlocked && (
+        <div className="bg-b1 border border-nt p-6 rounded-sm text-center text-nt text-[11px] font-mono">
+          FuFire-Adapter-Konfiguration nicht ladbar — Persistenz offline (Modus {persistenceStatus.mode} · SUPABASE STUB).
+          Konfiguration und Speichern sind erst nach aktivierter Persistenz verfügbar.
         </div>
       )}
 
@@ -667,7 +710,7 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
               <label className="block text-[10px] font-mono font-bold text-nt uppercase tracking-widest">Default POD Provider Name</label>
               <input
                 type="text"
-                disabled={isObserver}
+                disabled={isObserver || persistenceBlocked}
                 value={podConfig.name}
                 onChange={(e) => setPodConfig({ ...podConfig, name: e.target.value })}
                 className="w-full border border-nt rounded-sm p-2 font-mono font-bold mt-1 text-xs bg-b2 text-nt"
@@ -679,7 +722,7 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
               <label className="block text-[10px] font-mono font-bold text-nt uppercase tracking-widest">Live Endpoint API base</label>
               <input
                 type="text"
-                disabled={isObserver}
+                disabled={isObserver || persistenceBlocked}
                 value={podConfig.baseUrl}
                 onChange={(e) => setPodConfig({ ...podConfig, baseUrl: e.target.value })}
                 className="w-full border border-nt rounded-sm p-2 font-mono mt-1 text-xs"
@@ -690,7 +733,7 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
               <label className="block text-[10px] font-mono font-bold text-nt uppercase tracking-widest">Access Private Secret Vault Reference</label>
               <input
                 type="text"
-                disabled={isObserver}
+                disabled={isObserver || persistenceBlocked}
                 value={podConfig.secretRef}
                 onChange={(e) => setPodConfig({ ...podConfig, secretRef: e.target.value })}
                 className="w-full border border-nt bg-b2 rounded-sm p-2 font-mono text-ac font-bold mt-1 text-xs"
@@ -700,7 +743,7 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
             <div>
               <label className="block text-[10px] font-mono font-bold text-nt uppercase tracking-widest">Fulfillment Dispatch Mode</label>
               <select
-                disabled={isObserver}
+                disabled={isObserver || persistenceBlocked}
                 value={podConfig.dispatchMode}
                 onChange={(e) => setPodConfig({ ...podConfig, dispatchMode: e.target.value as any })}
                 className="w-full border border-nt bg-b1 rounded-sm p-2 font-bold font-mono text-xs text-da mt-1"
@@ -727,7 +770,7 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
                         <span className="text-[10px] font-mono font-bold text-nt uppercase">BluePrint UID:</span>
                         <input
                           type="text"
-                          disabled={isObserver}
+                          disabled={isObserver || persistenceBlocked}
                           value={val}
                           onChange={(e) => handleUpdateProductUid(p.id, e.target.value)}
                           placeholder="gelato-uuid-xxx"
@@ -747,12 +790,22 @@ export default function ConfigurationViews({ activeSection }: ConfigControllerPr
               <button
                 id="btn-save-pod"
                 onClick={handleSavePod}
-                className="bg-b2 hover:opacity-90 text-da font-bold font-mono p-2 px-6 rounded-sm text-xs flex items-center gap-1.5 cursor-pointer uppercase tracking-wider border border-da"
+                disabled={persistenceBlocked}
+                title={persistenceBlocked ? persistenceStatus.reason : undefined}
+                className="bg-b2 hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed text-da font-bold font-mono p-2 px-6 rounded-sm text-xs flex items-center gap-1.5 cursor-pointer uppercase tracking-wider border border-da"
               >
                 <Save className="w-3.5 h-3.5 text-ac" /> Save Dispatch Rules
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {/* 5b. POD zero-state — config unavailable because persistence is offline */}
+      {activeSection === 'Fulfillment / Shipping APIs' && !podConfig && persistenceBlocked && (
+        <div className="bg-b1 border border-nt p-6 rounded-sm text-center text-nt text-[11px] font-mono">
+          POD-Provider-Konfiguration nicht ladbar — Persistenz offline (Modus {persistenceStatus.mode} · SUPABASE STUB).
+          Konfiguration und Speichern sind erst nach aktivierter Persistenz verfügbar.
         </div>
       )}
     </div>

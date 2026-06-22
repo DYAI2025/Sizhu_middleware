@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { appServices } from '../lib/app/appServices';
+import { getPersistenceStatus, isSupabaseNotConfigured } from '../lib/app/persistenceStatus';
+import PersistenceOfflineBanner from './PersistenceOfflineBanner';
 import { ImageArtifact, ShopProduct } from '../types';
 import { CheckCircle2, AlertTriangle, HelpCircle, Eye, SlidersHorizontal, Layers, X, Calendar, Download } from 'lucide-react';
 
@@ -8,6 +10,12 @@ export default function ArtifactsView() {
   const [products, setProducts] = useState<ShopProduct[]>([]);
   const [activeTab, setActiveTab] = useState<'all' | 'accepted' | 'rejected' | 'not_selected'>('all');
   const [activeArtifact, setActiveArtifact] = useState<ImageArtifact | null>(null);
+
+  // True once the persistence boundary throws SUPABASE_NOT_CONFIGURED (any
+  // non-DEMO_LOCAL mode). Surfaces the previously-swallowed fail-closed error so
+  // the gallery isn't a silent "no artifacts" lie when persistence is offline.
+  const [persistenceBlocked, setPersistenceBlocked] = useState(false);
+  const persistenceStatus = getPersistenceStatus();
 
   useEffect(() => {
     loadData();
@@ -22,6 +30,11 @@ export default function ArtifactsView() {
       setArtifacts(artList);
       setProducts(prodList);
     } catch (e) {
+      // STOP swallowing silently: when the persistence boundary fails closed
+      // (SUPABASE_NOT_CONFIGURED outside DEMO_LOCAL), surface it as state so the
+      // empty gallery explains itself instead of implying no artifacts exist.
+      // The dev log stays for diagnostics.
+      if (isSupabaseNotConfigured(e)) setPersistenceBlocked(true);
       console.error(e);
     }
   };
@@ -130,6 +143,11 @@ export default function ArtifactsView() {
 
   return (
     <div className="space-y-6 animate-fade-in text-da" id="artifacts-gallery-container animate-fade-in">
+      {/* Persistence boundary surfaced (was previously swallowed silently) */}
+      {persistenceBlocked && (
+        <PersistenceOfflineBanner mode={persistenceStatus.mode} reason={persistenceStatus.reason} />
+      )}
+
       {/* Title block */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-nt pb-4">
         <div>
@@ -165,18 +183,20 @@ export default function ArtifactsView() {
               <span className="font-bold text-nt px-1 font-mono uppercase text-[8px] flex items-center gap-0.5">
                 <Download className="w-2.5 h-2.5" /> Export:
               </span>
-              <button 
+              <button
                 onClick={exportArtifactsAsJSON}
-                className="hover:bg-b2 text-da font-mono font-bold px-1.5 py-0.5 rounded-xs transition text-[9px] cursor-pointer"
-                title={`Export current ${activeTab} artifacts as JSON`}
+                disabled={persistenceBlocked}
+                className="hover:bg-b2 text-da font-mono font-bold px-1.5 py-0.5 rounded-xs transition text-[9px] cursor-pointer disabled:text-nt disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                title={persistenceBlocked ? persistenceStatus.reason : `Export current ${activeTab} artifacts as JSON`}
               >
                 JSON
               </button>
               <span className="text-nt">&bull;</span>
-              <button 
+              <button
                 onClick={exportArtifactsAsCSV}
-                className="hover:bg-b2 text-nt font-mono font-bold px-1.5 py-0.5 rounded-xs transition text-[9px] cursor-pointer"
-                title={`Export current ${activeTab} artifacts as CSV`}
+                disabled={persistenceBlocked}
+                className="hover:bg-b2 text-nt font-mono font-bold px-1.5 py-0.5 rounded-xs transition text-[9px] cursor-pointer disabled:text-nt disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                title={persistenceBlocked ? persistenceStatus.reason : `Export current ${activeTab} artifacts as CSV`}
               >
                 CSV
               </button>
@@ -189,11 +209,19 @@ export default function ArtifactsView() {
       </div>
 
       {artifacts.length === 0 ? (
-        <div className="bg-b1 rounded-sm border border-nt p-24 text-center text-nt text-xs font-mono">
-          <Eye className="w-8 h-8 text-nt stroke-[1.2] mx-auto mb-2" />
-          No images staged inside local storage bucket memory.
-          <p className="mt-1 text-[11px] opacity-85">Trigger simulated test orders to yield and QA test multiple artifact candidates.</p>
-        </div>
+        persistenceBlocked ? (
+          <div className="bg-b1 rounded-sm border border-ac p-24 text-center text-ac text-xs font-mono">
+            <AlertTriangle className="w-8 h-8 text-ac stroke-[1.2] mx-auto mb-2" />
+            Artefakt-Galerie mangels DB nicht ladbar (Modus {persistenceStatus.mode}).
+            <p className="mt-1 text-[11px] text-nt opacity-85">{persistenceStatus.reason}</p>
+          </div>
+        ) : (
+          <div className="bg-b1 rounded-sm border border-nt p-24 text-center text-nt text-xs font-mono">
+            <Eye className="w-8 h-8 text-nt stroke-[1.2] mx-auto mb-2" />
+            No images staged inside local storage bucket memory.
+            <p className="mt-1 text-[11px] opacity-85">Trigger simulated test orders to yield and QA test multiple artifact candidates.</p>
+          </div>
+        )
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
           {filteredArtifacts.map((art) => {
