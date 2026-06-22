@@ -5,7 +5,8 @@ import dotenv from "dotenv";
 import cors from "cors";
 import { FuFireDataService } from "./services/fufireDataService";
 import { registerBaziSoloRoutes, type BaziSoloRouteDeps } from "./routes/baziSolo";
-import { InMemoryBaZiSoloStore } from "./services/baziSoloPipeline";
+import { InMemoryBaZiSoloStore, type BaZiSoloStore } from "./services/baziSoloPipeline";
+import { SupabaseBaZiSoloStore } from "./services/supabaseBaziSoloStore";
 import { PodDispatchService } from "./services/podDispatchService";
 import {
   sanitizeTestRunBody,
@@ -58,6 +59,13 @@ export interface CreateAppDeps {
    * than fabricating success.
    */
   templateStore?: TemplateStoreService;
+  /**
+   * Injected bazi-solo pipeline deps (DI for tests). Defaults: the real
+   * FuFireDataService + the durable Supabase store when the service-role key is present,
+   * else an in-memory store. (Restored — the #23/#24 merge dropped this ST-8 field while
+   * the bazi-solo route below still references deps.baziSolo.)
+   */
+  baziSolo?: Partial<BaziSoloRouteDeps>;
 }
 
 /**
@@ -93,6 +101,29 @@ function buildSupabaseTemplateStore(): TemplateStoreService | null {
     new SupabaseTemplateRepository(client),
     new SupabaseAuditSink(client),
   );
+}
+
+/**
+ * Build the durable bazi-solo store SERVER-SIDE: the real Supabase store when the
+ * service-role key + project URL are present (prod), else the in-memory fallback.
+ * The service-role key is read by the secret-ref indirection and never logged; the
+ * client is constructed here, never in the browser-shared appServices facade.
+ */
+function buildBaziSoloStore(): BaZiSoloStore {
+  const url =
+    process.env.SUPABASE_URL ||
+    process.env.SUPABASE_PROJECT_URL ||
+    process.env.VITE_SUPABASE_URL;
+  const serviceRoleKey =
+    process.env[
+      process.env.SUPABASE_SERVICE_ROLE_SECRET_REF || "SECRET_REF_SUPABASE_SERVICE_ROLE"
+    ];
+  if (url && serviceRoleKey) {
+    return new SupabaseBaZiSoloStore(
+      createClient(url, serviceRoleKey, { auth: { persistSession: false } }),
+    );
+  }
+  return new InMemoryBaZiSoloStore();
 }
 
 export function createApp(deps: CreateAppDeps = {}): Express {
@@ -321,7 +352,7 @@ export function createApp(deps: CreateAppDeps = {}): Express {
   // the durable Supabase store (ST-2/BLK-002) implements the same BaZiSoloStore seam.
   registerBaziSoloRoutes(app, {
     fufire: deps.baziSolo?.fufire ?? fufireDataService,
-    store: deps.baziSolo?.store ?? new InMemoryBaZiSoloStore(),
+    store: deps.baziSolo?.store ?? buildBaziSoloStore(),
     generateRunId: deps.baziSolo?.generateRunId,
     fontPath: deps.baziSolo?.fontPath,
     templateId: deps.baziSolo?.templateId,
