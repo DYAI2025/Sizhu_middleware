@@ -42,8 +42,16 @@ import type { Font, FontCollection, Glyph } from "fontkit";
 // vitest all run from the project root, so cwd is the repo root.
 const REPO_ROOT = process.cwd();
 
-/** Default location of the (git-ignored) Noto Sans SC font binary. */
-export const DEFAULT_FONT_PATH = resolve(REPO_ROOT, "assets/fonts/NotoSansSC.ttf");
+/**
+ * Default font: a COMMITTED subset of Noto Sans SC (OFL) covering only the ~47 bazi-solo
+ * codepoints (~18KB). The full font stays git-ignored / is not deployed, so this small subset
+ * is what ships to prod (Railway) — the slice-1 fix for "render fail-closed because the font
+ * is absent". Glyph outlines are byte-identical to the full font's default (Thin) instance, so
+ * the render-back golden-hash (ST-7) still matches. Re-generate via:
+ *   pyftsubset assets/fonts/NotoSansSC.ttf --text-file=<bazi cjk> \
+ *     --output-file=assets/fonts/NotoSansSC-bazi.subset.ttf --no-hinting --desubroutinize
+ */
+export const DEFAULT_FONT_PATH = resolve(REPO_ROOT, "assets/fonts/NotoSansSC-bazi.subset.ttf");
 
 /** A4 @ 300dpi page, in pixels (210×297 mm). The renderer's fixed canvas. */
 export const A4_300DPI_WIDTH = 2480;
