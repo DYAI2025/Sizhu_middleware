@@ -38,7 +38,24 @@ import {
   SupabaseAuditSink,
 } from "../src/lib/repositories/supabaseTemplateRepository";
 import { SupabaseProductRepository } from "../src/lib/repositories/supabaseProductRepository";
-import type { ProductRepository } from "../src/lib/repositories/interfaces";
+import { registerProviderRoutes } from "./routes/providers";
+import { registerWorkflowRoutes } from "./routes/workflows";
+import { registerArtifactRoutes } from "./routes/artifacts";
+import { registerRoleRoutes } from "./routes/roles";
+import { registerSettingsRoutes } from "./routes/settings";
+import { SupabaseProviderRepository } from "../src/lib/repositories/supabaseProviderRepository";
+import { SupabaseWorkflowRepository } from "../src/lib/repositories/supabaseWorkflowRepository";
+import { SupabaseArtifactRepository } from "../src/lib/repositories/supabaseArtifactRepository";
+import { SupabaseRoleRepository } from "../src/lib/repositories/supabaseRoleRepository";
+import { SupabaseSettingsRepository } from "../src/lib/repositories/supabaseSettingsRepository";
+import type {
+  ProductRepository,
+  ProviderRepository,
+  WorkflowRepository,
+  ArtifactRepository,
+  RoleRepository,
+  SettingsRepository,
+} from "../src/lib/repositories/interfaces";
 
 dotenv.config();
 
@@ -76,6 +93,11 @@ export interface CreateAppDeps {
    * in-memory double so no Supabase / network is touched.
    */
   productRepo?: ProductRepository;
+  providerRepo?: ProviderRepository;
+  workflowRepo?: WorkflowRepository;
+  artifactRepo?: ArtifactRepository;
+  roleRepo?: RoleRepository;
+  settingsRepo?: SettingsRepository;
 }
 
 /**
@@ -115,6 +137,25 @@ function buildServiceRoleClient(): SupabaseClient | null {
 function buildSupabaseProductRepo(): ProductRepository | null {
   const client = buildServiceRoleClient();
   return client ? new SupabaseProductRepository(client) : null;
+}
+
+// --- The other 5 data domains (feat/supabase-data-layer) — server-side service-role
+// repos from the same shared client. Null when no config → failLoudRepo below.
+function buildSupabaseProviderRepo(): ProviderRepository | null { const c = buildServiceRoleClient(); return c ? new SupabaseProviderRepository(c) : null; }
+function buildSupabaseWorkflowRepo(): WorkflowRepository | null { const c = buildServiceRoleClient(); return c ? (new SupabaseWorkflowRepository(c) as unknown as WorkflowRepository) : null; }
+function buildSupabaseArtifactRepo(): ArtifactRepository | null { const c = buildServiceRoleClient(); return c ? new SupabaseArtifactRepository(c) : null; }
+function buildSupabaseRoleRepo(): RoleRepository | null { const c = buildServiceRoleClient(); return c ? new SupabaseRoleRepository(c) : null; }
+function buildSupabaseSettingsRepo(): SettingsRepository | null { const c = buildServiceRoleClient(); return c ? new SupabaseSettingsRepository(c) : null; }
+
+/** A repo whose every method throws a typed config error — registered when no service-role
+ * client is configured, so a misconfigured deployment fails LOUD (500) instead of fabricating
+ * data. Works for any *Repository contract via a Proxy. */
+function failLoudRepo<T>(domain: string): T {
+  return new Proxy({}, {
+    get: () => async () => {
+      throw new Error(`SUPABASE_${domain}_STORE_ERROR (config): no service-role Supabase client (URL + SECRET_REF_SUPABASE_SERVICE_ROLE required).`);
+    },
+  }) as unknown as T;
 }
 
 /**
@@ -252,6 +293,13 @@ export function createApp(deps: CreateAppDeps = {}): Express {
       },
     };
   registerProductRoutes(app, productRepo);
+
+  // --- The other 5 data domains, wired P1 (build server repo, else fail-loud config stub).
+  registerProviderRoutes(app, deps.providerRepo ?? buildSupabaseProviderRepo() ?? failLoudRepo<ProviderRepository>("PROVIDER"));
+  registerWorkflowRoutes(app, deps.workflowRepo ?? buildSupabaseWorkflowRepo() ?? failLoudRepo<WorkflowRepository>("WORKFLOW"));
+  registerArtifactRoutes(app, deps.artifactRepo ?? buildSupabaseArtifactRepo() ?? failLoudRepo<ArtifactRepository>("ARTIFACT"));
+  registerRoleRoutes(app, deps.roleRepo ?? buildSupabaseRoleRepo() ?? failLoudRepo<RoleRepository>("ROLE"));
+  registerSettingsRoutes(app, deps.settingsRepo ?? buildSupabaseSettingsRepo() ?? failLoudRepo<SettingsRepository>("SETTINGS"));
 
   // --- Compile Preview (REQ-001): deterministic Lane-1 + LLM-prose Lane-2 + post-validation.
   // Session-protected by the default-deny apiGuard above. The symbol values are deterministic

@@ -12,13 +12,15 @@ import { LocalApprovalRepository } from '../repositories/approvalRepository';
 import { ApiProductRepository } from '../repositories/apiProductRepository';
 import {
   SupabaseTemplateRepository,
-  SupabaseWorkflowRepository,
-  SupabaseArtifactRepository,
-  SupabaseSettingsRepository,
-  SupabaseRoleRepository,
-  SupabaseProviderRepository,
   SupabaseApprovalRepository
 } from '../repositories/supabaseRepository.stub';
+// Migrated data domains route through the SERVER data API (service-role behind
+// apiGuard) — the browser uses Api* repos, NOT the throwing Supabase stubs.
+import { ApiProviderRepository } from '../repositories/apiProviderRepository';
+import { ApiWorkflowRepository } from '../repositories/apiWorkflowRepository';
+import { ApiArtifactRepository } from '../repositories/apiArtifactRepository';
+import { ApiRoleRepository } from '../repositories/apiRoleRepository';
+import { ApiSettingsRepository } from '../repositories/apiSettingsRepository';
 import { ApprovalRepository, ProductRepository } from '../repositories/interfaces';
 import { 
   MockImageGenerationProvider, 
@@ -68,11 +70,11 @@ const localRunner = new WorkflowRunner(
 // supabaseRepository.stub.ts for the other (not-yet-migrated) domains.
 const apiProductRepo = new ApiProductRepository();
 const supabaseTemplateRepo = new SupabaseTemplateRepository();
-const supabaseWorkflowRepo = new SupabaseWorkflowRepository();
-const supabaseArtifactRepo = new SupabaseArtifactRepository();
-const supabaseSettingsRepo = new SupabaseSettingsRepository();
-const supabaseRoleRepo = new SupabaseRoleRepository();
-const supabaseProviderRepo = new SupabaseProviderRepository();
+const apiWorkflowRepo = new ApiWorkflowRepository();
+const apiArtifactRepo = new ApiArtifactRepository();
+const apiSettingsRepo = new ApiSettingsRepository();
+const apiRoleRepo = new ApiRoleRepository();
+const apiProviderRepo = new ApiProviderRepository();
 const supabaseApprovalRepo = new SupabaseApprovalRepository();
 
 // Stub runner that matches the runner's PUBLIC surface but throws the explicit,
@@ -121,23 +123,23 @@ export const appServices = {
   },
 
   get workflows() {
-    return selectDependency(localWorkflowRepo, supabaseWorkflowRepo);
+    return selectDependency(localWorkflowRepo, apiWorkflowRepo);
   },
 
   get artifacts() {
-    return selectDependency(localArtifactRepo, supabaseArtifactRepo);
+    return selectDependency(localArtifactRepo, apiArtifactRepo);
   },
 
   get settings() {
-    return selectDependency(localSettingsRepo, supabaseSettingsRepo);
+    return selectDependency(localSettingsRepo, apiSettingsRepo);
   },
 
   get roles() {
-    return selectDependency(localRoleRepo, supabaseRoleRepo);
+    return selectDependency(localRoleRepo, apiRoleRepo);
   },
 
   get providers() {
-    return selectDependency(localProviderRepo, supabaseProviderRepo);
+    return selectDependency(localProviderRepo, apiProviderRepo);
   },
 
   // OQ-005: the approval store is the SOLE load-bearing money gate. In DEMO_LOCAL it is

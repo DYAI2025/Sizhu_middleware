@@ -82,6 +82,17 @@ CREATE TABLE IF NOT EXISTS app_users (
 );
 
 
+-- 4b. APP SETTINGS (key-value) — single-row homes for console-level settings.
+-- The RBAC "active role" mirrors the Local store's single `active_role` value
+-- (there is no per-table column for it); SupabaseRoleRepository upserts it here
+-- under key 'active_role' (default 'Owner').
+CREATE TABLE IF NOT EXISTS app_settings (
+    key VARCHAR(64) PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+
 -- 5. PRODUCTS TABLE (PRE-REQUISITE)
 CREATE TABLE IF NOT EXISTS shop_products (
     id VARCHAR(64) PRIMARY KEY,
@@ -606,3 +617,17 @@ CREATE POLICY select_approvals ON dispatch_approvals FOR SELECT TO authenticated
 CREATE POLICY write_approvals ON dispatch_approvals FOR ALL TO authenticated USING (public.has_permission('manage_credentials'));
 
 
+
+-- ============================================================================
+-- VISUAL WORKFLOWS (feat/supabase-data-layer) — per-product node/edge graph (jsonb),
+-- keyed by product_id. The data API is server-side (service-role); RLS is defense-in-depth.
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS visual_workflows (
+    product_id VARCHAR(64) PRIMARY KEY REFERENCES shop_products(id) ON DELETE CASCADE,
+    graph JSONB NOT NULL DEFAULT '{}'::jsonb,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+ALTER TABLE visual_workflows ENABLE ROW LEVEL SECURITY;
+CREATE POLICY select_visual_workflows ON visual_workflows FOR SELECT USING (auth.role() = 'authenticated' OR auth.role() = 'service_role');
+CREATE POLICY write_visual_workflows ON visual_workflows FOR ALL USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role');
