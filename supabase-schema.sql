@@ -446,7 +446,7 @@ CREATE TABLE IF NOT EXISTS quality_issues (
     severity VARCHAR(16) NOT NULL DEFAULT 'medium',
     message TEXT NOT NULL,
     artifact_id VARCHAR(64) REFERENCES image_artifacts(id) ON DELETE CASCADE,
-    resolved_by VARCHAR(64) REFERENCES app_users(id) ON DELETE SET NULL,
+    resolved_by UUID REFERENCES app_users(id) ON DELETE SET NULL,
     resolution_notes TEXT,
     resolved_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -460,7 +460,7 @@ CREATE TABLE IF NOT EXISTS gateway_issues (
     provider_id VARCHAR(64) REFERENCES api_providers(id) ON DELETE CASCADE,
     error_message TEXT NOT NULL,
     retry_attempt INTEGER NOT NULL DEFAULT 0,
-    resolved_by VARCHAR(64) REFERENCES app_users(id) ON DELETE SET NULL,
+    resolved_by UUID REFERENCES app_users(id) ON DELETE SET NULL,
     resolution_notes TEXT,
     resolved_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP

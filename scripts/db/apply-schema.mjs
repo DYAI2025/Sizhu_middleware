@@ -20,6 +20,17 @@ const URI = dotenv
   .replace(/^["']|["']$/g, "");
 if (!URI) throw new Error("POSTGRGES_URI not found in .env");
 
+// The direct `db.<ref>.supabase.co` host is IPv6/deprecated and does not resolve from
+// restricted networks — rewrite it to the shared TRANSACTION POOLER (port 6543,
+// user `postgres.<ref>`, region aws-1-eu-central-1) which is reachable over IPv4.
+function toPooler(uri) {
+  const u = new URL(uri);
+  const m = u.hostname.match(/^db\.([a-z0-9]+)\.supabase\.co$/);
+  if (!m) return uri;
+  return `postgresql://postgres.${m[1]}:${u.password}@aws-1-eu-central-1.pooler.supabase.com:6543/postgres`;
+}
+const CONN = toPooler(URI);
+
 const SQL = readFileSync(new URL("../../supabase-schema.sql", import.meta.url), "utf8");
 
 // Split top-level statements, respecting dollar-quotes / strings / comments.
@@ -49,7 +60,7 @@ function split(sql) {
 const SKIP = new Set(["42P07", "42710", "42P06", "42723", "23505", "42701", "42P16"]); // duplicate_* / unique_violation
 
 const stmts = split(SQL);
-const client = new pg.Client({ connectionString: URI, ssl: { rejectUnauthorized: false } });
+const client = new pg.Client({ connectionString: CONN, ssl: { rejectUnauthorized: false } });
 await client.connect();
 console.log(`connected. applying ${stmts.length} statements…`);
 let ok = 0, skipped = 0;

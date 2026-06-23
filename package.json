@@ -23,7 +23,8 @@
     "smoke:compile-openrouter": "tsx scripts/smoke/openrouter-compile-smoke.ts",
     "smoke:templatestore": "tsx scripts/smoke/templateStore-live-smoke.ts",
     "spike:cjk": "tsx scripts/smoke/cjk-render-spike.ts",
-    "smoke:bazistore": "tsx scripts/smoke/baziStore-live-smoke.ts"
+    "smoke:bazistore": "tsx scripts/smoke/baziStore-live-smoke.ts",
+    "smoke:products": "tsx scripts/smoke/products-live-smoke.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
