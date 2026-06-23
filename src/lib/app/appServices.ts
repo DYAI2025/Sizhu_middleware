@@ -9,8 +9,8 @@ import {
   LocalProviderRepository
 } from '../repositories/localRepository';
 import { LocalApprovalRepository } from '../repositories/approvalRepository';
+import { ApiProductRepository } from '../repositories/apiProductRepository';
 import {
-  SupabaseProductRepository,
   SupabaseTemplateRepository,
   SupabaseWorkflowRepository,
   SupabaseArtifactRepository,
@@ -19,7 +19,7 @@ import {
   SupabaseProviderRepository,
   SupabaseApprovalRepository
 } from '../repositories/supabaseRepository.stub';
-import { ApprovalRepository } from '../repositories/interfaces';
+import { ApprovalRepository, ProductRepository } from '../repositories/interfaces';
 import { 
   MockImageGenerationProvider, 
   MockQualityGateProvider, 
@@ -61,7 +61,12 @@ const localRunner = new WorkflowRunner(
 );
 
 // Singletons for Supabase Mode
-const supabaseProductRepo = new SupabaseProductRepository();
+// Products go through the SERVER data API (service-role, behind apiGuard) — not
+// browser-direct — so the non-DEMO_LOCAL repo is the ApiProductRepository (which
+// fetches /api/v1/products with the current session token), NOT the throwing
+// Supabase stub. The throwing SupabaseProductRepository stub is retained in
+// supabaseRepository.stub.ts for the other (not-yet-migrated) domains.
+const apiProductRepo = new ApiProductRepository();
 const supabaseTemplateRepo = new SupabaseTemplateRepository();
 const supabaseWorkflowRepo = new SupabaseWorkflowRepository();
 const supabaseArtifactRepo = new SupabaseArtifactRepository();
@@ -104,8 +109,11 @@ export const appServices = {
     return getAppMode();
   },
   
-  get products() {
-    return selectDependency(localProductRepo, supabaseProductRepo);
+  // DEMO_LOCAL → localStorage repo (browser pipeline). Every other mode → the
+  // ApiProductRepository, which routes reads/writes through the SERVER data API
+  // (/api/v1/products, service-role behind apiGuard) — never browser-direct.
+  get products(): ProductRepository {
+    return selectDependency<ProductRepository>(localProductRepo, apiProductRepo);
   },
 
   get templates() {

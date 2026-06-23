@@ -31,11 +31,14 @@ import {
   InMemoryAuditSink,
 } from "./services/templateStoreService";
 import { registerTemplateRoutes } from "./routes/templates";
-import { createClient } from "@supabase/supabase-js";
+import { registerProductRoutes } from "./routes/products";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import {
   SupabaseTemplateRepository,
   SupabaseAuditSink,
 } from "../src/lib/repositories/supabaseTemplateRepository";
+import { SupabaseProductRepository } from "../src/lib/repositories/supabaseProductRepository";
+import type { ProductRepository } from "../src/lib/repositories/interfaces";
 
 dotenv.config();
 
@@ -66,6 +69,52 @@ export interface CreateAppDeps {
    * the bazi-solo route below still references deps.baziSolo.)
    */
   baziSolo?: Partial<BaziSoloRouteDeps>;
+  /**
+   * Injected server-side products repo (feat/supabase-data-layer). Defaults to the
+   * service-role `SupabaseProductRepository` when the project URL + service-role key
+   * are present, else `null` (the route fails loud with 500). Tests inject an
+   * in-memory double so no Supabase / network is touched.
+   */
+  productRepo?: ProductRepository;
+}
+
+/**
+ * SERVER-ONLY: build a service-role Supabase client from the env, or `null` when
+ * the project URL or the service-role key is missing.
+ *
+ * SECURITY: the service-role key is read by the secret-ref indirection
+ * (`process.env[ SUPABASE_SERVICE_ROLE_SECRET_REF || "SECRET_REF_SUPABASE_SERVICE_ROLE" ]`)
+ * and is NEVER logged. The client is constructed HERE (server), never in
+ * `appServices` (which is shared with the browser bundle). Shared by every
+ * server-side service-role repo so the wiring stays in one place.
+ */
+function buildServiceRoleClient(): SupabaseClient | null {
+  const url =
+    process.env.SUPABASE_URL ||
+    process.env.SUPABASE_PROJECT_URL ||
+    process.env.VITE_SUPABASE_URL ||
+    "";
+  const serviceRoleRef =
+    process.env.SUPABASE_SERVICE_ROLE_SECRET_REF ||
+    "SECRET_REF_SUPABASE_SERVICE_ROLE";
+  const serviceRoleKey = process.env[serviceRoleRef] || "";
+  if (!url || !serviceRoleKey) {
+    return null;
+  }
+  return createClient(url, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
+/**
+ * SERVER-ONLY: build the products repo from real Supabase persistence when the
+ * service-role client can be built; otherwise `null` so the route fails loud
+ * rather than fabricating data. (DEMO_LOCAL never reaches here — the browser uses
+ * the Local repo directly via appServices.)
+ */
+function buildSupabaseProductRepo(): ProductRepository | null {
+  const client = buildServiceRoleClient();
+  return client ? new SupabaseProductRepository(client) : null;
 }
 
 /**
@@ -180,6 +229,29 @@ export function createApp(deps: CreateAppDeps = {}): Express {
     buildSupabaseTemplateStore() ??
     new TemplateStoreService(appServices.templates, new InMemoryAuditSink());
   registerTemplateRoutes(app, templateStore);
+
+  // --- Products data API (feat/supabase-data-layer) -------------------------
+  // Mounted BELOW apiGuard so the routes inherit default-deny SESSION auth
+  // (products CRUD is session-class, NOT sensitive). The repo is the injected
+  // double in tests, else the service-role SupabaseProductRepository, else a
+  // fail-loud stub so a missing-config deployment errors honestly (500) instead
+  // of fabricating an empty product list.
+  const productRepo: ProductRepository =
+    deps.productRepo ??
+    buildSupabaseProductRepo() ??
+    {
+      async getProducts() {
+        throw new Error(
+          "SUPABASE_PRODUCT_STORE_ERROR (config): no service-role Supabase client (URL + SECRET_REF_SUPABASE_SERVICE_ROLE required).",
+        );
+      },
+      async saveProducts() {
+        throw new Error(
+          "SUPABASE_PRODUCT_STORE_ERROR (config): no service-role Supabase client (URL + SECRET_REF_SUPABASE_SERVICE_ROLE required).",
+        );
+      },
+    };
+  registerProductRoutes(app, productRepo);
 
   // --- Compile Preview (REQ-001): deterministic Lane-1 + LLM-prose Lane-2 + post-validation.
   // Session-protected by the default-deny apiGuard above. The symbol values are deterministic

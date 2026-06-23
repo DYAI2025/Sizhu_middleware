@@ -92,13 +92,25 @@ describe("AC-D-001b — facade never returns Local* repos (or local runner) outs
   });
 
   for (const mode of ["PRODUCTION", "CONFIG_REQUIRED", "SUPABASE_READY", "PRODUCTION_NOT_READY"]) {
-    it(`mode=${mode}: products repo is the Supabase stub (throws SUPABASE_NOT_CONFIGURED, never a silent Local fallback)`, async () => {
+    // feat/supabase-data-layer: the Products domain is the FIRST vertical to move
+    // to the real server-side architecture. Outside DEMO_LOCAL `facade.products`
+    // is now the ApiProductRepository (routes through the SERVER data API, behind
+    // apiGuard) — NOT the throwing Supabase stub. The boundary INVARIANT this loop
+    // protects is unchanged: outside DEMO_LOCAL the repo is NEVER a Local* repo and
+    // it FAILS LOUD (it throws PRODUCT_API_ERROR with no session token here — never
+    // a silent localStorage fallback / empty array). Only the error CODE differs
+    // now that Products has a real path; SUPABASE_NOT_CONFIGURED still gates every
+    // not-yet-migrated domain (workflowRunner below, settings/workflows above).
+    it(`mode=${mode}: products repo is the ApiProductRepository (fails loud, never a silent Local fallback)`, async () => {
       process.env.APP_MODE = mode;
       const facade = await freshFacade();
       expect(facade.getMode()).not.toBe("DEMO_LOCAL");
+      // Fails loud (throws) rather than returning a silent mock/localStorage array.
       await expect(facade.products.getProducts()).rejects.toMatchObject({
-        code: SUPABASE_NOT_CONFIGURED,
+        code: "PRODUCT_API_ERROR",
       });
+      // And it is NOT a Local* repo (the silent-mock-leak this loop guards against).
+      expect(facade.products.constructor.name).toBe("ApiProductRepository");
     });
 
     it(`mode=${mode}: workflowRunner.run rejects with SUPABASE_NOT_CONFIGURED (no local mock pipeline)`, async () => {
