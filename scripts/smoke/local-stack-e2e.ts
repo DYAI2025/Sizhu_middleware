@@ -14,7 +14,7 @@ const SECRET = get("SUPABASE_JWT_SECRET");
 const EMAIL = get("ADMIN_EMAIL_ALLOWLIST").split(",")[0];
 const URL_ = get("SUPABASE_URL") || get("VITE_SUPABASE_URL");
 const KEY = process.env[get("SUPABASE_SERVICE_ROLE_SECRET_REF") || "SECRET_REF_SUPABASE_SERVICE_ROLE"] || get("SECRET_REF_SUPABASE_SERVICE_ROLE");
-const BASE = "http://127.0.0.1:3055";
+const BASE = process.env.E2E_BASE || "http://127.0.0.1:3055";
 
 const token = signJwtHS256(
   { sub: "local-e2e", email: EMAIL, aal: "aal2", email_confirmed_at: "2024-01-01T00:00:00Z", exp: Math.floor(Date.now() / 1000) + 600 },
@@ -26,6 +26,13 @@ const check = (name: string, ok: boolean, detail = "") => { results.push(`${ok ?
 
 async function main() {
   console.log(`E2E vs ${BASE} (SUPABASE_READY), email=${EMAIL}`);
+
+  // 0. liveness + readiness (authed; prod has the secrets → READY)
+  const rHealth = await fetch(`${BASE}/api/health`);
+  check("GET /api/health → 200", rHealth.status === 200, `got ${rHealth.status}`);
+  const rReady = await fetch(`${BASE}/api/readiness`, { headers: auth });
+  const ready = rReady.ok ? await rReady.json().catch(() => ({})) : {};
+  check("GET /api/readiness authed → 200 READY", rReady.status === 200, `got ${rReady.status} ${JSON.stringify(ready).slice(0, 80)}`);
 
   // 1. apiGuard: no token → 401
   const r401 = await fetch(`${BASE}/api/v1/products`);
