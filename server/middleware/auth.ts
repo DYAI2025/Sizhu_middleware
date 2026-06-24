@@ -178,6 +178,12 @@ const SENSITIVE_API_ROUTES: Array<{ method: string; pattern: RegExp }> = [
   { method: "POST", pattern: /^\/fulfillment\/pod\/dispatch\/?$/ },
   { method: "POST", pattern: /^\/config(\/.*)?$/ },
   { method: "POST", pattern: /^\/secret-references\/check\/?$/ },
+  // RBAC writes (feat/supabase-data-layer roles vertical) are privileged: mutating
+  // the permission matrix, the user roster, or the acting role is an admin action.
+  // RBAC *reads* stay session-class (default-deny) and are deliberately NOT listed.
+  { method: "POST", pattern: /^\/v1\/roles\/role-permissions\/?$/ },
+  { method: "POST", pattern: /^\/v1\/roles\/users\/?$/ },
+  { method: "POST", pattern: /^\/v1\/roles\/active-role\/?$/ },
 ];
 
 /** Normalize the path used for classification (strip query, trailing slash). */

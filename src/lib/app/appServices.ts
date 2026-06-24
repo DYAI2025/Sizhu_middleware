@@ -9,17 +9,19 @@ import {
   LocalProviderRepository
 } from '../repositories/localRepository';
 import { LocalApprovalRepository } from '../repositories/approvalRepository';
+import { ApiProductRepository } from '../repositories/apiProductRepository';
 import {
-  SupabaseProductRepository,
   SupabaseTemplateRepository,
-  SupabaseWorkflowRepository,
-  SupabaseArtifactRepository,
-  SupabaseSettingsRepository,
-  SupabaseRoleRepository,
-  SupabaseProviderRepository,
   SupabaseApprovalRepository
 } from '../repositories/supabaseRepository.stub';
-import { ApprovalRepository } from '../repositories/interfaces';
+// Migrated data domains route through the SERVER data API (service-role behind
+// apiGuard) — the browser uses Api* repos, NOT the throwing Supabase stubs.
+import { ApiProviderRepository } from '../repositories/apiProviderRepository';
+import { ApiWorkflowRepository } from '../repositories/apiWorkflowRepository';
+import { ApiArtifactRepository } from '../repositories/apiArtifactRepository';
+import { ApiRoleRepository } from '../repositories/apiRoleRepository';
+import { ApiSettingsRepository } from '../repositories/apiSettingsRepository';
+import { ApprovalRepository, ProductRepository } from '../repositories/interfaces';
 import { 
   MockImageGenerationProvider, 
   MockQualityGateProvider, 
@@ -61,13 +63,18 @@ const localRunner = new WorkflowRunner(
 );
 
 // Singletons for Supabase Mode
-const supabaseProductRepo = new SupabaseProductRepository();
+// Products go through the SERVER data API (service-role, behind apiGuard) — not
+// browser-direct — so the non-DEMO_LOCAL repo is the ApiProductRepository (which
+// fetches /api/v1/products with the current session token), NOT the throwing
+// Supabase stub. The throwing SupabaseProductRepository stub is retained in
+// supabaseRepository.stub.ts for the other (not-yet-migrated) domains.
+const apiProductRepo = new ApiProductRepository();
 const supabaseTemplateRepo = new SupabaseTemplateRepository();
-const supabaseWorkflowRepo = new SupabaseWorkflowRepository();
-const supabaseArtifactRepo = new SupabaseArtifactRepository();
-const supabaseSettingsRepo = new SupabaseSettingsRepository();
-const supabaseRoleRepo = new SupabaseRoleRepository();
-const supabaseProviderRepo = new SupabaseProviderRepository();
+const apiWorkflowRepo = new ApiWorkflowRepository();
+const apiArtifactRepo = new ApiArtifactRepository();
+const apiSettingsRepo = new ApiSettingsRepository();
+const apiRoleRepo = new ApiRoleRepository();
+const apiProviderRepo = new ApiProviderRepository();
 const supabaseApprovalRepo = new SupabaseApprovalRepository();
 
 // Stub runner that matches the runner's PUBLIC surface but throws the explicit,
@@ -104,8 +111,11 @@ export const appServices = {
     return getAppMode();
   },
   
-  get products() {
-    return selectDependency(localProductRepo, supabaseProductRepo);
+  // DEMO_LOCAL → localStorage repo (browser pipeline). Every other mode → the
+  // ApiProductRepository, which routes reads/writes through the SERVER data API
+  // (/api/v1/products, service-role behind apiGuard) — never browser-direct.
+  get products(): ProductRepository {
+    return selectDependency<ProductRepository>(localProductRepo, apiProductRepo);
   },
 
   get templates() {
@@ -113,23 +123,23 @@ export const appServices = {
   },
 
   get workflows() {
-    return selectDependency(localWorkflowRepo, supabaseWorkflowRepo);
+    return selectDependency(localWorkflowRepo, apiWorkflowRepo);
   },
 
   get artifacts() {
-    return selectDependency(localArtifactRepo, supabaseArtifactRepo);
+    return selectDependency(localArtifactRepo, apiArtifactRepo);
   },
 
   get settings() {
-    return selectDependency(localSettingsRepo, supabaseSettingsRepo);
+    return selectDependency(localSettingsRepo, apiSettingsRepo);
   },
 
   get roles() {
-    return selectDependency(localRoleRepo, supabaseRoleRepo);
+    return selectDependency(localRoleRepo, apiRoleRepo);
   },
 
   get providers() {
-    return selectDependency(localProviderRepo, supabaseProviderRepo);
+    return selectDependency(localProviderRepo, apiProviderRepo);
   },
 
   // OQ-005: the approval store is the SOLE load-bearing money gate. In DEMO_LOCAL it is

@@ -31,11 +31,31 @@ import {
   InMemoryAuditSink,
 } from "./services/templateStoreService";
 import { registerTemplateRoutes } from "./routes/templates";
-import { createClient } from "@supabase/supabase-js";
+import { registerProductRoutes } from "./routes/products";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import {
   SupabaseTemplateRepository,
   SupabaseAuditSink,
 } from "../src/lib/repositories/supabaseTemplateRepository";
+import { SupabaseProductRepository } from "../src/lib/repositories/supabaseProductRepository";
+import { registerProviderRoutes } from "./routes/providers";
+import { registerWorkflowRoutes } from "./routes/workflows";
+import { registerArtifactRoutes } from "./routes/artifacts";
+import { registerRoleRoutes } from "./routes/roles";
+import { registerSettingsRoutes } from "./routes/settings";
+import { SupabaseProviderRepository } from "../src/lib/repositories/supabaseProviderRepository";
+import { SupabaseWorkflowRepository } from "../src/lib/repositories/supabaseWorkflowRepository";
+import { SupabaseArtifactRepository } from "../src/lib/repositories/supabaseArtifactRepository";
+import { SupabaseRoleRepository } from "../src/lib/repositories/supabaseRoleRepository";
+import { SupabaseSettingsRepository } from "../src/lib/repositories/supabaseSettingsRepository";
+import type {
+  ProductRepository,
+  ProviderRepository,
+  WorkflowRepository,
+  ArtifactRepository,
+  RoleRepository,
+  SettingsRepository,
+} from "../src/lib/repositories/interfaces";
 
 dotenv.config();
 
@@ -66,6 +86,76 @@ export interface CreateAppDeps {
    * the bazi-solo route below still references deps.baziSolo.)
    */
   baziSolo?: Partial<BaziSoloRouteDeps>;
+  /**
+   * Injected server-side products repo (feat/supabase-data-layer). Defaults to the
+   * service-role `SupabaseProductRepository` when the project URL + service-role key
+   * are present, else `null` (the route fails loud with 500). Tests inject an
+   * in-memory double so no Supabase / network is touched.
+   */
+  productRepo?: ProductRepository;
+  providerRepo?: ProviderRepository;
+  workflowRepo?: WorkflowRepository;
+  artifactRepo?: ArtifactRepository;
+  roleRepo?: RoleRepository;
+  settingsRepo?: SettingsRepository;
+}
+
+/**
+ * SERVER-ONLY: build a service-role Supabase client from the env, or `null` when
+ * the project URL or the service-role key is missing.
+ *
+ * SECURITY: the service-role key is read by the secret-ref indirection
+ * (`process.env[ SUPABASE_SERVICE_ROLE_SECRET_REF || "SECRET_REF_SUPABASE_SERVICE_ROLE" ]`)
+ * and is NEVER logged. The client is constructed HERE (server), never in
+ * `appServices` (which is shared with the browser bundle). Shared by every
+ * server-side service-role repo so the wiring stays in one place.
+ */
+function buildServiceRoleClient(): SupabaseClient | null {
+  const url =
+    process.env.SUPABASE_URL ||
+    process.env.SUPABASE_PROJECT_URL ||
+    process.env.VITE_SUPABASE_URL ||
+    "";
+  const serviceRoleRef =
+    process.env.SUPABASE_SERVICE_ROLE_SECRET_REF ||
+    "SECRET_REF_SUPABASE_SERVICE_ROLE";
+  const serviceRoleKey = process.env[serviceRoleRef] || "";
+  if (!url || !serviceRoleKey) {
+    return null;
+  }
+  return createClient(url, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
+/**
+ * SERVER-ONLY: build the products repo from real Supabase persistence when the
+ * service-role client can be built; otherwise `null` so the route fails loud
+ * rather than fabricating data. (DEMO_LOCAL never reaches here — the browser uses
+ * the Local repo directly via appServices.)
+ */
+function buildSupabaseProductRepo(): ProductRepository | null {
+  const client = buildServiceRoleClient();
+  return client ? new SupabaseProductRepository(client) : null;
+}
+
+// --- The other 5 data domains (feat/supabase-data-layer) — server-side service-role
+// repos from the same shared client. Null when no config → failLoudRepo below.
+function buildSupabaseProviderRepo(): ProviderRepository | null { const c = buildServiceRoleClient(); return c ? new SupabaseProviderRepository(c) : null; }
+function buildSupabaseWorkflowRepo(): WorkflowRepository | null { const c = buildServiceRoleClient(); return c ? (new SupabaseWorkflowRepository(c) as unknown as WorkflowRepository) : null; }
+function buildSupabaseArtifactRepo(): ArtifactRepository | null { const c = buildServiceRoleClient(); return c ? new SupabaseArtifactRepository(c) : null; }
+function buildSupabaseRoleRepo(): RoleRepository | null { const c = buildServiceRoleClient(); return c ? new SupabaseRoleRepository(c) : null; }
+function buildSupabaseSettingsRepo(): SettingsRepository | null { const c = buildServiceRoleClient(); return c ? new SupabaseSettingsRepository(c) : null; }
+
+/** A repo whose every method throws a typed config error — registered when no service-role
+ * client is configured, so a misconfigured deployment fails LOUD (500) instead of fabricating
+ * data. Works for any *Repository contract via a Proxy. */
+function failLoudRepo<T>(domain: string): T {
+  return new Proxy({}, {
+    get: () => async () => {
+      throw new Error(`SUPABASE_${domain}_STORE_ERROR (config): no service-role Supabase client (URL + SECRET_REF_SUPABASE_SERVICE_ROLE required).`);
+    },
+  }) as unknown as T;
 }
 
 /**
@@ -180,6 +270,36 @@ export function createApp(deps: CreateAppDeps = {}): Express {
     buildSupabaseTemplateStore() ??
     new TemplateStoreService(appServices.templates, new InMemoryAuditSink());
   registerTemplateRoutes(app, templateStore);
+
+  // --- Products data API (feat/supabase-data-layer) -------------------------
+  // Mounted BELOW apiGuard so the routes inherit default-deny SESSION auth
+  // (products CRUD is session-class, NOT sensitive). The repo is the injected
+  // double in tests, else the service-role SupabaseProductRepository, else a
+  // fail-loud stub so a missing-config deployment errors honestly (500) instead
+  // of fabricating an empty product list.
+  const productRepo: ProductRepository =
+    deps.productRepo ??
+    buildSupabaseProductRepo() ??
+    {
+      async getProducts() {
+        throw new Error(
+          "SUPABASE_PRODUCT_STORE_ERROR (config): no service-role Supabase client (URL + SECRET_REF_SUPABASE_SERVICE_ROLE required).",
+        );
+      },
+      async saveProducts() {
+        throw new Error(
+          "SUPABASE_PRODUCT_STORE_ERROR (config): no service-role Supabase client (URL + SECRET_REF_SUPABASE_SERVICE_ROLE required).",
+        );
+      },
+    };
+  registerProductRoutes(app, productRepo);
+
+  // --- The other 5 data domains, wired P1 (build server repo, else fail-loud config stub).
+  registerProviderRoutes(app, deps.providerRepo ?? buildSupabaseProviderRepo() ?? failLoudRepo<ProviderRepository>("PROVIDER"));
+  registerWorkflowRoutes(app, deps.workflowRepo ?? buildSupabaseWorkflowRepo() ?? failLoudRepo<WorkflowRepository>("WORKFLOW"));
+  registerArtifactRoutes(app, deps.artifactRepo ?? buildSupabaseArtifactRepo() ?? failLoudRepo<ArtifactRepository>("ARTIFACT"));
+  registerRoleRoutes(app, deps.roleRepo ?? buildSupabaseRoleRepo() ?? failLoudRepo<RoleRepository>("ROLE"));
+  registerSettingsRoutes(app, deps.settingsRepo ?? buildSupabaseSettingsRepo() ?? failLoudRepo<SettingsRepository>("SETTINGS"));
 
   // --- Compile Preview (REQ-001): deterministic Lane-1 + LLM-prose Lane-2 + post-validation.
   // Session-protected by the default-deny apiGuard above. The symbol values are deterministic

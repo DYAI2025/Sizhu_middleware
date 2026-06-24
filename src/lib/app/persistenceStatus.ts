@@ -44,19 +44,20 @@ export interface PersistenceStatus {
 /**
  * Resolve the current persistence status from the REAL getAppMode() resolver.
  *
- * `canPersist` is true ONLY in DEMO_LOCAL — the single mode whose repos
- * (Local*) don't throw today. In every other mode the Supabase workflow/product
- * repos are still THROWING stubs (supabaseRepository.stub.ts raises
- * SUPABASE_NOT_CONFIGURED), so persistence is effectively offline regardless of
- * whether real Supabase env vars are present. When a real Supabase repository
- * lands, this getter is where the SUPABASE_READY/PRODUCTION mapping gets refined.
+ * `canPersist` is true in every mode with a working repo path:
+ *   - DEMO_LOCAL    → Local* repos (localStorage),
+ *   - SUPABASE_READY / PRODUCTION → the Api* repos that route through the SERVER
+ *     data API (service-role behind apiGuard) onto the live Supabase tables.
+ * The ONLY offline mode is CONFIG_REQUIRED — config is incomplete, so the repos
+ * cannot reach a backend. (Before the data layer landed, SUPABASE_READY/PRODUCTION
+ * were throwing stubs; no longer — see appServices + the Api*Repository wiring.)
  */
 export function getPersistenceStatus(): PersistenceStatus {
   const mode = getAppMode();
-  const canPersist = mode === 'DEMO_LOCAL';
+  const canPersist = mode !== 'CONFIG_REQUIRED';
   const reason = canPersist
     ? ''
-    : `Persistenz offline (Modus ${mode} · DB: SUPABASE STUB). ` +
-      `Setze APP_MODE=DEMO_LOCAL für lokale Mock-Läufe, oder konfiguriere Supabase.`;
+    : `Persistenz offline (Modus ${mode}). Setze VITE_APP_MODE=SUPABASE_READY ` +
+      `(+ VITE_SUPABASE_URL/ANON_KEY) für echte Persistenz, oder DEMO_LOCAL für lokale Mock-Läufe.`;
   return { mode, canPersist, reason };
 }

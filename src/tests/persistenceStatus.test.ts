@@ -74,15 +74,18 @@ describe("getPersistenceStatus — mode-aware, actionable", () => {
     expect(status.reason.length).toBeGreaterThan(0);
     // Actionable: names the mode and points the operator at a fix.
     expect(status.reason).toContain("CONFIG_REQUIRED");
-    expect(status.reason).toContain("APP_MODE=DEMO_LOCAL");
+    expect(status.reason).toContain("SUPABASE_READY");
   });
 
-  it("every non-DEMO_LOCAL mode is blocked with a reason", () => {
-    for (const mode of ["PRODUCTION", "SUPABASE_READY", "PRODUCTION_NOT_READY"]) {
+  it("SUPABASE_READY / PRODUCTION: canPersist true (real data layer), no reason", () => {
+    // The data layer routes these modes through the server /api onto live Supabase,
+    // so persistence is genuinely available — CONFIG_REQUIRED is the only offline mode.
+    for (const mode of ["SUPABASE_READY", "PRODUCTION"]) {
       process.env.APP_MODE = mode;
       const status = getPersistenceStatus();
-      expect(status.canPersist).toBe(false);
-      expect(status.reason.length).toBeGreaterThan(0);
+      expect(status.mode).toBe(mode);
+      expect(status.canPersist).toBe(true);
+      expect(status.reason).toBe("");
     }
   });
 });
