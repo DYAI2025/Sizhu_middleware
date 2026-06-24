@@ -1,0 +1,11 @@
+import { readFileSync } from "node:fs";
+import { signJwtHS256 } from "../../server/lib/jwt";
+const env = readFileSync(new URL("../../.env", import.meta.url), "utf8");
+const g = (k: string) => env.split("\n").find((l) => l.startsWith(k + "="))?.slice(k.length + 1).trim().replace(/^["']|["']$/g, "") ?? "";
+const token = signJwtHS256({ sub: "diag", email: g("ADMIN_EMAIL_ALLOWLIST").split(",")[0], aal: "aal2", email_confirmed_at: "2024-01-01T00:00:00Z", exp: Math.floor(Date.now() / 1000) + 300 }, g("SUPABASE_JWT_SECRET"));
+const P = process.env.E2E_BASE || "https://sizhu.fufire.space";
+const h = { Authorization: `Bearer ${token}` };
+const rd = await fetch(`${P}/api/readiness`, { headers: h });
+console.log("readiness", rd.status, await rd.text());
+const pr = await fetch(`${P}/api/v1/products`, { headers: h });
+console.log("products", pr.status, await pr.text());
