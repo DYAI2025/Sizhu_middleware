@@ -42,15 +42,30 @@ import type { Font, FontCollection, Glyph } from "fontkit";
 // vitest all run from the project root, so cwd is the repo root.
 const REPO_ROOT = process.cwd();
 
-/** Default location of the (git-ignored) Noto Sans SC font binary. */
-export const DEFAULT_FONT_PATH = resolve(REPO_ROOT, "assets/fonts/NotoSansSC.ttf");
+/**
+ * Default font: a COMMITTED subset of Noto Sans SC (OFL) covering only the ~47 bazi-solo
+ * codepoints (~18KB). The full font stays git-ignored / is not deployed, so this small subset
+ * is what ships to prod (Railway) — the slice-1 fix for "render fail-closed because the font
+ * is absent". Glyph outlines are byte-identical to the full font's default (Thin) instance, so
+ * the render-back golden-hash (ST-7) still matches. Re-generate via:
+ *   pyftsubset assets/fonts/NotoSansSC.ttf --text-file=<bazi cjk> \
+ *     --output-file=assets/fonts/NotoSansSC-bazi.subset.ttf --no-hinting --desubroutinize
+ */
+export const DEFAULT_FONT_PATH = resolve(REPO_ROOT, "assets/fonts/NotoSansSC-bazi.subset.ttf");
 
 /** A4 @ 300dpi page, in pixels (210×297 mm). The renderer's fixed canvas. */
 export const A4_300DPI_WIDTH = 2480;
 export const A4_300DPI_HEIGHT = 3508;
 
-/** Below this size a "font" file is almost certainly an error page, not a real font. */
-const MIN_FONT_BYTES = 1024 * 1024;
+/**
+ * Below this size a "font" file is almost certainly an error page, not a real font. The COMMITTED
+ * prod subset (assets/fonts/NotoSansSC-bazi.subset.ttf) is ~18KB, so the floor sits well below that
+ * but above a typical 1–5KB HTML error page. The real structural validation is `fontkit.openSync`,
+ * which rejects any non-font regardless of size; this size gate is only a coarse pre-filter.
+ * (Was 1MB, which rejected the very prod subset committed for BLK-003 — the renderer fail-closed on
+ * its own font, so the subset could never load in prod.)
+ */
+const MIN_FONT_BYTES = 8 * 1024;
 
 /** A token the renderer can outline — the subset of an OverlayToken the renderer needs. */
 export interface RenderableToken {
@@ -158,6 +173,15 @@ function hex(cp: number): string {
   return "U+" + cp.toString(16).toUpperCase().padStart(4, "0");
 }
 
+/**
+ * Format a layout number for an SVG transform: trim to at most 4 decimals and drop a trailing
+ * `.0…`, so the transform string is compact and deterministic (no locale, no float noise like
+ * `0.30000000000000004`). Integers render bare.
+ */
+function fmt(n: number): string {
+  return Number(n.toFixed(4)).toString();
+}
+
 /** Escape a string for safe inclusion in an XML attribute value. */
 function xmlAttr(value: string): string {
   return value
@@ -168,32 +192,126 @@ function xmlAttr(value: string): string {
 }
 
 /**
- * A deterministic slice-1 grid: place token i into a single column, top-to-bottom, with a fixed
- * cell size, centered. A4-exact zone positioning is slice-2; this is a fixed template layout that
- * yields stable, distinct positions so the outlined paths are verifiable.
+ * Deterministic A4@300dpi ZONE/GRID layout (slice-2 — REAL positioning).
+ *
+ * WHY a wrapping `<g transform>` and NOT a baked-in path transform:
+ *   fontkit's `Path.scale()/translate()` are a NO-OP on the string `path.toSVG()` returns in this
+ *   version — re-reading the glyph and transforming the Path object does NOT change the emitted `d`,
+ *   so the slice-1 renderer drew every glyph at the font's native origin, STACKED (confirmed by
+ *   ST-5). We therefore position each glyph with an SVG GROUP wrapper —
+ *   `<g transform="translate(X,Y) scale(S,-S)"><path d="<RAW toSVG()>"/></g>` — and leave the inner
+ *   `<path d>` as the UNTRANSFORMED font outline. That is load-bearing: the render-back gate
+ *   (renderBackGate.ts) and the golden-hash (baziSoloReadyState.ts) recompute
+ *   `glyphForCodePoint(cp).path.toSVG()` and byte-compare it to the embedded `d`, so the `d` MUST
+ *   stay the raw outline. All layout lives in the group transform; baking it into `d` would break
+ *   both gates.
+ *
+ * Layout model: a fixed two-column grid mapped from each token's ZONE (falling back to plan order
+ * for any unknown/absent zone). Font outlines are Y-UP (origin at the baseline); SVG is Y-DOWN — the
+ * Y-flip is the `-S` in `scale(S, -S)` on the GROUP, and `translate(X, baselineY)` drops the glyph
+ * onto its cell baseline. Each cell gets a distinct (X, baselineY), so distinct tokens get distinct
+ * group transforms — real, verifiable layout (no longer origin-stacked).
  */
-const GRID_CELL = 320; // px per glyph cell at the chosen render size
-const GRID_TOP = 400; // px from the top of the page to the first cell baseline area
-const GRID_LEFT = (A4_300DPI_WIDTH - GRID_CELL) / 2; // centered single column
+const GRID_CELL = 280; // px: em box per glyph cell at the chosen render size
+const GRID_COL_GAP = 100; // px: horizontal gap between cells in a row
+const GRID_ROW_STEP = 320; // px: vertical distance between successive row baselines
+const GRID_TOP = 320; // px: baseline Y of the first row
+const GRID_MARGIN_X = 200; // px: left/right page margin
+/** Columns that fit across the A4 page within the margins (deterministic from the page geometry). */
+const COLS_PER_ROW = Math.max(
+  1,
+  Math.floor((A4_300DPI_WIDTH - 2 * GRID_MARGIN_X) / (GRID_CELL + GRID_COL_GAP)),
+);
 
-interface PlacedGlyph {
-  manifest: CodepointManifestEntry;
-  /** The transformed (positioned, Y-flipped, scaled) SVG path data for this glyph. */
-  d: string;
+/**
+ * Known overlay zones in on-page vertical order (top→bottom). A token's zone decides WHICH band it
+ * lands in; the value is only the ordering rank. Unknown / absent zones are appended after the known
+ * ones in first-seen plan order, so layout is always total and deterministic.
+ */
+const ZONE_ANCHOR: Readonly<Record<string, number>> = {
+  primary_year_pillar: 0,
+  stem_branch_detail: 1,
+  zodiac_animal: 2,
+  wuxing_phase: 3,
+};
+
+interface CellPos {
+  x: number;
+  baselineY: number;
+}
+
+/** Resolve a cell's top-left X and baseline Y from its (row, col) — row-major, COLS_PER_ROW wide. */
+function cellPosition(row: number, col: number): CellPos {
+  return {
+    x: GRID_MARGIN_X + col * (GRID_CELL + GRID_COL_GAP),
+    baselineY: GRID_TOP + row * GRID_ROW_STEP,
+  };
 }
 
 /**
- * Outline one hanzi character to a positioned SVG path `d`, failing closed on .notdef.
+ * Assign each glyph (indexed in plan order) a (row, col) by ZONE BAND. Zones are stacked vertically
+ * in ZONE_ANCHOR order (known zones first, then any unknown/absent zone in first-seen plan order);
+ * within a zone, glyphs fill columns left→right and wrap to the next row; each zone is followed by a
+ * gap row. Deterministic, total, collision-free: distinct glyphs always get distinct cells, and a
+ * token's zone drives WHERE on the A4 page it lands. The returned positions are in plan order (i.e.
+ * positions[i] is the cell for the i-th glyph), so the SVG/manifest stay 1:1 in plan order.
+ */
+function assignZonePositions(zones: readonly (string | undefined)[]): CellPos[] {
+  const order: (string | undefined)[] = [];
+  const seen = new Set<string | undefined>();
+  const present = new Set(zones);
+  for (const [zone] of Object.entries(ZONE_ANCHOR).sort((a, b) => a[1] - b[1])) {
+    if (present.has(zone)) {
+      order.push(zone);
+      seen.add(zone);
+    }
+  }
+  for (const zone of zones) {
+    if (!seen.has(zone)) {
+      order.push(zone);
+      seen.add(zone);
+    }
+  }
+
+  const positions: CellPos[] = new Array(zones.length);
+  let row = 0;
+  for (const zone of order) {
+    let col = 0;
+    for (let i = 0; i < zones.length; i++) {
+      if (zones[i] !== zone) continue;
+      if (col >= COLS_PER_ROW) {
+        row += 1;
+        col = 0;
+      }
+      positions[i] = cellPosition(row, col);
+      col += 1;
+    }
+    row += 2; // the zone's last row + one gap row before the next zone
+  }
+  return positions;
+}
+
+interface PlacedGlyph {
+  manifest: CodepointManifestEntry;
+  /** The RAW, UNTRANSFORMED glyph outline (`path.toSVG()`) — what the render-back gate verifies. */
+  d: string;
+  /** The SVG group transform that POSITIONS this glyph's raw outline on the A4 canvas. */
+  transform: string;
+}
+
+/**
+ * Outline one hanzi character to its RAW SVG path `d` PLUS a positioning group transform, failing
+ * closed on .notdef.
  *
- * Font outlines are Y-UP in font units (origin at the baseline); SVG is Y-DOWN. We scale the em
- * to the grid cell and flip Y, then translate into the cell so the placement is deterministic and
- * each distinct glyph yields a distinct `d`.
+ * The `d` is the font's untransformed outline (so render-back/golden stay byte-stable); the returned
+ * `transform` (`translate(x, baselineY) scale(s, -s)`) is what actually places + Y-flips + scales the
+ * glyph into its grid cell when wrapped in a `<g>`.
  */
 function outlineChar(
   font: Font,
   char: string,
   key: string,
-  cellIndex: number,
+  pos: CellPos,
 ): PlacedGlyph {
   const codepoint = char.codePointAt(0) as number;
   const glyph: Glyph = font.glyphForCodePoint(codepoint);
@@ -207,23 +325,21 @@ function outlineChar(
 
   const unitsPerEm = font.unitsPerEm || 1000;
   const scale = GRID_CELL / unitsPerEm;
-  const x = GRID_LEFT;
-  // Baseline Y for this cell. Y-flip: SVG y = baseline - (fontY * scale), achieved below via
-  // path.scale(scale, -scale) (flips Y) then translate to the cell baseline.
-  const baselineY = GRID_TOP + cellIndex * GRID_CELL + GRID_CELL;
 
-  // Clone the path by transforming a fresh copy: scale (with Y-flip) then translate into place.
-  // fontkit's Path.scale/translate mutate + return the path, so re-read the glyph for an unshared
-  // path object (glyphForCodePoint returns a fresh glyph each call).
-  const path = font.glyphForCodePoint(codepoint).path;
-  path.scale(scale, -scale); // Y-flip so the Y-up outline becomes Y-down for SVG
-  path.translate(x, baselineY);
-  const d = path.toSVG();
+  // The RAW outline — NOT transformed. fontkit's Path.scale/translate are a no-op on toSVG() here,
+  // and (critically) the render-back gate + golden-hash byte-compare this against a fresh
+  // glyphForCodePoint(cp).path.toSVG(), so it MUST remain the untransformed outline.
+  const d = font.glyphForCodePoint(codepoint).path.toSVG();
+
+  // Position via the GROUP transform: translate to the cell baseline, then scale with a Y-flip
+  // (`-scale`) so the Y-up font outline renders Y-down in SVG. Order matters: translate ∘ scale.
+  const transform = `translate(${fmt(pos.x)},${fmt(pos.baselineY)}) scale(${fmt(scale)},${fmt(-scale)})`;
 
   const hasPath = typeof d === "string" && d.trim().length > 0;
   return {
     manifest: { key, char, codepoint, glyphId: glyph.id, hasPath },
     d,
+    transform,
   };
 }
 
@@ -242,27 +358,31 @@ export function renderBaziSoloSvg(
 ): RenderBaziSoloResult {
   const font = openFont(opts.fontPath ?? DEFAULT_FONT_PATH);
 
-  const placed: PlacedGlyph[] = [];
-  let cellIndex = 0;
+  // Flatten plan tokens → one entry per glyph (char + token key + zone), in PLAN order. A token may
+  // be multi-char (e.g. a 2-char pillar); each char is outlined as its own path/cell. NFC-normalize
+  // so the looked-up codepoint matches the canonical form (mirrors the spike).
+  const glyphs: { char: string; key: string; zone?: string }[] = [];
   for (const token of plan.tokens) {
-    // NFC-normalize so the codepoint we look up matches the canonical form (mirrors the spike).
-    const normalized = token.hanzi.normalize("NFC");
-    // A token may be multi-char (e.g. a 2-char pillar); outline each char as its own path/cell.
-    for (const char of Array.from(normalized)) {
-      placed.push(outlineChar(font, char, token.key, cellIndex));
-      cellIndex += 1;
+    for (const char of Array.from(token.hanzi.normalize("NFC"))) {
+      glyphs.push({ char, key: token.key, zone: token.zone });
     }
   }
 
-  const paths = placed
-    .map((p) => `  <path d="${xmlAttr(p.d)}" fill="#000000" />`)
+  // Position by ZONE BAND (deterministic, collision-free); positions are in plan order.
+  const positions = assignZonePositions(glyphs.map((g) => g.zone));
+  const placed: PlacedGlyph[] = glyphs.map((g, i) => outlineChar(font, g.char, g.key, positions[i]));
+
+  // Emit in PLAN order: one `<g transform>` (the layout) wrapping the RAW `<path d>` (the outline the
+  // render-back gate byte-verifies). Document order == manifest order, so the gate stays 1:1.
+  const nodes = placed
+    .map((p) => `  <g transform="${xmlAttr(p.transform)}"><path d="${xmlAttr(p.d)}" fill="#000000" /></g>`)
     .join("\n");
 
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" ` +
     `width="${A4_300DPI_WIDTH}" height="${A4_300DPI_HEIGHT}" ` +
     `viewBox="0 0 ${A4_300DPI_WIDTH} ${A4_300DPI_HEIGHT}">\n` +
-    paths +
+    nodes +
     `\n</svg>\n`;
 
   return {

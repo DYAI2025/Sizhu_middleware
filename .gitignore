@@ -22,3 +22,6 @@ reports/mutation/
 # spike per scripts/smoke/cjk-render-spike.ts header.
 assets/fonts/*.ttf
 assets/fonts/*.otf
+# EXCEPTION: the tiny (~18KB) bazi-solo SUBSET IS committed — it must ship to prod (the full
+# font is not deployed, which left the render path fail-closed/BLOCKED on Railway). slice-2.
+!assets/fonts/NotoSansSC-bazi.subset.ttf
