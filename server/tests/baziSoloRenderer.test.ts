@@ -148,7 +148,12 @@ describeIfFont("renderBaziSoloSvg", () => {
     const groupCount = (svg.match(/<g\b[^>]*\btransform="/g) ?? []).length;
     const pathCount = (svg.match(/<path\b/g) ?? []).length;
     expect(groupCount).toBe(pathCount);
-    expect(groupCount).toBe(plan.tokens.length);
+    // One <g>/<path> per GLYPH (a token may be multi-char), so count chars across tokens — not tokens.
+    const glyphCount = plan.tokens.reduce(
+      (n, t) => n + Array.from(t.hanzi.normalize("NFC")).length,
+      0,
+    );
+    expect(groupCount).toBe(glyphCount);
 
     // Transforms are DISTINCT — the slice-1 bug placed every glyph at the font origin (all identical).
     const transforms = Array.from(svg.matchAll(/<g\b[^>]*\btransform="([^"]+)"/g)).map((m) => m[1]);
@@ -168,6 +173,27 @@ describeIfFont("renderBaziSoloSvg", () => {
     // Zone rank order ⇒ strictly increasing baseline Y (further down the A4 page).
     expect(ys[0]).toBeLessThan(ys[1]);
     expect(ys[1]).toBeLessThan(ys[2]);
+  });
+
+  it("(i) S2-A4: a MULTI-CHAR token outlines + positions one glyph PER CHAR (not per token)", () => {
+    // 戊午 as a SINGLE 2-char token ⇒ 2 glyphs, 2 groups, 2 manifest rows, distinct cells. Guards the
+    // (f) glyph-vs-token count and the renderer's deliberate multi-char support.
+    const plan: RenderableOverlayPlan = {
+      tokens: [{ key: "year_pillar_hanzi", hanzi: "戊午", zone: "primary_year_pillar", priority: 1 }],
+      yearPillarHanzi: "戊午",
+      isBeforeLichun: false,
+      codepoints: [cp("戊"), cp("午")],
+      variantId: "multichar",
+    };
+    const { svg, codepointManifest } = renderBaziSoloSvg(plan, { fontPath: FONT_PATH });
+
+    expect(codepointManifest).toHaveLength(2);
+    expect(codepointManifest.map((e) => e.char)).toEqual(["戊", "午"]);
+    expect((svg.match(/<path\b/g) ?? []).length).toBe(2);
+
+    const transforms = Array.from(svg.matchAll(/<g\b[^>]*\btransform="([^"]+)"/g)).map((m) => m[1]);
+    expect(transforms).toHaveLength(2);
+    expect(new Set(transforms).size).toBe(2); // the two chars of one token get DISTINCT cells
   });
 });
 

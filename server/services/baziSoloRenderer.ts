@@ -212,28 +212,40 @@ function xmlAttr(value: string): string {
  * onto its cell baseline. Each cell gets a distinct (X, baselineY), so distinct tokens get distinct
  * group transforms — real, verifiable layout (no longer origin-stacked).
  */
-const GRID_CELL = 280; // px: em box per glyph cell at the chosen render size
-const GRID_COL_GAP = 100; // px: horizontal gap between cells in a row
-const GRID_ROW_STEP = 320; // px: vertical distance between successive row baselines
-const GRID_TOP = 320; // px: baseline Y of the first row
-const GRID_MARGIN_X = 200; // px: left/right page margin
+/**
+ * The SINGLE source for the A4@300dpi zone-band geometry. Centralized so the renderer, its tests, and
+ * any future caller share ONE set of layout assumptions instead of duplicating magic numbers — tweak a
+ * design value (cell size, spacing, margins, or add a zone) in exactly one place. Exported for tests.
+ */
+export const A4_LAYOUT = {
+  /** px: em box per glyph cell at the chosen render size (also the glyph scale denominator). */
+  cell: 280,
+  /** px: horizontal gap between cells in a row. */
+  colGap: 100,
+  /** px: vertical distance between successive row baselines. */
+  rowStep: 320,
+  /** px: baseline Y of the first row. */
+  top: 320,
+  /** px: left/right page margin. */
+  marginX: 200,
+  /**
+   * Known overlay zones in on-page vertical order (top→bottom). A token's zone decides WHICH band it
+   * lands in; the value is only the ordering rank. Unknown/absent zones are appended after the known
+   * ones in first-seen plan order, so layout is always total and deterministic.
+   */
+  zoneOrder: {
+    primary_year_pillar: 0,
+    stem_branch_detail: 1,
+    zodiac_animal: 2,
+    wuxing_phase: 3,
+  } as Readonly<Record<string, number>>,
+} as const;
+
 /** Columns that fit across the A4 page within the margins (deterministic from the page geometry). */
 const COLS_PER_ROW = Math.max(
   1,
-  Math.floor((A4_300DPI_WIDTH - 2 * GRID_MARGIN_X) / (GRID_CELL + GRID_COL_GAP)),
+  Math.floor((A4_300DPI_WIDTH - 2 * A4_LAYOUT.marginX) / (A4_LAYOUT.cell + A4_LAYOUT.colGap)),
 );
-
-/**
- * Known overlay zones in on-page vertical order (top→bottom). A token's zone decides WHICH band it
- * lands in; the value is only the ordering rank. Unknown / absent zones are appended after the known
- * ones in first-seen plan order, so layout is always total and deterministic.
- */
-const ZONE_ANCHOR: Readonly<Record<string, number>> = {
-  primary_year_pillar: 0,
-  stem_branch_detail: 1,
-  zodiac_animal: 2,
-  wuxing_phase: 3,
-};
 
 interface CellPos {
   x: number;
@@ -243,14 +255,14 @@ interface CellPos {
 /** Resolve a cell's top-left X and baseline Y from its (row, col) — row-major, COLS_PER_ROW wide. */
 function cellPosition(row: number, col: number): CellPos {
   return {
-    x: GRID_MARGIN_X + col * (GRID_CELL + GRID_COL_GAP),
-    baselineY: GRID_TOP + row * GRID_ROW_STEP,
+    x: A4_LAYOUT.marginX + col * (A4_LAYOUT.cell + A4_LAYOUT.colGap),
+    baselineY: A4_LAYOUT.top + row * A4_LAYOUT.rowStep,
   };
 }
 
 /**
  * Assign each glyph (indexed in plan order) a (row, col) by ZONE BAND. Zones are stacked vertically
- * in ZONE_ANCHOR order (known zones first, then any unknown/absent zone in first-seen plan order);
+ * in A4_LAYOUT.zoneOrder (known zones first, then any unknown/absent zone in first-seen plan order);
  * within a zone, glyphs fill columns left→right and wrap to the next row; each zone is followed by a
  * gap row. Deterministic, total, collision-free: distinct glyphs always get distinct cells, and a
  * token's zone drives WHERE on the A4 page it lands. The returned positions are in plan order (i.e.
@@ -260,7 +272,7 @@ function assignZonePositions(zones: readonly (string | undefined)[]): CellPos[] 
   const order: (string | undefined)[] = [];
   const seen = new Set<string | undefined>();
   const present = new Set(zones);
-  for (const [zone] of Object.entries(ZONE_ANCHOR).sort((a, b) => a[1] - b[1])) {
+  for (const [zone] of Object.entries(A4_LAYOUT.zoneOrder).sort((a, b) => a[1] - b[1])) {
     if (present.has(zone)) {
       order.push(zone);
       seen.add(zone);
@@ -324,12 +336,13 @@ function outlineChar(
   }
 
   const unitsPerEm = font.unitsPerEm || 1000;
-  const scale = GRID_CELL / unitsPerEm;
+  const scale = A4_LAYOUT.cell / unitsPerEm;
 
-  // The RAW outline — NOT transformed. fontkit's Path.scale/translate are a no-op on toSVG() here,
-  // and (critically) the render-back gate + golden-hash byte-compare this against a fresh
-  // glyphForCodePoint(cp).path.toSVG(), so it MUST remain the untransformed outline.
-  const d = font.glyphForCodePoint(codepoint).path.toSVG();
+  // The RAW outline — NOT transformed (reuse the glyph already fetched above; one lookup per char).
+  // It MUST stay the untransformed outline: the render-back gate + golden-hash independently recompute
+  // glyphForCodePoint(cp).path.toSVG() and byte-compare it to this `d`. All layout lives in the group
+  // transform below, never baked into `d`.
+  const d = glyph.path.toSVG();
 
   // Position via the GROUP transform: translate to the cell baseline, then scale with a Y-flip
   // (`-scale`) so the Y-up font outline renders Y-down in SVG. Order matters: translate ∘ scale.
