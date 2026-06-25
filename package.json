@@ -26,7 +26,8 @@
     "smoke:bazistore": "tsx scripts/smoke/baziStore-live-smoke.ts",
     "smoke:products": "tsx scripts/smoke/products-live-smoke.ts",
     "smoke:datalayer": "tsx scripts/smoke/datalayer-live-smoke.ts",
-    "smoke:e2e-local": "tsx scripts/smoke/local-stack-e2e.ts"
+    "smoke:e2e-local": "tsx scripts/smoke/local-stack-e2e.ts",
+    "smoke:bazi-dod": "tsx scripts/smoke/baziSolo-dod-smoke.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
