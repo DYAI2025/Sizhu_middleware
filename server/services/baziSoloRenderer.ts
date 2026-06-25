@@ -272,7 +272,7 @@ function assignZonePositions(zones: readonly (string | undefined)[]): CellPos[] 
   const order: (string | undefined)[] = [];
   const seen = new Set<string | undefined>();
   const present = new Set(zones);
-  for (const [zone] of Object.entries(A4_LAYOUT.zoneOrder).sort((a, b) => a[1] - b[1])) {
+  for (const [zone] of Object.entries(A4_LAYOUT.zoneOrder).sort(([, rankA], [, rankB]) => rankA - rankB)) {
     if (present.has(zone)) {
       order.push(zone);
       seen.add(zone);
