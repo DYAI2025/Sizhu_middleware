@@ -18,16 +18,26 @@
  * Both `ready_for_shipping` AND `BLOCKED` are a PASS — the DoD is about the flow being
  * DETERMINISTIC and PERSISTED, never about a particular outcome.
  *
- * KNOWN LIVE LIMITATION (surfaced 2026-06-25 by an adversarial multi-subject probe, P7/P9 — do
- * NOT launder): against the REAL FuFire boundary, EVERY probed subject (near-Lichun, mid-year,
- * mid-autumn) blocks at compile with `LICHUN_PILLAR_UNVERIFIED` — the live `bazi` response carries
- * no verifiable `data.transition.is_before_lichun` (see lichunPillarGuard + fufireResponseInterpreter),
- * so the lichun hard-gate can never confirm the year pillar. Consequence: `ready_for_shipping` is
- * currently UNREACHABLE live, so the live run only ever exercises the BLOCKED branch. This smoke
- * therefore proves the deterministic+persisted flow, NOT the green (ready) path. Making `ready`
- * reachable is upstream work (REQ-F-005/006: a verifiable solar-term transition from FuFire), not a
- * defect of this smoke — the fail-closed BLOCK is the CORRECT no-mock behavior (never ship an
- * unverified year pillar to a permanent print).
+ * KNOWN LIVE LIMITATION (surfaced 2026-06-25, root cause CORRECTED 2026-06-26 with live evidence,
+ * P7/P9 — do NOT launder): against the REAL FuFire boundary, EVERY probed subject (near-Lichun,
+ * mid-year, mid-autumn) blocks at compile with `LICHUN_PILLAR_UNVERIFIED`.
+ *
+ *   CORRECTED ROOT CAUSE (do NOT say "FuFire delivers no transition.is_before_lichun" — that is
+ *   FALSE). FuFire DOES deliver the year-pillar fields AND the lichun side. Live for 1990-02-06:
+ *     pillars.year.stamm = "Geng"          (present)
+ *     pillars.year.zweig = "Wu"            (present)
+ *     transition.is_before_lichun = false  (present)
+ *     dates.lichun_local = "1990-02-04T10:14:00+08:00"  (present)
+ *     derivation_trace.day.day_anchor_evidence.anchor_verification = "unverified"  (present, unverified)
+ *   The block comes from the guard ADDITIONALLY requiring that last field === "verified", which is
+ *   live "unverified" for every tested subject. That field is a DAY-pillar anchor status — NOT a
+ *   year/lichun field. So `ready_for_shipping` is UNREACHABLE live PER THE CURRENT GUARD POLICY, not
+ *   because year/lichun data is missing.
+ *
+ * This smoke therefore proves ONLY the deterministic + persisted BLOCKED path — it does NOT prove
+ * `ready_for_shipping`. Whether to keep the strict policy (day-anchor must be verified) or split the
+ * day-anchor gate from the year/lichun gate is an OPEN product decision (REQ-F-005/006/010); until it
+ * is made, the fail-closed BLOCK is the correct no-mock behavior.
  *
  * The smoke FAILS only on:
  *   - an unexpected throw / hang (the pipeline must never crash),
@@ -263,10 +273,11 @@ async function runLive(): Promise<void> {
     console.log(`DOD VERDICT: ${summary.status} (persisted ✓)`);
     if (summary.status === "BLOCKED") {
       console.log(
-        "NOTE            : this proves the DETERMINISTIC + PERSISTED flow, NOT the ready path.\n" +
-          "                  The live FuFire boundary blocks all probed subjects on " +
-          `${summary.reason ?? "a compile gate"}; ready_for_shipping is currently UNREACHABLE live\n` +
-          "                  (upstream — a verifiable solar-term transition, REQ-F-005/006). See the file header.",
+        "NOTE            : this proves the DETERMINISTIC + PERSISTED BLOCKED path, NOT ready_for_shipping.\n" +
+          `                  Reason ${summary.reason ?? "(compile gate)"}: the year-pillar + transition.is_before_lichun\n` +
+          "                  ARE present from FuFire; the guard blocks because day_anchor_evidence.anchor_verification\n" +
+          "                  is \"unverified\" (a DAY-pillar field). ready is unreachable PER CURRENT GUARD POLICY,\n" +
+          "                  not because year/lichun data is missing — an open gate-semantics decision. See the header.",
       );
     }
   } finally {
