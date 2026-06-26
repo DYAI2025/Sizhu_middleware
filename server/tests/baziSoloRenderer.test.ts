@@ -141,19 +141,17 @@ describeIfFont("renderBaziSoloSvg", () => {
   });
 
   it("(f) S2-A4: every glyph is positioned via its OWN <g transform> — DISTINCT, never origin-stacked", () => {
-    const plan = buildPlan();
-    const { svg } = renderBaziSoloSvg(plan, { fontPath: FONT_PATH });
+    const { svg, codepointManifest } = renderBaziSoloSvg(buildPlan(), { fontPath: FONT_PATH });
 
     // One positioning <g transform> per <path> (the slice-1 renderer drew bare, origin-stacked paths).
     const groupCount = (svg.match(/<g\b[^>]*\btransform="/g) ?? []).length;
     const pathCount = (svg.match(/<path\b/g) ?? []).length;
     expect(groupCount).toBe(pathCount);
-    // One <g>/<path> per GLYPH (a token may be multi-char), so count chars across tokens — not tokens.
-    const glyphCount = plan.tokens.reduce(
-      (n, t) => n + Array.from(t.hanzi.normalize("NFC")).length,
-      0,
-    );
-    expect(groupCount).toBe(glyphCount);
+    // One <g>/<path> per GLYPH the renderer actually outlined — the manifest IS that per-glyph audit
+    // trail (one row per emitted codepoint). Tying the count to the manifest (not a re-derivation from
+    // the plan string) means it tracks the real glyph set: a multi-char token yields >1 (see test (i)),
+    // never collapsing to one-per-token.
+    expect(groupCount).toBe(codepointManifest.length);
 
     // Transforms are DISTINCT — the slice-1 bug placed every glyph at the font origin (all identical).
     const transforms = Array.from(svg.matchAll(/<g\b[^>]*\btransform="([^"]+)"/g)).map((m) => m[1]);
