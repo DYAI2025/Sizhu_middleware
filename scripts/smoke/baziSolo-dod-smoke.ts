@@ -42,6 +42,8 @@
  * The smoke FAILS only on:
  *   - an unexpected throw / hang (the pipeline must never crash),
  *   - a status that is not EXACTLY one of the two terminal values,
+ *   - in REAL mode, a FuFire-boundary block (`FUFIRE_NOT_READY` or
+ *     `FUFIRE_BAZI_OPERATION_FAILED`) or missing raw `bazi` response,
  *   - the run not being read back (read-back via a fresh store call → not persisted),
  *   - a persisted record whose status/reason/artifact does not match the in-memory summary.
  *
@@ -61,6 +63,7 @@ import {
   runBaziSoloPipeline,
   InMemoryBaZiSoloStore,
   type BaZiSoloStore,
+  type BaziSoloRunRecord,
   type BaziSoloPipelineSummary,
 } from "../../server/services/baziSoloPipeline";
 import type {
@@ -168,7 +171,7 @@ function assertTerminal(summary: BaziSoloPipelineSummary): void {
 async function assertPersisted(
   store: BaZiSoloStore,
   summary: BaziSoloPipelineSummary,
-): Promise<void> {
+): Promise<BaziSoloRunRecord> {
   const back = await store.getRun(summary.runId);
   if (!back) {
     throw new Error(
@@ -191,6 +194,42 @@ async function assertPersisted(
     if (!hasReason && !hasGates) {
       throw new Error("FAIL: BLOCKED run persisted WITHOUT a reason or failedGates.");
     }
+  }
+
+  return back;
+}
+
+/**
+ * Live-mode boundary proof: the real-boundary smoke is allowed to pass a downstream
+ * deterministic BLOCKED result (for example today's documented Lichun/day-anchor gate),
+ * but it must NOT pass when the FuFire boundary itself was not ready or did not return
+ * an honest raw `bazi` response. That would only prove Supabase persisted a pre-boundary
+ * rejection, not that the headline smoke reached the live FuFire data boundary.
+ */
+function assertLiveFuFireBoundaryReady(record: BaziSoloRunRecord): void {
+  const boundaryBlockReasons = new Set([
+    "FUFIRE_NOT_READY",
+    "FUFIRE_BAZI_OPERATION_FAILED",
+  ]);
+
+  if (record.status === "BLOCKED" && record.reason && boundaryBlockReasons.has(record.reason)) {
+    throw new Error(
+      `FAIL: live smoke blocked before a READY FuFire bazi boundary (${record.reason}). ` +
+        "Check FuFire credentials/config; this DoD only allows downstream compile/render/ready-gate blocks.",
+    );
+  }
+
+  const hasBaziResponse = record.rawBundle.responses.some(
+    (response) =>
+      response &&
+      typeof response === "object" &&
+      (response as { operation?: unknown }).operation === "bazi",
+  );
+  if (!hasBaziResponse) {
+    throw new Error(
+      "FAIL: live smoke did not persist an honest raw FuFire `bazi` response. " +
+        "A persisted BLOCKED row without live bazi data is not a real-boundary DoD pass.",
+    );
   }
 }
 
@@ -266,9 +305,11 @@ async function runLive(): Promise<void> {
     describeOutcome(summary);
 
     // Read it back through the SAME store contract (a real DB round-trip) and assert persisted.
-    await assertPersisted(store, summary);
+    const persisted = await assertPersisted(store, summary);
+    assertLiveFuFireBoundaryReady(persisted);
 
     console.log("read-back       : run round-tripped from Supabase ✓");
+    console.log("fufire boundary : READY bazi response persisted ✓");
     console.log("─────────────────────────────────────────────────────────────");
     console.log(`DOD VERDICT: ${summary.status} (persisted ✓)`);
     if (summary.status === "BLOCKED") {
